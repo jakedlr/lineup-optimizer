@@ -12,6 +12,7 @@ from ..matching import Config
 from ..models import BookMarket
 from .http import Http, in_window, parse_time
 
+# Public app key FanDuel's own website sends with every odds request; not a personal credential.
 API_KEY = "FhMFpcPWXMeyZxOx"
 LEAGUE = "https://sbapi.{state}.sportsbook.fanduel.com/api/content-managed-page?page=CUSTOM&customPageId={page}&_ak={key}&timezone=America/New_York"
 EVENT = "https://sbapi.{state}.sportsbook.fanduel.com/api/event-page?_ak={key}&eventId={event}&tab={tab}"

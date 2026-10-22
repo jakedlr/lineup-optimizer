@@ -58,7 +58,8 @@ such as tacos.
 ### Install
 
 ```bash
-cd prizepicks-optimizer
+git clone https://github.com/jakedlr/lineup-optimizer.git
+cd lineup-optimizer
 python3 -m venv .venv
 .venv/bin/pip install -e ".[dev]"
 .venv/bin/python -m pytest            # optional: check everything works
@@ -81,7 +82,8 @@ the stealth browser in testing. The reliable route is to save the board from you
    `https://api.prizepicks.com/projections?per_page=1000&single_stat=true&game_mode=pickem`
    and complete the "verify you're human" check if one appears.
 3. Press **Ctrl+S** and save it as `samples/projections.json` in this folder. On WSL the path is
-   `\\wsl.localhost\Ubuntu\home\<you>\prizepicks-optimizer\samples\projections.json`.
+   `\\wsl.localhost\Ubuntu\home\<you>\lineup-optimizer\samples\projections.json`
+   (adjust for your distro and clone location).
 
    If that page won't load: open DevTools (**F12**) on app.prizepicks.com, go to **Network**,
    filter for `projections`, refresh, then right-click the request → **Copy → Copy response**
