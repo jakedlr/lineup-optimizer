@@ -1,0 +1,44 @@
+{
+  "_note": "Sportsbook adapter config. Map each book's market identifiers to canonical stats (see stats.json). 'state' is the regional API host used for odds.",
+  "draftkings": {
+    "state": "nj",
+    "sports": {
+      "NFL": {"league": 88808, "subcategories": {
+        "Pass Yards O/U": "pass_yards", "Pass TDs O/U": "pass_tds", "Pass Attempts O/U": "pass_attempts",
+        "Completions O/U": "pass_completions", "Interceptions O/U": "pass_ints", "Pass + Rush Yards O/U": "pass_rush_yards",
+        "Longest Completion O/U": "longest_completion", "Rush Yards O/U": "rush_yards", "Rush Attempts O/U": "rush_attempts",
+        "Rush + Rec Yards O/U": "rush_rec_yards", "Longest Rush O/U": "longest_rush", "Rec Yards O/U": "rec_yards",
+        "Receptions O/U": "receptions", "Longest Reception O/U": "longest_reception"}},
+      "NBA": {"league": 42648, "subcategories": {
+        "Points O/U": "points", "Rebounds O/U": "rebounds", "Assists O/U": "assists", "Threes O/U": "threes",
+        "Steals O/U": "steals", "Blocks O/U": "blocks", "Steals + Blocks O/U": "blocks_steals",
+        "Pts + Reb + Ast O/U": "pts_rebs_asts", "Pts + Reb O/U": "pts_rebs", "Pts + Ast O/U": "pts_asts", "Ast + Reb O/U": "rebs_asts"}},
+      "NHL": {"league": 42133, "subcategories": {
+        "Shots on Goal O/U": "shots_on_goal", "Points O/U": "points", "Assists O/U": "assists",
+        "Blocks O/U": "blocked_shots", "Saves O/U": "saves"}},
+      "MLB": {"league": 84240, "subcategories": {
+        "Strikeouts Thrown O/U": "pitcher_strikeouts", "Hits Allowed O/U": "hits_allowed", "Earned Runs Allowed O/U": "earned_runs",
+        "Walks Allowed O/U": "walks_allowed", "Outs Recorded O/U": "pitching_outs", "Hits O/U": "hits", "Total Bases O/U": "total_bases",
+        "Runs O/U": "runs", "RBIs O/U": "rbis", "Hits + Runs + RBIs O/U": "hits_runs_rbis", "Singles O/U": "singles",
+        "Doubles O/U": "doubles", "Stolen Bases O/U": "stolen_bases", "Walks (Batter) O/U": "batter_walks"}}
+    }
+  },
+  "fanduel": {
+    "state": "nj",
+    "_markets_note": "Keys are FanDuel marketType with the per-player letter removed and any _HIGH/_MEDIUM/_LOW suffix dropped, e.g. PLAYER_X_PASSING_YARDS_HIGH -> PLAYER_PASSING_YARDS.",
+    "sports": {
+      "NFL": {"page": "nfl", "tabs": ["passing-props", "receiving-props", "rushing-props"], "markets": {
+        "PLAYER_PASSING_YARDS": "pass_yards", "PLAYER_PASSING_TOUCHDOWNS": "pass_tds", "PLAYER_RUSHING_YARDS": "rush_yards",
+        "PLAYER_RECEIVING_YARDS": "rec_yards", "PLAYER_RECEPTIONS": "receptions", "PLAYER_RUSHING_+_RECEIVING_YARDS": "rush_rec_yards"}},
+      "NBA": {"page": "nba", "tabs": ["player-points", "player-rebounds", "player-assists", "player-threes", "player-combos", "player-defense"], "markets": {
+        "PLAYER_TOTAL_POINTS": "points", "PLAYER_TOTAL_REBOUNDS": "rebounds", "PLAYER_TOTAL_ASSISTS": "assists",
+        "PLAYER_TOTAL_MADE_3_POINT_FIELD_GOALS": "threes", "PLAYER_TOTAL_STEALS": "steals", "PLAYER_TOTAL_BLOCKS": "blocks",
+        "PLAYER_TOTAL_POINTS_+_REB_+_AST": "pts_rebs_asts", "PLAYER_TOTAL_POINTS_+_REBOUNDS": "pts_rebs",
+        "PLAYER_TOTAL_POINTS_+_ASSISTS": "pts_asts", "PLAYER_TOTAL_REBOUNDS_+_ASSISTS": "rebs_asts"}},
+      "NHL": {"page": "nhl", "tabs": ["shots", "goalies", "points-assists"], "markets": {
+        "PLAYER_TOTAL_SHOTS": "shots_on_goal", "PLAYER_TOTAL_SAVES": "saves"}},
+      "MLB": {"page": "mlb", "tabs": ["pitcher-props", "batter-props"], "markets": {
+        "PITCHER_TOTAL_STRIKEOUTS": "pitcher_strikeouts"}}
+    }
+  }
+}

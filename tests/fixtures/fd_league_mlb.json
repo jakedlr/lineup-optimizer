@@ -1,0 +1,36 @@
+{
+ "attachments": {
+  "events": {
+   "32041755": {
+    "eventId": 32041755,
+    "name": "MLB Player Awards",
+    "eventTypeId": 7511,
+    "competitionId": 12551860,
+    "countryCode": "US",
+    "openDate": "2027-01-19T20:48:21.000Z",
+    "videoAvailable": false,
+    "statsAvailable": false
+   },
+   "34821316": {
+    "eventId": 34821316,
+    "name": "MLB Futures",
+    "eventTypeId": 7511,
+    "competitionId": 12765173,
+    "countryCode": "GB",
+    "openDate": "2026-10-31T00:00:00.000Z",
+    "videoAvailable": false,
+    "statsAvailable": false
+   },
+   "36214758": {
+    "eventId": 36214758,
+    "name": "Tampa Bay Rays (N Martinez) @ Milwaukee Brewers (J Misiorowski)",
+    "eventTypeId": 7511,
+    "competitionId": 11196870,
+    "countryCode": "GB",
+    "openDate": "2026-10-24T00:00:00.000Z",
+    "videoAvailable": false,
+    "statsAvailable": false
+   }
+  }
+ }
+}

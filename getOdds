@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+# Run the PrizePicks EV optimizer from this project's virtualenv.
+DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PY="$DIR/.venv/bin/python"
+if [ ! -x "$PY" ]; then
+  echo "error: $DIR/.venv not found; see README.md 'Setup'" >&2
+  exit 1
+fi
+PYTHONPATH="$DIR/src" exec "$PY" -m ppopt.cli "$@"

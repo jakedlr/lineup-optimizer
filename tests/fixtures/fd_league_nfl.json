@@ -1,0 +1,36 @@
+{
+ "attachments": {
+  "events": {
+   "34100802": {
+    "eventId": 34100802,
+    "name": "NFL Futures",
+    "eventTypeId": 6423,
+    "competitionId": 12721217,
+    "countryCode": "US",
+    "openDate": "2026-03-06T18:48:05.000Z",
+    "videoAvailable": false,
+    "statsAvailable": false
+   },
+   "36190129": {
+    "eventId": 36190129,
+    "name": "New England Patriots @ Chicago Bears",
+    "eventTypeId": 6423,
+    "competitionId": 12282733,
+    "countryCode": "GB",
+    "openDate": "2026-10-23T00:16:00.000Z",
+    "videoAvailable": true,
+    "statsAvailable": true
+   },
+   "36215323": {
+    "eventId": 36215323,
+    "name": "Chicago Bears @ Seattle Seahawks",
+    "eventTypeId": 6423,
+    "competitionId": 12282733,
+    "countryCode": "GB",
+    "openDate": "2026-11-03T01:16:00.000Z",
+    "videoAvailable": false,
+    "statsAvailable": true
+   }
+  }
+ }
+}

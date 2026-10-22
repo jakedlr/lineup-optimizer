@@ -1,0 +1,3560 @@
+{
+ "layout": {
+  "tabs": {
+   "1": {
+    "id": 1,
+    "title": "Popular",
+    "cards": [
+     {
+      "id": 1
+     }
+    ],
+    "isSameGameMulti": false,
+    "description": {
+     "title": "Popular",
+     "body": "Popular american football markets",
+     "footer": null
+    }
+   },
+   "20": {
+    "id": 20,
+    "title": "1st Half",
+    "cards": [
+     {
+      "id": 20
+     }
+    ],
+    "isSameGameMulti": false,
+    "description": null
+   },
+   "21": {
+    "id": 21,
+    "title": "1st Quarter",
+    "cards": [
+     {
+      "id": 21
+     }
+    ],
+    "isSameGameMulti": false,
+    "description": null
+   },
+   "22": {
+    "id": 22,
+    "title": "2nd Quarter",
+    "cards": [
+     {
+      "id": 22
+     }
+    ],
+    "isSameGameMulti": false,
+    "description": null
+   },
+   "24": {
+    "id": 24,
+    "title": "3rd Quarter",
+    "cards": [
+     {
+      "id": 24
+     }
+    ],
+    "isSameGameMulti": false,
+    "description": null
+   },
+   "25": {
+    "id": 25,
+    "title": "4th Quarter",
+    "cards": [
+     {
+      "id": 25
+     }
+    ],
+    "isSameGameMulti": false,
+    "description": null
+   },
+   "150": {
+    "id": 150,
+    "title": "Same Game Parlay\u2122",
+    "cards": [
+     {
+      "id": 150
+     }
+    ],
+    "isSameGameMulti": true,
+    "description": null
+   },
+   "151": {
+    "id": 151,
+    "title": "2nd Half",
+    "cards": [
+     {
+      "id": 151
+     }
+    ],
+    "isSameGameMulti": false,
+    "description": null
+   },
+   "214": {
+    "id": 214,
+    "title": "Scoring",
+    "cards": [
+     {
+      "id": 214
+     }
+    ],
+    "isSameGameMulti": false,
+    "description": null
+   },
+   "215": {
+    "id": 215,
+    "title": "D/ST",
+    "cards": [
+     {
+      "id": 215
+     }
+    ],
+    "isSameGameMulti": false,
+    "description": null
+   },
+   "217": {
+    "id": 217,
+    "title": "Passing Props",
+    "cards": [
+     {
+      "id": 217
+     }
+    ],
+    "isSameGameMulti": false,
+    "description": null
+   },
+   "218": {
+    "id": 218,
+    "title": "Receiving Props",
+    "cards": [
+     {
+      "id": 218
+     }
+    ],
+    "isSameGameMulti": false,
+    "description": null
+   },
+   "219": {
+    "id": 219,
+    "title": "Rushing Props",
+    "cards": [
+     {
+      "id": 219
+     }
+    ],
+    "isSameGameMulti": false,
+    "description": null
+   },
+   "220": {
+    "id": 220,
+    "title": "TD Scorer Props",
+    "cards": [
+     {
+      "id": 220
+     }
+    ],
+    "isSameGameMulti": false,
+    "description": null
+   },
+   "240": {
+    "id": 240,
+    "title": "Game Specials",
+    "cards": [
+     {
+      "id": 240
+     }
+    ],
+    "isSameGameMulti": false,
+    "description": null
+   },
+   "274": {
+    "id": 274,
+    "title": "Quick Bets",
+    "cards": [
+     {
+      "id": 274
+     }
+    ],
+    "isSameGameMulti": false,
+    "description": null
+   },
+   "327": {
+    "id": 327,
+    "title": "Quarter Props",
+    "cards": [
+     {
+      "id": 327
+     }
+    ],
+    "isSameGameMulti": false,
+    "description": null
+   }
+  }
+ },
+ "attachments": {
+  "events": {
+   "36190129": {
+    "competitionId": 12282733,
+    "inPlay": false,
+    "eventId": 36190129,
+    "key": "EVENT:36190129",
+    "name": "New England Patriots @ Chicago Bears",
+    "eventTypeId": 6423,
+    "countryCode": "GB",
+    "timezone": "GMT",
+    "openDate": "2026-10-23T00:16:00.000Z",
+    "videoAvailable": true,
+    "primaryMarketId": "734.191539418"
+   }
+  },
+  "markets": {
+   "734.193169507": {
+    "marketId": "734.193169507",
+    "eventTypeId": 6423,
+    "competitionId": 12282733,
+    "eventId": 36190129,
+    "marketName": "Drake Maye - Interception",
+    "marketTime": "2026-10-23T00:16:00.000Z",
+    "marketType": "PLAYER_A_INTERCEPTION",
+    "bspMarket": false,
+    "sgmMarket": false,
+    "inPlay": false,
+    "numberOfRunners": 2,
+    "numberOfActiveRunners": 2,
+    "numberOfWinners": 1,
+    "sortPriority": 0,
+    "bettingType": "ODDS",
+    "marketStatus": "OPEN",
+    "runners": [
+     {
+      "selectionId": 50782612,
+      "handicap": 0,
+      "runnerName": "Drake Maye Yes",
+      "sortPriority": 1,
+      "result": {},
+      "runnerStatus": "ACTIVE",
+      "logo": "https://assets.sportsbook.fanduel.com/images/team/nfl/new_england_patriots_jersey.png",
+      "secondaryLogo": "https://assets.sportsbook.fanduel.com/images/team/nfl/new_england_patriots.png",
+      "isPlayerSelection": true,
+      "jersey": {
+       "jerseyNumber": "10",
+       "jerseyBg": "dark"
+      },
+      "winRunnerOdds": {
+       "americanDisplayOdds": {
+        "americanOdds": -128,
+        "americanOddsInt": -128
+       },
+       "trueOdds": {
+        "decimalOdds": {
+         "decimalOdds": 1.78125
+        },
+        "fractionalOdds": {
+         "numerator": 100,
+         "denominator": 128
+        }
+       }
+      },
+      "previousWinRunnerOdds": []
+     },
+     {
+      "selectionId": 50782613,
+      "handicap": 0,
+      "runnerName": "Drake Maye No",
+      "sortPriority": 2,
+      "result": {},
+      "runnerStatus": "ACTIVE",
+      "logo": "https://assets.sportsbook.fanduel.com/images/team/nfl/new_england_patriots_jersey.png",
+      "secondaryLogo": "https://assets.sportsbook.fanduel.com/images/team/nfl/new_england_patriots.png",
+      "isPlayerSelection": true,
+      "jersey": {
+       "jerseyNumber": "10",
+       "jerseyBg": "dark"
+      },
+      "winRunnerOdds": {
+       "americanDisplayOdds": {
+        "americanOdds": -102,
+        "americanOddsInt": -102
+       },
+       "trueOdds": {
+        "decimalOdds": {
+         "decimalOdds": 1.980392156862745
+        },
+        "fractionalOdds": {
+         "numerator": 100,
+         "denominator": 102
+        }
+       }
+      },
+      "previousWinRunnerOdds": []
+     }
+    ],
+    "canTurnInPlay": false,
+    "associatedMarkets": [
+     {
+      "eventId": 36190129,
+      "eventTypeId": 6423,
+      "externalMarketId": "42.618564200"
+     }
+    ],
+    "isSuperSubEnabled": false,
+    "isBetProtectEligible": false,
+    "shouldDisplayStatsInRunner": true,
+    "eachwayAvailable": false,
+    "legTypes": [
+     "SIMPLE_SELECTION"
+    ]
+   },
+   "734.193169876": {
+    "marketId": "734.193169876",
+    "eventTypeId": 6423,
+    "competitionId": 12282733,
+    "eventId": 36190129,
+    "marketName": "Caleb Williams Interception",
+    "marketTime": "2026-10-23T00:16:00.000Z",
+    "marketType": "PLAYER_B_INTERCEPTION",
+    "bspMarket": false,
+    "sgmMarket": false,
+    "inPlay": false,
+    "numberOfRunners": 2,
+    "numberOfActiveRunners": 2,
+    "numberOfWinners": 1,
+    "sortPriority": 0,
+    "bettingType": "ODDS",
+    "marketStatus": "OPEN",
+    "runners": [
+     {
+      "selectionId": 50455018,
+      "handicap": 0,
+      "runnerName": "Caleb Williams Yes",
+      "sortPriority": 1,
+      "result": {},
+      "runnerStatus": "ACTIVE",
+      "logo": "https://assets.sportsbook.fanduel.com/images/team/nfl/chicago_bears_jersey.png",
+      "secondaryLogo": "https://assets.sportsbook.fanduel.com/images/team/nfl/chicago_bears.png",
+      "isPlayerSelection": true,
+      "jersey": {
+       "jerseyNumber": "18",
+       "jerseyBg": "dark"
+      },
+      "winRunnerOdds": {
+       "americanDisplayOdds": {
+        "americanOdds": 108,
+        "americanOddsInt": 108
+       },
+       "trueOdds": {
+        "decimalOdds": {
+         "decimalOdds": 2.08
+        },
+        "fractionalOdds": {
+         "numerator": 108,
+         "denominator": 100
+        }
+       }
+      },
+      "previousWinRunnerOdds": []
+     },
+     {
+      "selectionId": 50455017,
+      "handicap": 0,
+      "runnerName": "Caleb Williams No",
+      "sortPriority": 2,
+      "result": {},
+      "runnerStatus": "ACTIVE",
+      "logo": "https://assets.sportsbook.fanduel.com/images/team/nfl/chicago_bears_jersey.png",
+      "secondaryLogo": "https://assets.sportsbook.fanduel.com/images/team/nfl/chicago_bears.png",
+      "isPlayerSelection": true,
+      "jersey": {
+       "jerseyNumber": "18",
+       "jerseyBg": "dark"
+      },
+      "winRunnerOdds": {
+       "americanDisplayOdds": {
+        "americanOdds": -140,
+        "americanOddsInt": -140
+       },
+       "trueOdds": {
+        "decimalOdds": {
+         "decimalOdds": 1.714285714285714
+        },
+        "fractionalOdds": {
+         "numerator": 100,
+         "denominator": 140
+        }
+       }
+      },
+      "previousWinRunnerOdds": []
+     }
+    ],
+    "canTurnInPlay": false,
+    "associatedMarkets": [
+     {
+      "eventId": 36190129,
+      "eventTypeId": 6423,
+      "externalMarketId": "42.618564902"
+     }
+    ],
+    "isSuperSubEnabled": false,
+    "isBetProtectEligible": false,
+    "shouldDisplayStatsInRunner": true,
+    "eachwayAvailable": false,
+    "legTypes": [
+     "SIMPLE_SELECTION"
+    ]
+   },
+   "734.191539418": {
+    "marketId": "734.191539418",
+    "eventTypeId": 6423,
+    "competitionId": 12282733,
+    "eventId": 36190129,
+    "marketName": "Spread",
+    "marketTime": "2026-10-23T00:16:00.000Z",
+    "marketType": "MATCH_HANDICAP_(2-WAY)",
+    "bspMarket": false,
+    "sgmMarket": true,
+    "inPlay": false,
+    "numberOfRunners": 2,
+    "numberOfActiveRunners": 2,
+    "numberOfWinners": 1,
+    "sortPriority": -890,
+    "bettingType": "MOVING_HANDICAP",
+    "marketStatus": "OPEN",
+    "runners": [
+     {
+      "selectionId": 50204,
+      "handicap": 3,
+      "runnerName": "New England Patriots",
+      "sortPriority": 1,
+      "result": {
+       "type": "AWAY"
+      },
+      "runnerStatus": "ACTIVE",
+      "logo": "https://assets.sportsbook.fanduel.com/images/team/nfl/new_england_patriots.png",
+      "nameAbbr": "NE Patriots",
+      "winRunnerOdds": {
+       "americanDisplayOdds": {
+        "americanOdds": -112,
+        "americanOddsInt": -112
+       },
+       "trueOdds": {
+        "decimalOdds": {
+         "decimalOdds": 1.892857142857143
+        },
+        "fractionalOdds": {
+         "numerator": 100,
+         "denominator": 112
+        }
+       }
+      },
+      "previousWinRunnerOdds": [
+       {
+        "americanDisplayOdds": {
+         "americanOdds": -114,
+         "americanOddsInt": -114
+        },
+        "trueOdds": {
+         "decimalOdds": {
+          "decimalOdds": 1.87719298245614
+         },
+         "fractionalOdds": {
+          "numerator": 100,
+          "denominator": 114
+         }
+        }
+       }
+      ]
+     },
+     {
+      "selectionId": 50194,
+      "handicap": -3,
+      "runnerName": "Chicago Bears",
+      "sortPriority": 2,
+      "result": {
+       "type": "HOME"
+      },
+      "runnerStatus": "ACTIVE",
+      "logo": "https://assets.sportsbook.fanduel.com/images/team/nfl/chicago_bears.png",
+      "nameAbbr": "CHI Bears",
+      "winRunnerOdds": {
+       "americanDisplayOdds": {
+        "americanOdds": -108,
+        "americanOddsInt": -108
+       },
+       "trueOdds": {
+        "decimalOdds": {
+         "decimalOdds": 1.925925925925926
+        },
+        "fractionalOdds": {
+         "numerator": 100,
+         "denominator": 108
+        }
+       }
+      },
+      "previousWinRunnerOdds": [
+       {
+        "americanDisplayOdds": {
+         "americanOdds": -106,
+         "americanOddsInt": -106
+        },
+        "trueOdds": {
+         "decimalOdds": {
+          "decimalOdds": 1.943396226415094
+         },
+         "fractionalOdds": {
+          "numerator": 100,
+          "denominator": 106
+         }
+        }
+       }
+      ]
+     }
+    ],
+    "canTurnInPlay": true,
+    "associatedMarkets": [
+     {
+      "eventId": 36190129,
+      "eventTypeId": 6423,
+      "externalMarketId": "42.616149653"
+     }
+    ],
+    "isSuperSubEnabled": false,
+    "isBetProtectEligible": false,
+    "shouldDisplayStatsInRunner": true,
+    "eachwayAvailable": false,
+    "legTypes": [
+     "SIMPLE_SELECTION"
+    ]
+   },
+   "734.191539409": {
+    "marketId": "734.191539409",
+    "eventTypeId": 6423,
+    "competitionId": 12282733,
+    "eventId": 36190129,
+    "marketName": "Total Points",
+    "marketTime": "2026-10-23T00:16:00.000Z",
+    "marketType": "TOTAL_POINTS_(OVER/UNDER)",
+    "bspMarket": false,
+    "sgmMarket": true,
+    "inPlay": false,
+    "numberOfRunners": 2,
+    "numberOfActiveRunners": 2,
+    "numberOfWinners": 1,
+    "sortPriority": -880,
+    "bettingType": "MOVING_HANDICAP",
+    "marketStatus": "OPEN",
+    "runners": [
+     {
+      "selectionId": 7017916,
+      "handicap": 50.5,
+      "runnerName": "Over",
+      "sortPriority": 1,
+      "result": {
+       "type": "OVER"
+      },
+      "runnerStatus": "ACTIVE",
+      "winRunnerOdds": {
+       "americanDisplayOdds": {
+        "americanOdds": -120,
+        "americanOddsInt": -120
+       },
+       "trueOdds": {
+        "decimalOdds": {
+         "decimalOdds": 1.833333333333333
+        },
+        "fractionalOdds": {
+         "numerator": 100,
+         "denominator": 120
+        }
+       }
+      },
+      "previousWinRunnerOdds": [
+       {
+        "americanDisplayOdds": {
+         "americanOdds": -115,
+         "americanOddsInt": -115
+        },
+        "trueOdds": {
+         "decimalOdds": {
+          "decimalOdds": 1.869565217391304
+         },
+         "fractionalOdds": {
+          "numerator": 100,
+          "denominator": 115
+         }
+        }
+       }
+      ]
+     },
+     {
+      "selectionId": 7017917,
+      "handicap": 50.5,
+      "runnerName": "Under",
+      "sortPriority": 2,
+      "result": {
+       "type": "UNDER"
+      },
+      "runnerStatus": "ACTIVE",
+      "winRunnerOdds": {
+       "americanDisplayOdds": {
+        "americanOdds": -102,
+        "americanOddsInt": -102
+       },
+       "trueOdds": {
+        "decimalOdds": {
+         "decimalOdds": 1.980392156862745
+        },
+        "fractionalOdds": {
+         "numerator": 100,
+         "denominator": 102
+        }
+       }
+      },
+      "previousWinRunnerOdds": [
+       {
+        "americanDisplayOdds": {
+         "americanOdds": -105,
+         "americanOddsInt": -105
+        },
+        "trueOdds": {
+         "decimalOdds": {
+          "decimalOdds": 1.952380952380952
+         },
+         "fractionalOdds": {
+          "numerator": 100,
+          "denominator": 105
+         }
+        }
+       }
+      ]
+     }
+    ],
+    "canTurnInPlay": true,
+    "associatedMarkets": [
+     {
+      "eventId": 36190129,
+      "eventTypeId": 6423,
+      "externalMarketId": "42.616149655"
+     }
+    ],
+    "isSuperSubEnabled": false,
+    "isBetProtectEligible": false,
+    "shouldDisplayStatsInRunner": true,
+    "eachwayAvailable": false,
+    "legTypes": [
+     "SIMPLE_SELECTION"
+    ]
+   },
+   "734.192539137": {
+    "marketId": "734.192539137",
+    "eventTypeId": 6423,
+    "competitionId": 12282733,
+    "eventId": 36190129,
+    "marketName": "Caleb Williams - Alt Passing Yds",
+    "marketTime": "2026-10-23T00:16:00.000Z",
+    "marketType": "PLAYER_X_ALT_PASSING_YARDS_HIGH",
+    "bspMarket": false,
+    "sgmMarket": true,
+    "inPlay": false,
+    "numberOfRunners": 10,
+    "numberOfActiveRunners": 10,
+    "numberOfWinners": 1,
+    "sortPriority": 3430,
+    "bettingType": "ODDS",
+    "marketStatus": "OPEN",
+    "runners": [
+     {
+      "selectionId": 48773615,
+      "handicap": 0,
+      "runnerName": "Caleb Williams 150+ Yards",
+      "sortPriority": 1,
+      "result": {},
+      "runnerStatus": "ACTIVE",
+      "logo": "https://assets.sportsbook.fanduel.com/images/team/nfl/chicago_bears_jersey.png",
+      "secondaryLogo": "https://assets.sportsbook.fanduel.com/images/team/nfl/chicago_bears.png",
+      "isPlayerSelection": true,
+      "jersey": {
+       "jerseyNumber": "18",
+       "jerseyBg": "dark"
+      },
+      "winRunnerOdds": {
+       "americanDisplayOdds": {
+        "americanOdds": -1600,
+        "americanOddsInt": -1600
+       },
+       "trueOdds": {
+        "decimalOdds": {
+         "decimalOdds": 1.0625
+        },
+        "fractionalOdds": {
+         "numerator": 10,
+         "denominator": 160
+        }
+       }
+      },
+      "previousWinRunnerOdds": [
+       {
+        "americanDisplayOdds": {
+         "americanOdds": -1450,
+         "americanOddsInt": -1450
+        },
+        "trueOdds": {
+         "decimalOdds": {
+          "decimalOdds": 1.068965517241379
+         },
+         "fractionalOdds": {
+          "numerator": 10,
+          "denominator": 145
+         }
+        }
+       }
+      ]
+     },
+     {
+      "selectionId": 73379112,
+      "handicap": 0,
+      "runnerName": "Caleb Williams 175+ Yards",
+      "sortPriority": 2,
+      "result": {},
+      "runnerStatus": "ACTIVE",
+      "logo": "https://assets.sportsbook.fanduel.com/images/team/nfl/chicago_bears_jersey.png",
+      "secondaryLogo": "https://assets.sportsbook.fanduel.com/images/team/nfl/chicago_bears.png",
+      "isPlayerSelection": true,
+      "jersey": {
+       "jerseyNumber": "18",
+       "jerseyBg": "dark"
+      },
+      "winRunnerOdds": {
+       "americanDisplayOdds": {
+        "americanOdds": -670,
+        "americanOddsInt": -670
+       },
+       "trueOdds": {
+        "decimalOdds": {
+         "decimalOdds": 1.149253731343284
+        },
+        "fractionalOdds": {
+         "numerator": 100,
+         "denominator": 670
+        }
+       }
+      },
+      "previousWinRunnerOdds": [
+       {
+        "americanDisplayOdds": {
+         "americanOdds": -650,
+         "americanOddsInt": -650
+        },
+        "trueOdds": {
+         "decimalOdds": {
+          "decimalOdds": 1.153846153846154
+         },
+         "fractionalOdds": {
+          "numerator": 10,
+          "denominator": 65
+         }
+        }
+       }
+      ]
+     },
+     {
+      "selectionId": 48335550,
+      "handicap": 0,
+      "runnerName": "Caleb Williams 200+ Yards",
+      "sortPriority": 3,
+      "result": {},
+      "runnerStatus": "ACTIVE",
+      "logo": "https://assets.sportsbook.fanduel.com/images/team/nfl/chicago_bears_jersey.png",
+      "secondaryLogo": "https://assets.sportsbook.fanduel.com/images/team/nfl/chicago_bears.png",
+      "isPlayerSelection": true,
+      "jersey": {
+       "jerseyNumber": "18",
+       "jerseyBg": "dark"
+      },
+      "winRunnerOdds": {
+       "americanDisplayOdds": {
+        "americanOdds": -330,
+        "americanOddsInt": -330
+       },
+       "trueOdds": {
+        "decimalOdds": {
+         "decimalOdds": 1.303030303030303
+        },
+        "fractionalOdds": {
+         "numerator": 10,
+         "denominator": 33
+        }
+       }
+      },
+      "previousWinRunnerOdds": [
+       {
+        "americanDisplayOdds": {
+         "americanOdds": -340,
+         "americanOddsInt": -340
+        },
+        "trueOdds": {
+         "decimalOdds": {
+          "decimalOdds": 1.294117647058824
+         },
+         "fractionalOdds": {
+          "numerator": 10,
+          "denominator": 34
+         }
+        }
+       }
+      ]
+     },
+     {
+      "selectionId": 48335567,
+      "handicap": 0,
+      "runnerName": "Caleb Williams 225+ Yards",
+      "sortPriority": 4,
+      "result": {},
+      "runnerStatus": "ACTIVE",
+      "logo": "https://assets.sportsbook.fanduel.com/images/team/nfl/chicago_bears_jersey.png",
+      "secondaryLogo": "https://assets.sportsbook.fanduel.com/images/team/nfl/chicago_bears.png",
+      "isPlayerSelection": true,
+      "jersey": {
+       "jerseyNumber": "18",
+       "jerseyBg": "dark"
+      },
+      "winRunnerOdds": {
+       "americanDisplayOdds": {
+        "americanOdds": -188,
+        "americanOddsInt": -188
+       },
+       "trueOdds": {
+        "decimalOdds": {
+         "decimalOdds": 1.531914893617021
+        },
+        "fractionalOdds": {
+         "numerator": 100,
+         "denominator": 188
+        }
+       }
+      },
+      "previousWinRunnerOdds": [
+       {
+        "americanDisplayOdds": {
+         "americanOdds": -182,
+         "americanOddsInt": -182
+        },
+        "trueOdds": {
+         "decimalOdds": {
+          "decimalOdds": 1.549450549450549
+         },
+         "fractionalOdds": {
+          "numerator": 100,
+          "denominator": 182
+         }
+        }
+       }
+      ]
+     },
+     {
+      "selectionId": 48335580,
+      "handicap": 0,
+      "runnerName": "Caleb Williams 250+ Yards",
+      "sortPriority": 5,
+      "result": {},
+      "runnerStatus": "ACTIVE",
+      "logo": "https://assets.sportsbook.fanduel.com/images/team/nfl/chicago_bears_jersey.png",
+      "secondaryLogo": "https://assets.sportsbook.fanduel.com/images/team/nfl/chicago_bears.png",
+      "isPlayerSelection": true,
+      "jersey": {
+       "jerseyNumber": "18",
+       "jerseyBg": "dark"
+      },
+      "winRunnerOdds": {
+       "americanDisplayOdds": {
+        "americanOdds": 100,
+        "americanOddsInt": 100
+       },
+       "trueOdds": {
+        "decimalOdds": {
+         "decimalOdds": 2
+        },
+        "fractionalOdds": {
+         "numerator": 100,
+         "denominator": 100
+        }
+       }
+      },
+      "previousWinRunnerOdds": [
+       {
+        "americanDisplayOdds": {
+         "americanOdds": 102,
+         "americanOddsInt": 102
+        },
+        "trueOdds": {
+         "decimalOdds": {
+          "decimalOdds": 2.02
+         },
+         "fractionalOdds": {
+          "numerator": 102,
+          "denominator": 100
+         }
+        }
+       }
+      ]
+     },
+     {
+      "selectionId": 48335563,
+      "handicap": 0,
+      "runnerName": "Caleb Williams 275+ Yards",
+      "sortPriority": 6,
+      "result": {},
+      "runnerStatus": "ACTIVE",
+      "logo": "https://assets.sportsbook.fanduel.com/images/team/nfl/chicago_bears_jersey.png",
+      "secondaryLogo": "https://assets.sportsbook.fanduel.com/images/team/nfl/chicago_bears.png",
+      "isPlayerSelection": true,
+      "jersey": {
+       "jerseyNumber": "18",
+       "jerseyBg": "dark"
+      },
+      "winRunnerOdds": {
+       "americanDisplayOdds": {
+        "americanOdds": 174,
+        "americanOddsInt": 174
+       },
+       "trueOdds": {
+        "decimalOdds": {
+         "decimalOdds": 2.74
+        },
+        "fractionalOdds": {
+         "numerator": 174,
+         "denominator": 100
+        }
+       }
+      },
+      "previousWinRunnerOdds": [
+       {
+        "americanDisplayOdds": {
+         "americanOdds": 178,
+         "americanOddsInt": 178
+        },
+        "trueOdds": {
+         "decimalOdds": {
+          "decimalOdds": 2.78
+         },
+         "fractionalOdds": {
+          "numerator": 178,
+          "denominator": 100
+         }
+        }
+       }
+      ]
+     },
+     {
+      "selectionId": 48335592,
+      "handicap": 0,
+      "runnerName": "Caleb Williams 300+ Yards",
+      "sortPriority": 7,
+      "result": {},
+      "runnerStatus": "ACTIVE",
+      "logo": "https://assets.sportsbook.fanduel.com/images/team/nfl/chicago_bears_jersey.png",
+      "secondaryLogo": "https://assets.sportsbook.fanduel.com/images/team/nfl/chicago_bears.png",
+      "isPlayerSelection": true,
+      "jersey": {
+       "jerseyNumber": "18",
+       "jerseyBg": "dark"
+      },
+      "winRunnerOdds": {
+       "americanDisplayOdds": {
+        "americanOdds": 300,
+        "americanOddsInt": 300
+       },
+       "trueOdds": {
+        "decimalOdds": {
+         "decimalOdds": 4
+        },
+        "fractionalOdds": {
+         "numerator": 30,
+         "denominator": 10
+        }
+       }
+      },
+      "previousWinRunnerOdds": [
+       {
+        "americanDisplayOdds": {
+         "americanOdds": 310,
+         "americanOddsInt": 310
+        },
+        "trueOdds": {
+         "decimalOdds": {
+          "decimalOdds": 4.1
+         },
+         "fractionalOdds": {
+          "numerator": 31,
+          "denominator": 10
+         }
+        }
+       }
+      ]
+     },
+     {
+      "selectionId": 48335565,
+      "handicap": 0,
+      "runnerName": "Caleb Williams 325+ Yards",
+      "sortPriority": 8,
+      "result": {},
+      "runnerStatus": "ACTIVE",
+      "logo": "https://assets.sportsbook.fanduel.com/images/team/nfl/chicago_bears_jersey.png",
+      "secondaryLogo": "https://assets.sportsbook.fanduel.com/images/team/nfl/chicago_bears.png",
+      "isPlayerSelection": true,
+      "jersey": {
+       "jerseyNumber": "18",
+       "jerseyBg": "dark"
+      },
+      "winRunnerOdds": {
+       "americanDisplayOdds": {
+        "americanOdds": 490,
+        "americanOddsInt": 490
+       },
+       "trueOdds": {
+        "decimalOdds": {
+         "decimalOdds": 5.9
+        },
+        "fractionalOdds": {
+         "numerator": 49,
+         "denominator": 10
+        }
+       }
+      },
+      "previousWinRunnerOdds": [
+       {
+        "americanDisplayOdds": {
+         "americanOdds": 520,
+         "americanOddsInt": 520
+        },
+        "trueOdds": {
+         "decimalOdds": {
+          "decimalOdds": 6.2
+         },
+         "fractionalOdds": {
+          "numerator": 52,
+          "denominator": 10
+         }
+        }
+       }
+      ]
+     },
+     {
+      "selectionId": 48335557,
+      "handicap": 0,
+      "runnerName": "Caleb Williams 350+ Yards",
+      "sortPriority": 9,
+      "result": {},
+      "runnerStatus": "ACTIVE",
+      "logo": "https://assets.sportsbook.fanduel.com/images/team/nfl/chicago_bears_jersey.png",
+      "secondaryLogo": "https://assets.sportsbook.fanduel.com/images/team/nfl/chicago_bears.png",
+      "isPlayerSelection": true,
+      "jersey": {
+       "jerseyNumber": "18",
+       "jerseyBg": "dark"
+      },
+      "winRunnerOdds": {
+       "americanDisplayOdds": {
+        "americanOdds": 800,
+        "americanOddsInt": 800
+       },
+       "trueOdds": {
+        "decimalOdds": {
+         "decimalOdds": 9
+        },
+        "fractionalOdds": {
+         "numerator": 80,
+         "denominator": 10
+        }
+       }
+      },
+      "previousWinRunnerOdds": [
+       {
+        "americanDisplayOdds": {
+         "americanOdds": 850,
+         "americanOddsInt": 850
+        },
+        "trueOdds": {
+         "decimalOdds": {
+          "decimalOdds": 9.5
+         },
+         "fractionalOdds": {
+          "numerator": 85,
+          "denominator": 10
+         }
+        }
+       }
+      ]
+     },
+     {
+      "selectionId": 82569266,
+      "handicap": 0,
+      "runnerName": "Caleb Williams 375+ Yards",
+      "sortPriority": 10,
+      "result": {},
+      "runnerStatus": "ACTIVE",
+      "logo": "https://assets.sportsbook.fanduel.com/images/team/nfl/chicago_bears_jersey.png",
+      "secondaryLogo": "https://assets.sportsbook.fanduel.com/images/team/nfl/chicago_bears.png",
+      "isPlayerSelection": true,
+      "jersey": {
+       "jerseyNumber": "18",
+       "jerseyBg": "dark"
+      },
+      "winRunnerOdds": {
+       "americanDisplayOdds": {
+        "americanOdds": 1280,
+        "americanOddsInt": 1280
+       },
+       "trueOdds": {
+        "decimalOdds": {
+         "decimalOdds": 13.8
+        },
+        "fractionalOdds": {
+         "numerator": 128,
+         "denominator": 10
+        }
+       }
+      },
+      "previousWinRunnerOdds": [
+       {
+        "americanDisplayOdds": {
+         "americanOdds": 1400,
+         "americanOddsInt": 1400
+        },
+        "trueOdds": {
+         "decimalOdds": {
+          "decimalOdds": 15
+         },
+         "fractionalOdds": {
+          "numerator": 140,
+          "denominator": 10
+         }
+        }
+       }
+      ]
+     }
+    ],
+    "canTurnInPlay": true,
+    "associatedMarkets": [
+     {
+      "eventId": 36190129,
+      "eventTypeId": 6423,
+      "externalMarketId": "42.617700525"
+     }
+    ],
+    "isSuperSubEnabled": false,
+    "isBetProtectEligible": true,
+    "shouldDisplayStatsInRunner": true,
+    "eachwayAvailable": false,
+    "legTypes": [
+     "SIMPLE_SELECTION"
+    ]
+   },
+   "734.192761726": {
+    "marketId": "734.192761726",
+    "eventTypeId": 6423,
+    "competitionId": 12282733,
+    "eventId": 36190129,
+    "marketName": "Game Specials - Passing",
+    "marketTime": "2026-10-23T00:16:00.000Z",
+    "marketType": "GAME_SPECIALS_-_PASSING",
+    "bspMarket": false,
+    "sgmMarket": false,
+    "inPlay": false,
+    "numberOfRunners": 17,
+    "numberOfActiveRunners": 17,
+    "numberOfWinners": 1,
+    "sortPriority": 10,
+    "bettingType": "ODDS",
+    "marketStatus": "OPEN",
+    "runners": [
+     {
+      "selectionId": 74806340,
+      "handicap": 0,
+      "runnerName": "Drake Maye to record 25+ Passing Yards in Each Quarter",
+      "sortPriority": 1,
+      "result": {},
+      "runnerStatus": "ACTIVE",
+      "winRunnerOdds": {
+       "americanDisplayOdds": {
+        "americanOdds": -125,
+        "americanOddsInt": -125
+       },
+       "trueOdds": {
+        "decimalOdds": {
+         "decimalOdds": 1.8
+        },
+        "fractionalOdds": {
+         "numerator": 100,
+         "denominator": 125
+        }
+       }
+      },
+      "previousWinRunnerOdds": [
+       {
+        "americanDisplayOdds": {
+         "americanOdds": -130,
+         "americanOddsInt": -130
+        },
+        "trueOdds": {
+         "decimalOdds": {
+          "decimalOdds": 1.769230769230769
+         },
+         "fractionalOdds": {
+          "numerator": 100,
+          "denominator": 130
+         }
+        }
+       }
+      ]
+     },
+     {
+      "selectionId": 75594441,
+      "handicap": 0,
+      "runnerName": "Caleb Williams to record 25+ Passing Yards in Each Quarter",
+      "sortPriority": 2,
+      "result": {},
+      "runnerStatus": "ACTIVE",
+      "winRunnerOdds": {
+       "americanDisplayOdds": {
+        "americanOdds": -120,
+        "americanOddsInt": -120
+       },
+       "trueOdds": {
+        "decimalOdds": {
+         "decimalOdds": 1.833333333333333
+        },
+        "fractionalOdds": {
+         "numerator": 100,
+         "denominator": 120
+        }
+       }
+      },
+      "previousWinRunnerOdds": [
+       {
+        "americanDisplayOdds": {
+         "americanOdds": -115,
+         "americanOddsInt": -115
+        },
+        "trueOdds": {
+         "decimalOdds": {
+          "decimalOdds": 1.869565217391304
+         },
+         "fractionalOdds": {
+          "numerator": 100,
+          "denominator": 115
+         }
+        }
+       }
+      ]
+     },
+     {
+      "selectionId": 76122986,
+      "handicap": 0,
+      "runnerName": "Caleb Williams and Drake Maye to Combine for 500+ Passing Yards",
+      "sortPriority": 3,
+      "result": {},
+      "runnerStatus": "ACTIVE",
+      "winRunnerOdds": {
+       "americanDisplayOdds": {
+        "americanOdds": -110,
+        "americanOddsInt": -110
+       },
+       "trueOdds": {
+        "decimalOdds": {
+         "decimalOdds": 1.909090909090909
+        },
+        "fractionalOdds": {
+         "numerator": 100,
+         "denominator": 110
+        }
+       }
+      },
+      "previousWinRunnerOdds": [
+       {
+        "americanDisplayOdds": {
+         "americanOdds": -105,
+         "americanOddsInt": -105
+        },
+        "trueOdds": {
+         "decimalOdds": {
+          "decimalOdds": 1.952380952380952
+         },
+         "fractionalOdds": {
+          "numerator": 100,
+          "denominator": 105
+         }
+        }
+       }
+      ]
+     },
+     {
+      "selectionId": 74806338,
+      "handicap": 0,
+      "runnerName": "Drake Maye to record 100+ Passing Yards in Each Half",
+      "sortPriority": 4,
+      "result": {},
+      "runnerStatus": "ACTIVE",
+      "winRunnerOdds": {
+       "americanDisplayOdds": {
+        "americanOdds": 100,
+        "americanOddsInt": 100
+       },
+       "trueOdds": {
+        "decimalOdds": {
+         "decimalOdds": 2
+        },
+        "fractionalOdds": {
+         "numerator": 100,
+         "denominator": 100
+        }
+       }
+      },
+      "previousWinRunnerOdds": [
+       {
+        "americanDisplayOdds": {
+         "americanOdds": -110,
+         "americanOddsInt": -110
+        },
+        "trueOdds": {
+         "decimalOdds": {
+          "decimalOdds": 1.909090909090909
+         },
+         "fractionalOdds": {
+          "numerator": 100,
+          "denominator": 110
+         }
+        }
+       }
+      ]
+     },
+     {
+      "selectionId": 73525196,
+      "handicap": 0,
+      "runnerName": "Caleb Williams to record 100+ Passing Yards in Each Half",
+      "sortPriority": 5,
+      "result": {},
+      "runnerStatus": "ACTIVE",
+      "winRunnerOdds": {
+       "americanDisplayOdds": {
+        "americanOdds": 105,
+        "americanOddsInt": 105
+       },
+       "trueOdds": {
+        "decimalOdds": {
+         "decimalOdds": 2.05
+        },
+        "fractionalOdds": {
+         "numerator": 105,
+         "denominator": 100
+        }
+       }
+      },
+      "previousWinRunnerOdds": [
+       {
+        "americanDisplayOdds": {
+         "americanOdds": 110,
+         "americanOddsInt": 110
+        },
+        "trueOdds": {
+         "decimalOdds": {
+          "decimalOdds": 2.1
+         },
+         "fractionalOdds": {
+          "numerator": 110,
+          "denominator": 100
+         }
+        }
+       }
+      ]
+     },
+     {
+      "selectionId": 76122985,
+      "handicap": 0,
+      "runnerName": "Caleb Williams and Drake Maye to Combine for 600+ Passing Yards",
+      "sortPriority": 6,
+      "result": {},
+      "runnerStatus": "ACTIVE",
+      "winRunnerOdds": {
+       "americanDisplayOdds": {
+        "americanOdds": 340,
+        "americanOddsInt": 340
+       },
+       "trueOdds": {
+        "decimalOdds": {
+         "decimalOdds": 4.4
+        },
+        "fractionalOdds": {
+         "numerator": 34,
+         "denominator": 10
+        }
+       }
+      },
+      "previousWinRunnerOdds": [
+       {
+        "americanDisplayOdds": {
+         "americanOdds": 350,
+         "americanOddsInt": 350
+        },
+        "trueOdds": {
+         "decimalOdds": {
+          "decimalOdds": 4.5
+         },
+         "fractionalOdds": {
+          "numerator": 35,
+          "denominator": 10
+         }
+        }
+       }
+      ]
+     },
+     {
+      "selectionId": 74923873,
+      "handicap": 0,
+      "runnerName": "Drake Maye to record 50+ Passing Yards in Each Quarter",
+      "sortPriority": 7,
+      "result": {},
+      "runnerStatus": "ACTIVE",
+      "winRunnerOdds": {
+       "americanDisplayOdds": {
+        "americanOdds": 500,
+        "americanOddsInt": 500
+       },
+       "trueOdds": {
+        "decimalOdds": {
+         "decimalOdds": 6
+        },
+        "fractionalOdds": {
+         "numerator": 50,
+         "denominator": 10
+        }
+       }
+      },
+      "previousWinRunnerOdds": [
+       {
+        "americanDisplayOdds": {
+         "americanOdds": 550,
+         "americanOddsInt": 550
+        },
+        "trueOdds": {
+         "decimalOdds": {
+          "decimalOdds": 6.5
+         },
+         "fractionalOdds": {
+          "numerator": 55,
+          "denominator": 10
+         }
+        }
+       }
+      ]
+     },
+     {
+      "selectionId": 74923865,
+      "handicap": 0,
+      "runnerName": "Caleb Williams to record 50+ Passing Yards in Each Quarter",
+      "sortPriority": 8,
+      "result": {},
+      "runnerStatus": "ACTIVE",
+      "winRunnerOdds": {
+       "americanDisplayOdds": {
+        "americanOdds": 550,
+        "americanOddsInt": 550
+       },
+       "trueOdds": {
+        "decimalOdds": {
+         "decimalOdds": 6.5
+        },
+        "fractionalOdds": {
+         "numerator": 55,
+         "denominator": 10
+        }
+       }
+      },
+      "previousWinRunnerOdds": [
+       {
+        "americanDisplayOdds": {
+         "americanOdds": 600,
+         "americanOddsInt": 600
+        },
+        "trueOdds": {
+         "decimalOdds": {
+          "decimalOdds": 7
+         },
+         "fractionalOdds": {
+          "numerator": 60,
+          "denominator": 10
+         }
+        }
+       }
+      ]
+     },
+     {
+      "selectionId": 74904432,
+      "handicap": 0,
+      "runnerName": "Drake Maye to record 150+ Passing Yards in Each Half",
+      "sortPriority": 9,
+      "result": {},
+      "runnerStatus": "ACTIVE",
+      "winRunnerOdds": {
+       "americanDisplayOdds": {
+        "americanOdds": 700,
+        "americanOddsInt": 700
+       },
+       "trueOdds": {
+        "decimalOdds": {
+         "decimalOdds": 8
+        },
+        "fractionalOdds": {
+         "numerator": 70,
+         "denominator": 10
+        }
+       }
+      },
+      "previousWinRunnerOdds": [
+       {
+        "americanDisplayOdds": {
+         "americanOdds": 750,
+         "americanOddsInt": 750
+        },
+        "trueOdds": {
+         "decimalOdds": {
+          "decimalOdds": 8.5
+         },
+         "fractionalOdds": {
+          "numerator": 75,
+          "denominator": 10
+         }
+        }
+       }
+      ]
+     },
+     {
+      "selectionId": 73525199,
+      "handicap": 0,
+      "runnerName": "Caleb Williams to record 150+ Passing Yards in Each Half",
+      "sortPriority": 10,
+      "result": {},
+      "runnerStatus": "ACTIVE",
+      "winRunnerOdds": {
+       "americanDisplayOdds": {
+        "americanOdds": 750,
+        "americanOddsInt": 750
+       },
+       "trueOdds": {
+        "decimalOdds": {
+         "decimalOdds": 8.5
+        },
+        "fractionalOdds": {
+         "numerator": 75,
+         "denominator": 10
+        }
+       }
+      },
+      "previousWinRunnerOdds": [
+       {
+        "americanDisplayOdds": {
+         "americanOdds": 800,
+         "americanOddsInt": 800
+        },
+        "trueOdds": {
+         "decimalOdds": {
+          "decimalOdds": 9
+         },
+         "fractionalOdds": {
+          "numerator": 80,
+          "denominator": 10
+         }
+        }
+       }
+      ]
+     },
+     {
+      "selectionId": 104116151,
+      "handicap": 0,
+      "runnerName": "Caleb Williams or Drake Maye to record 400+ Passing Yards",
+      "sortPriority": 11,
+      "result": {},
+      "runnerStatus": "ACTIVE",
+      "winRunnerOdds": {
+       "americanDisplayOdds": {
+        "americanOdds": 1300,
+        "americanOddsInt": 1300
+       },
+       "trueOdds": {
+        "decimalOdds": {
+         "decimalOdds": 14
+        },
+        "fractionalOdds": {
+         "numerator": 13,
+         "denominator": 1
+        }
+       }
+      },
+      "previousWinRunnerOdds": [
+       {
+        "americanDisplayOdds": {
+         "americanOdds": 1200,
+         "americanOddsInt": 1200
+        },
+        "trueOdds": {
+         "decimalOdds": {
+          "decimalOdds": 13
+         },
+         "fractionalOdds": {
+          "numerator": 12,
+          "denominator": 1
+         }
+        }
+       }
+      ]
+     },
+     {
+      "selectionId": 104116150,
+      "handicap": 0,
+      "runnerName": "Caleb Williams and Drake Maye to Combine for 700+ Passing Yards",
+      "sortPriority": 12,
+      "result": {},
+      "runnerStatus": "ACTIVE",
+      "winRunnerOdds": {
+       "americanDisplayOdds": {
+        "americanOdds": 1500,
+        "americanOddsInt": 1500
+       },
+       "trueOdds": {
+        "decimalOdds": {
+         "decimalOdds": 16
+        },
+        "fractionalOdds": {
+         "numerator": 15,
+         "denominator": 1
+        }
+       }
+      },
+      "previousWinRunnerOdds": [
+       {
+        "americanDisplayOdds": {
+         "americanOdds": 1600,
+         "americanOddsInt": 1600
+        },
+        "trueOdds": {
+         "decimalOdds": {
+          "decimalOdds": 17
+         },
+         "fractionalOdds": {
+          "numerator": 16,
+          "denominator": 1
+         }
+        }
+       }
+      ]
+     },
+     {
+      "selectionId": 74923860,
+      "handicap": 0,
+      "runnerName": "Caleb Williams to record 1+ Passing TD in Each Quarter",
+      "sortPriority": 13,
+      "result": {},
+      "runnerStatus": "ACTIVE",
+      "winRunnerOdds": {
+       "americanDisplayOdds": {
+        "americanOdds": 2700,
+        "americanOddsInt": 2700
+       },
+       "trueOdds": {
+        "decimalOdds": {
+         "decimalOdds": 28
+        },
+        "fractionalOdds": {
+         "numerator": 27,
+         "denominator": 1
+        }
+       }
+      },
+      "previousWinRunnerOdds": [
+       {
+        "americanDisplayOdds": {
+         "americanOdds": 2500,
+         "americanOddsInt": 2500
+        },
+        "trueOdds": {
+         "decimalOdds": {
+          "decimalOdds": 26
+         },
+         "fractionalOdds": {
+          "numerator": 25,
+          "denominator": 1
+         }
+        }
+       }
+      ]
+     },
+     {
+      "selectionId": 75181158,
+      "handicap": 0,
+      "runnerName": "Drake Maye to record 1+ Passing TD in Each Quarter",
+      "sortPriority": 14,
+      "result": {},
+      "runnerStatus": "ACTIVE",
+      "winRunnerOdds": {
+       "americanDisplayOdds": {
+        "americanOdds": 3300,
+        "americanOddsInt": 3300
+       },
+       "trueOdds": {
+        "decimalOdds": {
+         "decimalOdds": 34
+        },
+        "fractionalOdds": {
+         "numerator": 33,
+         "denominator": 1
+        }
+       }
+      },
+      "previousWinRunnerOdds": [
+       {
+        "americanDisplayOdds": {
+         "americanOdds": 3500,
+         "americanOddsInt": 3500
+        },
+        "trueOdds": {
+         "decimalOdds": {
+          "decimalOdds": 36
+         },
+         "fractionalOdds": {
+          "numerator": 35,
+          "denominator": 1
+         }
+        }
+       }
+      ]
+     },
+     {
+      "selectionId": 103990946,
+      "handicap": 0,
+      "runnerName": "Caleb Williams to record 200+ Passing Yards in Each Half",
+      "sortPriority": 15,
+      "result": {},
+      "runnerStatus": "ACTIVE",
+      "winRunnerOdds": {
+       "americanDisplayOdds": {
+        "americanOdds": 6500,
+        "americanOddsInt": 6500
+       },
+       "trueOdds": {
+        "decimalOdds": {
+         "decimalOdds": 66
+        },
+        "fractionalOdds": {
+         "numerator": 65,
+         "denominator": 1
+        }
+       }
+      },
+      "previousWinRunnerOdds": [
+       {
+        "americanDisplayOdds": {
+         "americanOdds": 7000,
+         "americanOddsInt": 7000
+        },
+        "trueOdds": {
+         "decimalOdds": {
+          "decimalOdds": 71
+         },
+         "fractionalOdds": {
+          "numerator": 70,
+          "denominator": 1
+         }
+        }
+       }
+      ]
+     },
+     {
+      "selectionId": 91129304,
+      "handicap": 0,
+      "runnerName": "Drake Maye to record 200+ Passing Yards in Each Half",
+      "sortPriority": 16,
+      "result": {},
+      "runnerStatus": "ACTIVE",
+      "winRunnerOdds": {
+       "americanDisplayOdds": {
+        "americanOdds": 7000,
+        "americanOddsInt": 7000
+       },
+       "trueOdds": {
+        "decimalOdds": {
+         "decimalOdds": 71
+        },
+        "fractionalOdds": {
+         "numerator": 70,
+         "denominator": 1
+        }
+       }
+      },
+      "previousWinRunnerOdds": [
+       {
+        "americanDisplayOdds": {
+         "americanOdds": 6500,
+         "americanOddsInt": 6500
+        },
+        "trueOdds": {
+         "decimalOdds": {
+          "decimalOdds": 66
+         },
+         "fractionalOdds": {
+          "numerator": 65,
+          "denominator": 1
+         }
+        }
+       }
+      ]
+     },
+     {
+      "selectionId": 104116152,
+      "handicap": 0,
+      "runnerName": "Caleb Williams or Drake Maye to record 500+ Passing Yards",
+      "sortPriority": 17,
+      "result": {},
+      "runnerStatus": "ACTIVE",
+      "winRunnerOdds": {
+       "americanDisplayOdds": {
+        "americanOdds": 12500,
+        "americanOddsInt": 12500
+       },
+       "trueOdds": {
+        "decimalOdds": {
+         "decimalOdds": 126
+        },
+        "fractionalOdds": {
+         "numerator": 125,
+         "denominator": 1
+        }
+       }
+      },
+      "previousWinRunnerOdds": [
+       {
+        "americanDisplayOdds": {
+         "americanOdds": 15000,
+         "americanOddsInt": 15000
+        },
+        "trueOdds": {
+         "decimalOdds": {
+          "decimalOdds": 151
+         },
+         "fractionalOdds": {
+          "numerator": 150,
+          "denominator": 1
+         }
+        }
+       }
+      ]
+     }
+    ],
+    "canTurnInPlay": true,
+    "associatedMarkets": [
+     {
+      "eventId": 36190129,
+      "eventTypeId": 6423,
+      "externalMarketId": "42.618007352"
+     }
+    ],
+    "isSuperSubEnabled": false,
+    "isBetProtectEligible": false,
+    "shouldDisplayStatsInRunner": true,
+    "eachwayAvailable": false,
+    "legTypes": [
+     "SIMPLE_SELECTION"
+    ]
+   },
+   "734.192539136": {
+    "marketId": "734.192539136",
+    "eventTypeId": 6423,
+    "competitionId": 12282733,
+    "eventId": 36190129,
+    "marketName": "Caleb Williams - Alt Passing TDs",
+    "marketTime": "2026-10-23T00:16:00.000Z",
+    "marketType": "PLAYER_X_ALT_PASSING_TOUCHDOWNS_HIGH",
+    "bspMarket": false,
+    "sgmMarket": true,
+    "inPlay": false,
+    "numberOfRunners": 4,
+    "numberOfActiveRunners": 4,
+    "numberOfWinners": 1,
+    "sortPriority": 3540,
+    "bettingType": "ODDS",
+    "marketStatus": "OPEN",
+    "runners": [
+     {
+      "selectionId": 59734532,
+      "handicap": 0,
+      "runnerName": "Caleb Williams 1+ Passing Touchdowns",
+      "sortPriority": 1,
+      "result": {},
+      "runnerStatus": "ACTIVE",
+      "logo": "https://assets.sportsbook.fanduel.com/images/team/nfl/chicago_bears_jersey.png",
+      "secondaryLogo": "https://assets.sportsbook.fanduel.com/images/team/nfl/chicago_bears.png",
+      "isPlayerSelection": true,
+      "jersey": {
+       "jerseyNumber": "18",
+       "jerseyBg": "dark"
+      },
+      "winRunnerOdds": {
+       "americanDisplayOdds": {
+        "americanOdds": -1000,
+        "americanOddsInt": -1000
+       },
+       "trueOdds": {
+        "decimalOdds": {
+         "decimalOdds": 1.1
+        },
+        "fractionalOdds": {
+         "numerator": 10,
+         "denominator": 100
+        }
+       }
+      },
+      "previousWinRunnerOdds": [
+       {
+        "americanDisplayOdds": {
+         "americanOdds": -900,
+         "americanOddsInt": -900
+        },
+        "trueOdds": {
+         "decimalOdds": {
+          "decimalOdds": 1.111111111111111
+         },
+         "fractionalOdds": {
+          "numerator": 10,
+          "denominator": 90
+         }
+        }
+       }
+      ]
+     },
+     {
+      "selectionId": 59734531,
+      "handicap": 0,
+      "runnerName": "Caleb Williams 2+ Passing Touchdowns",
+      "sortPriority": 2,
+      "result": {},
+      "runnerStatus": "ACTIVE",
+      "logo": "https://assets.sportsbook.fanduel.com/images/team/nfl/chicago_bears_jersey.png",
+      "secondaryLogo": "https://assets.sportsbook.fanduel.com/images/team/nfl/chicago_bears.png",
+      "isPlayerSelection": true,
+      "jersey": {
+       "jerseyNumber": "18",
+       "jerseyBg": "dark"
+      },
+      "winRunnerOdds": {
+       "americanDisplayOdds": {
+        "americanOdds": -158,
+        "americanOddsInt": -158
+       },
+       "trueOdds": {
+        "decimalOdds": {
+         "decimalOdds": 1.632911392405063
+        },
+        "fractionalOdds": {
+         "numerator": 100,
+         "denominator": 158
+        }
+       }
+      },
+      "previousWinRunnerOdds": [
+       {
+        "americanDisplayOdds": {
+         "americanOdds": -154,
+         "americanOddsInt": -154
+        },
+        "trueOdds": {
+         "decimalOdds": {
+          "decimalOdds": 1.649350649350649
+         },
+         "fractionalOdds": {
+          "numerator": 100,
+          "denominator": 154
+         }
+        }
+       }
+      ]
+     },
+     {
+      "selectionId": 59734535,
+      "handicap": 0,
+      "runnerName": "Caleb Williams 3+ Passing Touchdowns",
+      "sortPriority": 3,
+      "result": {},
+      "runnerStatus": "ACTIVE",
+      "logo": "https://assets.sportsbook.fanduel.com/images/team/nfl/chicago_bears_jersey.png",
+      "secondaryLogo": "https://assets.sportsbook.fanduel.com/images/team/nfl/chicago_bears.png",
+      "isPlayerSelection": true,
+      "jersey": {
+       "jerseyNumber": "18",
+       "jerseyBg": "dark"
+      },
+      "winRunnerOdds": {
+       "americanDisplayOdds": {
+        "americanOdds": 235,
+        "americanOddsInt": 235
+       },
+       "trueOdds": {
+        "decimalOdds": {
+         "decimalOdds": 3.35
+        },
+        "fractionalOdds": {
+         "numerator": 235,
+         "denominator": 100
+        }
+       }
+      },
+      "previousWinRunnerOdds": [
+       {
+        "americanDisplayOdds": {
+         "americanOdds": 240,
+         "americanOddsInt": 240
+        },
+        "trueOdds": {
+         "decimalOdds": {
+          "decimalOdds": 3.4
+         },
+         "fractionalOdds": {
+          "numerator": 240,
+          "denominator": 100
+         }
+        }
+       }
+      ]
+     },
+     {
+      "selectionId": 59734536,
+      "handicap": 0,
+      "runnerName": "Caleb Williams 4+ Passing Touchdowns",
+      "sortPriority": 4,
+      "result": {},
+      "runnerStatus": "ACTIVE",
+      "logo": "https://assets.sportsbook.fanduel.com/images/team/nfl/chicago_bears_jersey.png",
+      "secondaryLogo": "https://assets.sportsbook.fanduel.com/images/team/nfl/chicago_bears.png",
+      "isPlayerSelection": true,
+      "jersey": {
+       "jerseyNumber": "18",
+       "jerseyBg": "dark"
+      },
+      "winRunnerOdds": {
+       "americanDisplayOdds": {
+        "americanOdds": 750,
+        "americanOddsInt": 750
+       },
+       "trueOdds": {
+        "decimalOdds": {
+         "decimalOdds": 8.5
+        },
+        "fractionalOdds": {
+         "numerator": 75,
+         "denominator": 10
+        }
+       }
+      },
+      "previousWinRunnerOdds": [
+       {
+        "americanDisplayOdds": {
+         "americanOdds": 800,
+         "americanOddsInt": 800
+        },
+        "trueOdds": {
+         "decimalOdds": {
+          "decimalOdds": 9
+         },
+         "fractionalOdds": {
+          "numerator": 80,
+          "denominator": 10
+         }
+        }
+       }
+      ]
+     }
+    ],
+    "canTurnInPlay": true,
+    "associatedMarkets": [
+     {
+      "eventId": 36190129,
+      "eventTypeId": 6423,
+      "externalMarketId": "42.617700529"
+     }
+    ],
+    "isSuperSubEnabled": false,
+    "isBetProtectEligible": true,
+    "shouldDisplayStatsInRunner": true,
+    "eachwayAvailable": false,
+    "legTypes": [
+     "SIMPLE_SELECTION"
+    ]
+   },
+   "734.192539078": {
+    "marketId": "734.192539078",
+    "eventTypeId": 6423,
+    "competitionId": 12282733,
+    "eventId": 36190129,
+    "marketName": "Caleb Williams - Passing TDs",
+    "marketTime": "2026-10-23T00:16:00.000Z",
+    "marketType": "PLAYER_X_PASSING_TOUCHDOWNS_HIGH",
+    "bspMarket": false,
+    "sgmMarket": true,
+    "inPlay": false,
+    "numberOfRunners": 2,
+    "numberOfActiveRunners": 2,
+    "numberOfWinners": 1,
+    "sortPriority": 2100,
+    "bettingType": "MOVING_HANDICAP",
+    "marketStatus": "OPEN",
+    "runners": [
+     {
+      "selectionId": 41519457,
+      "handicap": 1.5,
+      "runnerName": "Caleb Williams Over",
+      "sortPriority": 1,
+      "result": {
+       "type": "OVER"
+      },
+      "runnerStatus": "ACTIVE",
+      "logo": "https://assets.sportsbook.fanduel.com/images/team/nfl/chicago_bears_jersey.png",
+      "secondaryLogo": "https://assets.sportsbook.fanduel.com/images/team/nfl/chicago_bears.png",
+      "isPlayerSelection": true,
+      "jersey": {
+       "jerseyNumber": "18",
+       "jerseyBg": "dark"
+      },
+      "winRunnerOdds": {
+       "americanDisplayOdds": {
+        "americanOdds": -156,
+        "americanOddsInt": -156
+       },
+       "trueOdds": {
+        "decimalOdds": {
+         "decimalOdds": 1.641025641025641
+        },
+        "fractionalOdds": {
+         "numerator": 100,
+         "denominator": 156
+        }
+       }
+      },
+      "previousWinRunnerOdds": [
+       {
+        "americanDisplayOdds": {
+         "americanOdds": -154,
+         "americanOddsInt": -154
+        },
+        "trueOdds": {
+         "decimalOdds": {
+          "decimalOdds": 1.649350649350649
+         },
+         "fractionalOdds": {
+          "numerator": 100,
+          "denominator": 154
+         }
+        }
+       }
+      ]
+     },
+     {
+      "selectionId": 41519458,
+      "handicap": 1.5,
+      "runnerName": "Caleb Williams Under",
+      "sortPriority": 2,
+      "result": {
+       "type": "UNDER"
+      },
+      "runnerStatus": "ACTIVE",
+      "logo": "https://assets.sportsbook.fanduel.com/images/team/nfl/chicago_bears_jersey.png",
+      "secondaryLogo": "https://assets.sportsbook.fanduel.com/images/team/nfl/chicago_bears.png",
+      "isPlayerSelection": true,
+      "jersey": {
+       "jerseyNumber": "18",
+       "jerseyBg": "dark"
+      },
+      "winRunnerOdds": {
+       "americanDisplayOdds": {
+        "americanOdds": 120,
+        "americanOddsInt": 120
+       },
+       "trueOdds": {
+        "decimalOdds": {
+         "decimalOdds": 2.2
+        },
+        "fractionalOdds": {
+         "numerator": 120,
+         "denominator": 100
+        }
+       }
+      },
+      "previousWinRunnerOdds": [
+       {
+        "americanDisplayOdds": {
+         "americanOdds": 118,
+         "americanOddsInt": 118
+        },
+        "trueOdds": {
+         "decimalOdds": {
+          "decimalOdds": 2.18
+         },
+         "fractionalOdds": {
+          "numerator": 118,
+          "denominator": 100
+         }
+        }
+       }
+      ]
+     }
+    ],
+    "canTurnInPlay": true,
+    "associatedMarkets": [
+     {
+      "eventId": 36190129,
+      "eventTypeId": 6423,
+      "externalMarketId": "42.617700527"
+     }
+    ],
+    "isSuperSubEnabled": false,
+    "isBetProtectEligible": true,
+    "shouldDisplayStatsInRunner": true,
+    "eachwayAvailable": false,
+    "legTypes": [
+     "SIMPLE_SELECTION"
+    ]
+   },
+   "734.191539413": {
+    "marketId": "734.191539413",
+    "eventTypeId": 6423,
+    "competitionId": 12282733,
+    "eventId": 36190129,
+    "marketName": "Moneyline",
+    "marketTime": "2026-10-23T00:16:00.000Z",
+    "marketType": "MONEY_LINE",
+    "bspMarket": false,
+    "sgmMarket": true,
+    "inPlay": false,
+    "numberOfRunners": 2,
+    "numberOfActiveRunners": 2,
+    "numberOfWinners": 1,
+    "sortPriority": -900,
+    "bettingType": "ODDS",
+    "marketStatus": "OPEN",
+    "runners": [
+     {
+      "selectionId": 50204,
+      "handicap": 0,
+      "runnerName": "New England Patriots",
+      "sortPriority": 1,
+      "result": {
+       "type": "AWAY"
+      },
+      "runnerStatus": "ACTIVE",
+      "logo": "https://assets.sportsbook.fanduel.com/images/team/nfl/new_england_patriots.png",
+      "nameAbbr": "NE Patriots",
+      "winRunnerOdds": {
+       "americanDisplayOdds": {
+        "americanOdds": 134,
+        "americanOddsInt": 134
+       },
+       "trueOdds": {
+        "decimalOdds": {
+         "decimalOdds": 2.34
+        },
+        "fractionalOdds": {
+         "numerator": 134,
+         "denominator": 100
+        }
+       }
+      },
+      "previousWinRunnerOdds": [
+       {
+        "americanDisplayOdds": {
+         "americanOdds": 136,
+         "americanOddsInt": 136
+        },
+        "trueOdds": {
+         "decimalOdds": {
+          "decimalOdds": 2.36
+         },
+         "fractionalOdds": {
+          "numerator": 136,
+          "denominator": 100
+         }
+        }
+       }
+      ]
+     },
+     {
+      "selectionId": 50194,
+      "handicap": 0,
+      "runnerName": "Chicago Bears",
+      "sortPriority": 2,
+      "result": {
+       "type": "HOME"
+      },
+      "runnerStatus": "ACTIVE",
+      "logo": "https://assets.sportsbook.fanduel.com/images/team/nfl/chicago_bears.png",
+      "nameAbbr": "CHI Bears",
+      "winRunnerOdds": {
+       "americanDisplayOdds": {
+        "americanOdds": -158,
+        "americanOddsInt": -158
+       },
+       "trueOdds": {
+        "decimalOdds": {
+         "decimalOdds": 1.632911392405063
+        },
+        "fractionalOdds": {
+         "numerator": 100,
+         "denominator": 158
+        }
+       }
+      },
+      "previousWinRunnerOdds": [
+       {
+        "americanDisplayOdds": {
+         "americanOdds": -162,
+         "americanOddsInt": -162
+        },
+        "trueOdds": {
+         "decimalOdds": {
+          "decimalOdds": 1.617283950617284
+         },
+         "fractionalOdds": {
+          "numerator": 100,
+          "denominator": 162
+         }
+        }
+       }
+      ]
+     }
+    ],
+    "canTurnInPlay": true,
+    "associatedMarkets": [
+     {
+      "eventId": 36190129,
+      "eventTypeId": 6423,
+      "externalMarketId": "42.616149652"
+     }
+    ],
+    "isSuperSubEnabled": false,
+    "isBetProtectEligible": false,
+    "shouldDisplayStatsInRunner": true,
+    "eachwayAvailable": false,
+    "legTypes": [
+     "SIMPLE_SELECTION"
+    ]
+   },
+   "734.192539120": {
+    "marketId": "734.192539120",
+    "eventTypeId": 6423,
+    "competitionId": 12282733,
+    "eventId": 36190129,
+    "marketName": "Caleb Williams - Passing Yds",
+    "marketTime": "2026-10-23T00:16:00.000Z",
+    "marketType": "PLAYER_X_PASSING_YARDS_HIGH",
+    "bspMarket": false,
+    "sgmMarket": true,
+    "inPlay": false,
+    "numberOfRunners": 2,
+    "numberOfActiveRunners": 2,
+    "numberOfWinners": 1,
+    "sortPriority": 2060,
+    "bettingType": "MOVING_HANDICAP",
+    "marketStatus": "OPEN",
+    "runners": [
+     {
+      "selectionId": 41519457,
+      "handicap": 243.5,
+      "runnerName": "Caleb Williams Over",
+      "sortPriority": 1,
+      "result": {
+       "type": "OVER"
+      },
+      "runnerStatus": "ACTIVE",
+      "logo": "https://assets.sportsbook.fanduel.com/images/team/nfl/chicago_bears_jersey.png",
+      "secondaryLogo": "https://assets.sportsbook.fanduel.com/images/team/nfl/chicago_bears.png",
+      "isPlayerSelection": true,
+      "jersey": {
+       "jerseyNumber": "18",
+       "jerseyBg": "dark"
+      },
+      "winRunnerOdds": {
+       "americanDisplayOdds": {
+        "americanOdds": -113,
+        "americanOddsInt": -113
+       },
+       "trueOdds": {
+        "decimalOdds": {
+         "decimalOdds": 1.884955752212389
+        },
+        "fractionalOdds": {
+         "numerator": 100,
+         "denominator": 113
+        }
+       }
+      },
+      "previousWinRunnerOdds": [
+       {
+        "americanDisplayOdds": {
+         "americanOdds": -114,
+         "americanOddsInt": -114
+        },
+        "trueOdds": {
+         "decimalOdds": {
+          "decimalOdds": 1.87719298245614
+         },
+         "fractionalOdds": {
+          "numerator": 100,
+          "denominator": 114
+         }
+        }
+       }
+      ]
+     },
+     {
+      "selectionId": 41519458,
+      "handicap": 243.5,
+      "runnerName": "Caleb Williams Under",
+      "sortPriority": 2,
+      "result": {
+       "type": "UNDER"
+      },
+      "runnerStatus": "ACTIVE",
+      "logo": "https://assets.sportsbook.fanduel.com/images/team/nfl/chicago_bears_jersey.png",
+      "secondaryLogo": "https://assets.sportsbook.fanduel.com/images/team/nfl/chicago_bears.png",
+      "isPlayerSelection": true,
+      "jersey": {
+       "jerseyNumber": "18",
+       "jerseyBg": "dark"
+      },
+      "winRunnerOdds": {
+       "americanDisplayOdds": {
+        "americanOdds": -113,
+        "americanOddsInt": -113
+       },
+       "trueOdds": {
+        "decimalOdds": {
+         "decimalOdds": 1.884955752212389
+        },
+        "fractionalOdds": {
+         "numerator": 100,
+         "denominator": 113
+        }
+       }
+      },
+      "previousWinRunnerOdds": [
+       {
+        "americanDisplayOdds": {
+         "americanOdds": -114,
+         "americanOddsInt": -114
+        },
+        "trueOdds": {
+         "decimalOdds": {
+          "decimalOdds": 1.87719298245614
+         },
+         "fractionalOdds": {
+          "numerator": 100,
+          "denominator": 114
+         }
+        }
+       }
+      ]
+     }
+    ],
+    "canTurnInPlay": true,
+    "associatedMarkets": [
+     {
+      "eventId": 36190129,
+      "eventTypeId": 6423,
+      "externalMarketId": "42.617700523"
+     }
+    ],
+    "isSuperSubEnabled": false,
+    "isBetProtectEligible": true,
+    "shouldDisplayStatsInRunner": true,
+    "eachwayAvailable": false,
+    "legTypes": [
+     "SIMPLE_SELECTION"
+    ]
+   },
+   "734.192539143": {
+    "marketId": "734.192539143",
+    "eventTypeId": 6423,
+    "competitionId": 12282733,
+    "eventId": 36190129,
+    "marketName": "Drake Maye - Passing TDs",
+    "marketTime": "2026-10-23T00:16:00.000Z",
+    "marketType": "PLAYER_X_PASSING_TOUCHDOWNS_HIGH",
+    "bspMarket": false,
+    "sgmMarket": true,
+    "inPlay": false,
+    "numberOfRunners": 2,
+    "numberOfActiveRunners": 2,
+    "numberOfWinners": 1,
+    "sortPriority": 2100,
+    "bettingType": "MOVING_HANDICAP",
+    "marketStatus": "OPEN",
+    "runners": [
+     {
+      "selectionId": 48103561,
+      "handicap": 1.5,
+      "runnerName": "Drake Maye Over",
+      "sortPriority": 1,
+      "result": {
+       "type": "OVER"
+      },
+      "runnerStatus": "ACTIVE",
+      "logo": "https://assets.sportsbook.fanduel.com/images/team/nfl/new_england_patriots_jersey.png",
+      "secondaryLogo": "https://assets.sportsbook.fanduel.com/images/team/nfl/new_england_patriots.png",
+      "isPlayerSelection": true,
+      "jersey": {
+       "jerseyNumber": "10",
+       "jerseyBg": "dark"
+      },
+      "winRunnerOdds": {
+       "americanDisplayOdds": {
+        "americanOdds": -130,
+        "americanOddsInt": -130
+       },
+       "trueOdds": {
+        "decimalOdds": {
+         "decimalOdds": 1.769230769230769
+        },
+        "fractionalOdds": {
+         "numerator": 100,
+         "denominator": 130
+        }
+       }
+      },
+      "previousWinRunnerOdds": [
+       {
+        "americanDisplayOdds": {
+         "americanOdds": -128,
+         "americanOddsInt": -128
+        },
+        "trueOdds": {
+         "decimalOdds": {
+          "decimalOdds": 1.78125
+         },
+         "fractionalOdds": {
+          "numerator": 100,
+          "denominator": 128
+         }
+        }
+       }
+      ]
+     },
+     {
+      "selectionId": 48103562,
+      "handicap": 1.5,
+      "runnerName": "Drake Maye Under",
+      "sortPriority": 2,
+      "result": {
+       "type": "UNDER"
+      },
+      "runnerStatus": "ACTIVE",
+      "logo": "https://assets.sportsbook.fanduel.com/images/team/nfl/new_england_patriots_jersey.png",
+      "secondaryLogo": "https://assets.sportsbook.fanduel.com/images/team/nfl/new_england_patriots.png",
+      "isPlayerSelection": true,
+      "jersey": {
+       "jerseyNumber": "10",
+       "jerseyBg": "dark"
+      },
+      "winRunnerOdds": {
+       "americanDisplayOdds": {
+        "americanOdds": 100,
+        "americanOddsInt": 100
+       },
+       "trueOdds": {
+        "decimalOdds": {
+         "decimalOdds": 2
+        },
+        "fractionalOdds": {
+         "numerator": 100,
+         "denominator": 100
+        }
+       }
+      },
+      "previousWinRunnerOdds": [
+       {
+        "americanDisplayOdds": {
+         "americanOdds": -102,
+         "americanOddsInt": -102
+        },
+        "trueOdds": {
+         "decimalOdds": {
+          "decimalOdds": 1.980392156862745
+         },
+         "fractionalOdds": {
+          "numerator": 100,
+          "denominator": 102
+         }
+        }
+       }
+      ]
+     }
+    ],
+    "canTurnInPlay": true,
+    "associatedMarkets": [
+     {
+      "eventId": 36190129,
+      "eventTypeId": 6423,
+      "externalMarketId": "42.617700528"
+     }
+    ],
+    "isSuperSubEnabled": false,
+    "isBetProtectEligible": true,
+    "shouldDisplayStatsInRunner": true,
+    "eachwayAvailable": false,
+    "legTypes": [
+     "SIMPLE_SELECTION"
+    ]
+   },
+   "734.192539085": {
+    "marketId": "734.192539085",
+    "eventTypeId": 6423,
+    "competitionId": 12282733,
+    "eventId": 36190129,
+    "marketName": "Drake Maye - Alt Passing TDs",
+    "marketTime": "2026-10-23T00:16:00.000Z",
+    "marketType": "PLAYER_X_ALT_PASSING_TOUCHDOWNS_HIGH",
+    "bspMarket": false,
+    "sgmMarket": true,
+    "inPlay": false,
+    "numberOfRunners": 4,
+    "numberOfActiveRunners": 4,
+    "numberOfWinners": 1,
+    "sortPriority": 3540,
+    "bettingType": "ODDS",
+    "marketStatus": "OPEN",
+    "runners": [
+     {
+      "selectionId": 60052202,
+      "handicap": 0,
+      "runnerName": "Drake Maye 1+ Passing Touchdowns",
+      "sortPriority": 1,
+      "result": {},
+      "runnerStatus": "ACTIVE",
+      "logo": "https://assets.sportsbook.fanduel.com/images/team/nfl/new_england_patriots_jersey.png",
+      "secondaryLogo": "https://assets.sportsbook.fanduel.com/images/team/nfl/new_england_patriots.png",
+      "isPlayerSelection": true,
+      "jersey": {
+       "jerseyNumber": "10",
+       "jerseyBg": "dark"
+      },
+      "winRunnerOdds": {
+       "americanDisplayOdds": {
+        "americanOdds": -750,
+        "americanOddsInt": -750
+       },
+       "trueOdds": {
+        "decimalOdds": {
+         "decimalOdds": 1.133333333333333
+        },
+        "fractionalOdds": {
+         "numerator": 10,
+         "denominator": 75
+        }
+       }
+      },
+      "previousWinRunnerOdds": [
+       {
+        "americanDisplayOdds": {
+         "americanOdds": -700,
+         "americanOddsInt": -700
+        },
+        "trueOdds": {
+         "decimalOdds": {
+          "decimalOdds": 1.142857142857143
+         },
+         "fractionalOdds": {
+          "numerator": 10,
+          "denominator": 70
+         }
+        }
+       }
+      ]
+     },
+     {
+      "selectionId": 60052216,
+      "handicap": 0,
+      "runnerName": "Drake Maye 2+ Passing Touchdowns",
+      "sortPriority": 2,
+      "result": {},
+      "runnerStatus": "ACTIVE",
+      "logo": "https://assets.sportsbook.fanduel.com/images/team/nfl/new_england_patriots_jersey.png",
+      "secondaryLogo": "https://assets.sportsbook.fanduel.com/images/team/nfl/new_england_patriots.png",
+      "isPlayerSelection": true,
+      "jersey": {
+       "jerseyNumber": "10",
+       "jerseyBg": "dark"
+      },
+      "winRunnerOdds": {
+       "americanDisplayOdds": {
+        "americanOdds": -132,
+        "americanOddsInt": -132
+       },
+       "trueOdds": {
+        "decimalOdds": {
+         "decimalOdds": 1.757575757575758
+        },
+        "fractionalOdds": {
+         "numerator": 100,
+         "denominator": 132
+        }
+       }
+      },
+      "previousWinRunnerOdds": [
+       {
+        "americanDisplayOdds": {
+         "americanOdds": -130,
+         "americanOddsInt": -130
+        },
+        "trueOdds": {
+         "decimalOdds": {
+          "decimalOdds": 1.769230769230769
+         },
+         "fractionalOdds": {
+          "numerator": 100,
+          "denominator": 130
+         }
+        }
+       }
+      ]
+     },
+     {
+      "selectionId": 60052199,
+      "handicap": 0,
+      "runnerName": "Drake Maye 3+ Passing Touchdowns",
+      "sortPriority": 3,
+      "result": {},
+      "runnerStatus": "ACTIVE",
+      "logo": "https://assets.sportsbook.fanduel.com/images/team/nfl/new_england_patriots_jersey.png",
+      "secondaryLogo": "https://assets.sportsbook.fanduel.com/images/team/nfl/new_england_patriots.png",
+      "isPlayerSelection": true,
+      "jersey": {
+       "jerseyNumber": "10",
+       "jerseyBg": "dark"
+      },
+      "winRunnerOdds": {
+       "americanDisplayOdds": {
+        "americanOdds": 280,
+        "americanOddsInt": 280
+       },
+       "trueOdds": {
+        "decimalOdds": {
+         "decimalOdds": 3.8
+        },
+        "fractionalOdds": {
+         "numerator": 28,
+         "denominator": 10
+        }
+       }
+      },
+      "previousWinRunnerOdds": [
+       {
+        "americanDisplayOdds": {
+         "americanOdds": 290,
+         "americanOddsInt": 290
+        },
+        "trueOdds": {
+         "decimalOdds": {
+          "decimalOdds": 3.9
+         },
+         "fractionalOdds": {
+          "numerator": 29,
+          "denominator": 10
+         }
+        }
+       }
+      ]
+     },
+     {
+      "selectionId": 60052215,
+      "handicap": 0,
+      "runnerName": "Drake Maye 4+ Passing Touchdowns",
+      "sortPriority": 4,
+      "result": {},
+      "runnerStatus": "ACTIVE",
+      "logo": "https://assets.sportsbook.fanduel.com/images/team/nfl/new_england_patriots_jersey.png",
+      "secondaryLogo": "https://assets.sportsbook.fanduel.com/images/team/nfl/new_england_patriots.png",
+      "isPlayerSelection": true,
+      "jersey": {
+       "jerseyNumber": "10",
+       "jerseyBg": "dark"
+      },
+      "winRunnerOdds": {
+       "americanDisplayOdds": {
+        "americanOdds": 880,
+        "americanOddsInt": 880
+       },
+       "trueOdds": {
+        "decimalOdds": {
+         "decimalOdds": 9.8
+        },
+        "fractionalOdds": {
+         "numerator": 88,
+         "denominator": 10
+        }
+       }
+      },
+      "previousWinRunnerOdds": [
+       {
+        "americanDisplayOdds": {
+         "americanOdds": 920,
+         "americanOddsInt": 920
+        },
+        "trueOdds": {
+         "decimalOdds": {
+          "decimalOdds": 10.2
+         },
+         "fractionalOdds": {
+          "numerator": 92,
+          "denominator": 10
+         }
+        }
+       }
+      ]
+     }
+    ],
+    "canTurnInPlay": true,
+    "associatedMarkets": [
+     {
+      "eventId": 36190129,
+      "eventTypeId": 6423,
+      "externalMarketId": "42.617700530"
+     }
+    ],
+    "isSuperSubEnabled": false,
+    "isBetProtectEligible": true,
+    "shouldDisplayStatsInRunner": true,
+    "eachwayAvailable": false,
+    "legTypes": [
+     "SIMPLE_SELECTION"
+    ]
+   },
+   "734.192539141": {
+    "marketId": "734.192539141",
+    "eventTypeId": 6423,
+    "competitionId": 12282733,
+    "eventId": 36190129,
+    "marketName": "Drake Maye - Alt Passing Yds",
+    "marketTime": "2026-10-23T00:16:00.000Z",
+    "marketType": "PLAYER_X_ALT_PASSING_YARDS_HIGH",
+    "bspMarket": false,
+    "sgmMarket": true,
+    "inPlay": false,
+    "numberOfRunners": 9,
+    "numberOfActiveRunners": 9,
+    "numberOfWinners": 1,
+    "sortPriority": 3430,
+    "bettingType": "ODDS",
+    "marketStatus": "OPEN",
+    "runners": [
+     {
+      "selectionId": 74921917,
+      "handicap": 0,
+      "runnerName": "Drake Maye 175+ Yards",
+      "sortPriority": 1,
+      "result": {},
+      "runnerStatus": "ACTIVE",
+      "logo": "https://assets.sportsbook.fanduel.com/images/team/nfl/new_england_patriots_jersey.png",
+      "secondaryLogo": "https://assets.sportsbook.fanduel.com/images/team/nfl/new_england_patriots.png",
+      "isPlayerSelection": true,
+      "jersey": {
+       "jerseyNumber": "10",
+       "jerseyBg": "dark"
+      },
+      "winRunnerOdds": {
+       "americanDisplayOdds": {
+        "americanOdds": -750,
+        "americanOddsInt": -750
+       },
+       "trueOdds": {
+        "decimalOdds": {
+         "decimalOdds": 1.133333333333333
+        },
+        "fractionalOdds": {
+         "numerator": 10,
+         "denominator": 75
+        }
+       }
+      },
+      "previousWinRunnerOdds": [
+       {
+        "americanDisplayOdds": {
+         "americanOdds": -700,
+         "americanOddsInt": -700
+        },
+        "trueOdds": {
+         "decimalOdds": {
+          "decimalOdds": 1.142857142857143
+         },
+         "fractionalOdds": {
+          "numerator": 10,
+          "denominator": 70
+         }
+        }
+       }
+      ]
+     },
+     {
+      "selectionId": 48777665,
+      "handicap": 0,
+      "runnerName": "Drake Maye 200+ Yards",
+      "sortPriority": 2,
+      "result": {},
+      "runnerStatus": "ACTIVE",
+      "logo": "https://assets.sportsbook.fanduel.com/images/team/nfl/new_england_patriots_jersey.png",
+      "secondaryLogo": "https://assets.sportsbook.fanduel.com/images/team/nfl/new_england_patriots.png",
+      "isPlayerSelection": true,
+      "jersey": {
+       "jerseyNumber": "10",
+       "jerseyBg": "dark"
+      },
+      "winRunnerOdds": {
+       "americanDisplayOdds": {
+        "americanOdds": -360,
+        "americanOddsInt": -360
+       },
+       "trueOdds": {
+        "decimalOdds": {
+         "decimalOdds": 1.277777777777778
+        },
+        "fractionalOdds": {
+         "numerator": 10,
+         "denominator": 36
+        }
+       }
+      },
+      "previousWinRunnerOdds": [
+       {
+        "americanDisplayOdds": {
+         "americanOdds": -380,
+         "americanOddsInt": -380
+        },
+        "trueOdds": {
+         "decimalOdds": {
+          "decimalOdds": 1.263157894736842
+         },
+         "fractionalOdds": {
+          "numerator": 10,
+          "denominator": 38
+         }
+        }
+       }
+      ]
+     },
+     {
+      "selectionId": 48777656,
+      "handicap": 0,
+      "runnerName": "Drake Maye 225+ Yards",
+      "sortPriority": 3,
+      "result": {},
+      "runnerStatus": "ACTIVE",
+      "logo": "https://assets.sportsbook.fanduel.com/images/team/nfl/new_england_patriots_jersey.png",
+      "secondaryLogo": "https://assets.sportsbook.fanduel.com/images/team/nfl/new_england_patriots.png",
+      "isPlayerSelection": true,
+      "jersey": {
+       "jerseyNumber": "10",
+       "jerseyBg": "dark"
+      },
+      "winRunnerOdds": {
+       "americanDisplayOdds": {
+        "americanOdds": -200,
+        "americanOddsInt": -200
+       },
+       "trueOdds": {
+        "decimalOdds": {
+         "decimalOdds": 1.5
+        },
+        "fractionalOdds": {
+         "numerator": 100,
+         "denominator": 200
+        }
+       }
+      },
+      "previousWinRunnerOdds": [
+       {
+        "americanDisplayOdds": {
+         "americanOdds": -198,
+         "americanOddsInt": -198
+        },
+        "trueOdds": {
+         "decimalOdds": {
+          "decimalOdds": 1.505050505050505
+         },
+         "fractionalOdds": {
+          "numerator": 100,
+          "denominator": 198
+         }
+        }
+       }
+      ]
+     },
+     {
+      "selectionId": 48777669,
+      "handicap": 0,
+      "runnerName": "Drake Maye 250+ Yards",
+      "sortPriority": 4,
+      "result": {},
+      "runnerStatus": "ACTIVE",
+      "logo": "https://assets.sportsbook.fanduel.com/images/team/nfl/new_england_patriots_jersey.png",
+      "secondaryLogo": "https://assets.sportsbook.fanduel.com/images/team/nfl/new_england_patriots.png",
+      "isPlayerSelection": true,
+      "jersey": {
+       "jerseyNumber": "10",
+       "jerseyBg": "dark"
+      },
+      "winRunnerOdds": {
+       "americanDisplayOdds": {
+        "americanOdds": -110,
+        "americanOddsInt": -110
+       },
+       "trueOdds": {
+        "decimalOdds": {
+         "decimalOdds": 1.909090909090909
+        },
+        "fractionalOdds": {
+         "numerator": 100,
+         "denominator": 110
+        }
+       }
+      },
+      "previousWinRunnerOdds": [
+       {
+        "americanDisplayOdds": {
+         "americanOdds": -106,
+         "americanOddsInt": -106
+        },
+        "trueOdds": {
+         "decimalOdds": {
+          "decimalOdds": 1.943396226415094
+         },
+         "fractionalOdds": {
+          "numerator": 100,
+          "denominator": 106
+         }
+        }
+       }
+      ]
+     },
+     {
+      "selectionId": 48777652,
+      "handicap": 0,
+      "runnerName": "Drake Maye 275+ Yards",
+      "sortPriority": 5,
+      "result": {},
+      "runnerStatus": "ACTIVE",
+      "logo": "https://assets.sportsbook.fanduel.com/images/team/nfl/new_england_patriots_jersey.png",
+      "secondaryLogo": "https://assets.sportsbook.fanduel.com/images/team/nfl/new_england_patriots.png",
+      "isPlayerSelection": true,
+      "jersey": {
+       "jerseyNumber": "10",
+       "jerseyBg": "dark"
+      },
+      "winRunnerOdds": {
+       "americanDisplayOdds": {
+        "americanOdds": 162,
+        "americanOddsInt": 162
+       },
+       "trueOdds": {
+        "decimalOdds": {
+         "decimalOdds": 2.62
+        },
+        "fractionalOdds": {
+         "numerator": 162,
+         "denominator": 100
+        }
+       }
+      },
+      "previousWinRunnerOdds": [
+       {
+        "americanDisplayOdds": {
+         "americanOdds": 164,
+         "americanOddsInt": 164
+        },
+        "trueOdds": {
+         "decimalOdds": {
+          "decimalOdds": 2.64
+         },
+         "fractionalOdds": {
+          "numerator": 164,
+          "denominator": 100
+         }
+        }
+       }
+      ]
+     },
+     {
+      "selectionId": 48777654,
+      "handicap": 0,
+      "runnerName": "Drake Maye 300+ Yards",
+      "sortPriority": 6,
+      "result": {},
+      "runnerStatus": "ACTIVE",
+      "logo": "https://assets.sportsbook.fanduel.com/images/team/nfl/new_england_patriots_jersey.png",
+      "secondaryLogo": "https://assets.sportsbook.fanduel.com/images/team/nfl/new_england_patriots.png",
+      "isPlayerSelection": true,
+      "jersey": {
+       "jerseyNumber": "10",
+       "jerseyBg": "dark"
+      },
+      "winRunnerOdds": {
+       "americanDisplayOdds": {
+        "americanOdds": 280,
+        "americanOddsInt": 280
+       },
+       "trueOdds": {
+        "decimalOdds": {
+         "decimalOdds": 3.8
+        },
+        "fractionalOdds": {
+         "numerator": 28,
+         "denominator": 10
+        }
+       }
+      },
+      "previousWinRunnerOdds": [
+       {
+        "americanDisplayOdds": {
+         "americanOdds": 270,
+         "americanOddsInt": 270
+        },
+        "trueOdds": {
+         "decimalOdds": {
+          "decimalOdds": 3.7
+         },
+         "fractionalOdds": {
+          "numerator": 27,
+          "denominator": 10
+         }
+        }
+       }
+      ]
+     },
+     {
+      "selectionId": 48777677,
+      "handicap": 0,
+      "runnerName": "Drake Maye 325+ Yards",
+      "sortPriority": 7,
+      "result": {},
+      "runnerStatus": "ACTIVE",
+      "logo": "https://assets.sportsbook.fanduel.com/images/team/nfl/new_england_patriots_jersey.png",
+      "secondaryLogo": "https://assets.sportsbook.fanduel.com/images/team/nfl/new_england_patriots.png",
+      "isPlayerSelection": true,
+      "jersey": {
+       "jerseyNumber": "10",
+       "jerseyBg": "dark"
+      },
+      "winRunnerOdds": {
+       "americanDisplayOdds": {
+        "americanOdds": 470,
+        "americanOddsInt": 470
+       },
+       "trueOdds": {
+        "decimalOdds": {
+         "decimalOdds": 5.7
+        },
+        "fractionalOdds": {
+         "numerator": 47,
+         "denominator": 10
+        }
+       }
+      },
+      "previousWinRunnerOdds": [
+       {
+        "americanDisplayOdds": {
+         "americanOdds": 450,
+         "americanOddsInt": 450
+        },
+        "trueOdds": {
+         "decimalOdds": {
+          "decimalOdds": 5.5
+         },
+         "fractionalOdds": {
+          "numerator": 45,
+          "denominator": 10
+         }
+        }
+       }
+      ]
+     },
+     {
+      "selectionId": 48777651,
+      "handicap": 0,
+      "runnerName": "Drake Maye 350+ Yards",
+      "sortPriority": 8,
+      "result": {},
+      "runnerStatus": "ACTIVE",
+      "logo": "https://assets.sportsbook.fanduel.com/images/team/nfl/new_england_patriots_jersey.png",
+      "secondaryLogo": "https://assets.sportsbook.fanduel.com/images/team/nfl/new_england_patriots.png",
+      "isPlayerSelection": true,
+      "jersey": {
+       "jerseyNumber": "10",
+       "jerseyBg": "dark"
+      },
+      "winRunnerOdds": {
+       "americanDisplayOdds": {
+        "americanOdds": 750,
+        "americanOddsInt": 750
+       },
+       "trueOdds": {
+        "decimalOdds": {
+         "decimalOdds": 8.5
+        },
+        "fractionalOdds": {
+         "numerator": 75,
+         "denominator": 10
+        }
+       }
+      },
+      "previousWinRunnerOdds": [
+       {
+        "americanDisplayOdds": {
+         "americanOdds": 800,
+         "americanOddsInt": 800
+        },
+        "trueOdds": {
+         "decimalOdds": {
+          "decimalOdds": 9
+         },
+         "fractionalOdds": {
+          "numerator": 80,
+          "denominator": 10
+         }
+        }
+       }
+      ]
+     },
+     {
+      "selectionId": 87513422,
+      "handicap": 0,
+      "runnerName": "Drake Maye 375+ Yards",
+      "sortPriority": 9,
+      "result": {},
+      "runnerStatus": "ACTIVE",
+      "logo": "https://assets.sportsbook.fanduel.com/images/team/nfl/new_england_patriots_jersey.png",
+      "secondaryLogo": "https://assets.sportsbook.fanduel.com/images/team/nfl/new_england_patriots.png",
+      "isPlayerSelection": true,
+      "jersey": {
+       "jerseyNumber": "10",
+       "jerseyBg": "dark"
+      },
+      "winRunnerOdds": {
+       "americanDisplayOdds": {
+        "americanOdds": 1200,
+        "americanOddsInt": 1200
+       },
+       "trueOdds": {
+        "decimalOdds": {
+         "decimalOdds": 13
+        },
+        "fractionalOdds": {
+         "numerator": 120,
+         "denominator": 10
+        }
+       }
+      },
+      "previousWinRunnerOdds": [
+       {
+        "americanDisplayOdds": {
+         "americanOdds": 1100,
+         "americanOddsInt": 1100
+        },
+        "trueOdds": {
+         "decimalOdds": {
+          "decimalOdds": 12
+         },
+         "fractionalOdds": {
+          "numerator": 110,
+          "denominator": 10
+         }
+        }
+       }
+      ]
+     }
+    ],
+    "canTurnInPlay": true,
+    "associatedMarkets": [
+     {
+      "eventId": 36190129,
+      "eventTypeId": 6423,
+      "externalMarketId": "42.617700526"
+     }
+    ],
+    "isSuperSubEnabled": false,
+    "isBetProtectEligible": true,
+    "shouldDisplayStatsInRunner": true,
+    "eachwayAvailable": false,
+    "legTypes": [
+     "SIMPLE_SELECTION"
+    ]
+   },
+   "734.192539084": {
+    "marketId": "734.192539084",
+    "eventTypeId": 6423,
+    "competitionId": 12282733,
+    "eventId": 36190129,
+    "marketName": "Most Passing Yards",
+    "marketTime": "2026-10-23T00:16:00.000Z",
+    "marketType": "MOST_PASSING_YARDS",
+    "bspMarket": false,
+    "sgmMarket": true,
+    "inPlay": false,
+    "numberOfRunners": 2,
+    "numberOfActiveRunners": 2,
+    "numberOfWinners": 1,
+    "sortPriority": 100,
+    "bettingType": "ODDS",
+    "marketStatus": "OPEN",
+    "runners": [
+     {
+      "selectionId": 48167907,
+      "handicap": 0,
+      "runnerName": "Drake Maye",
+      "sortPriority": 1,
+      "result": {},
+      "runnerStatus": "ACTIVE",
+      "logo": "https://assets.sportsbook.fanduel.com/images/team/nfl/new_england_patriots_jersey.png",
+      "secondaryLogo": "https://assets.sportsbook.fanduel.com/images/team/nfl/new_england_patriots.png",
+      "isPlayerSelection": true,
+      "jersey": {
+       "jerseyNumber": "10",
+       "jerseyBg": "dark"
+      },
+      "winRunnerOdds": {
+       "americanDisplayOdds": {
+        "americanOdds": -120,
+        "americanOddsInt": -120
+       },
+       "trueOdds": {
+        "decimalOdds": {
+         "decimalOdds": 1.833333333333333
+        },
+        "fractionalOdds": {
+         "numerator": 100,
+         "denominator": 120
+        }
+       }
+      },
+      "previousWinRunnerOdds": [
+       {
+        "americanDisplayOdds": {
+         "americanOdds": -122,
+         "americanOddsInt": -122
+        },
+        "trueOdds": {
+         "decimalOdds": {
+          "decimalOdds": 1.819672131147541
+         },
+         "fractionalOdds": {
+          "numerator": 100,
+          "denominator": 122
+         }
+        }
+       }
+      ]
+     },
+     {
+      "selectionId": 41325151,
+      "handicap": 0,
+      "runnerName": "Caleb Williams",
+      "sortPriority": 2,
+      "result": {},
+      "runnerStatus": "ACTIVE",
+      "logo": "https://assets.sportsbook.fanduel.com/images/team/nfl/chicago_bears_jersey.png",
+      "secondaryLogo": "https://assets.sportsbook.fanduel.com/images/team/nfl/chicago_bears.png",
+      "isPlayerSelection": true,
+      "jersey": {
+       "jerseyNumber": "18",
+       "jerseyBg": "dark"
+      },
+      "winRunnerOdds": {
+       "americanDisplayOdds": {
+        "americanOdds": -108,
+        "americanOddsInt": -108
+       },
+       "trueOdds": {
+        "decimalOdds": {
+         "decimalOdds": 1.925925925925926
+        },
+        "fractionalOdds": {
+         "numerator": 100,
+         "denominator": 108
+        }
+       }
+      },
+      "previousWinRunnerOdds": [
+       {
+        "americanDisplayOdds": {
+         "americanOdds": -104,
+         "americanOddsInt": -104
+        },
+        "trueOdds": {
+         "decimalOdds": {
+          "decimalOdds": 1.961538461538462
+         },
+         "fractionalOdds": {
+          "numerator": 100,
+          "denominator": 104
+         }
+        }
+       }
+      ]
+     }
+    ],
+    "canTurnInPlay": true,
+    "associatedMarkets": [
+     {
+      "eventId": 36190129,
+      "eventTypeId": 6423,
+      "externalMarketId": "42.617700502"
+     }
+    ],
+    "isSuperSubEnabled": false,
+    "isBetProtectEligible": true,
+    "shouldDisplayStatsInRunner": true,
+    "eachwayAvailable": false,
+    "legTypes": [
+     "SIMPLE_SELECTION"
+    ]
+   },
+   "734.192539070": {
+    "marketId": "734.192539070",
+    "eventTypeId": 6423,
+    "competitionId": 12282733,
+    "eventId": 36190129,
+    "marketName": "Drake Maye - Passing Yds",
+    "marketTime": "2026-10-23T00:16:00.000Z",
+    "marketType": "PLAYER_X_PASSING_YARDS_HIGH",
+    "bspMarket": false,
+    "sgmMarket": true,
+    "inPlay": false,
+    "numberOfRunners": 2,
+    "numberOfActiveRunners": 2,
+    "numberOfWinners": 1,
+    "sortPriority": 2060,
+    "bettingType": "MOVING_HANDICAP",
+    "marketStatus": "OPEN",
+    "runners": [
+     {
+      "selectionId": 48103561,
+      "handicap": 247.5,
+      "runnerName": "Drake Maye Over",
+      "sortPriority": 1,
+      "result": {
+       "type": "OVER"
+      },
+      "runnerStatus": "ACTIVE",
+      "logo": "https://assets.sportsbook.fanduel.com/images/team/nfl/new_england_patriots_jersey.png",
+      "secondaryLogo": "https://assets.sportsbook.fanduel.com/images/team/nfl/new_england_patriots.png",
+      "isPlayerSelection": true,
+      "jersey": {
+       "jerseyNumber": "10",
+       "jerseyBg": "dark"
+      },
+      "winRunnerOdds": {
+       "americanDisplayOdds": {
+        "americanOdds": -113,
+        "americanOddsInt": -113
+       },
+       "trueOdds": {
+        "decimalOdds": {
+         "decimalOdds": 1.884955752212389
+        },
+        "fractionalOdds": {
+         "numerator": 100,
+         "denominator": 113
+        }
+       }
+      },
+      "previousWinRunnerOdds": [
+       {
+        "americanDisplayOdds": {
+         "americanOdds": -114,
+         "americanOddsInt": -114
+        },
+        "trueOdds": {
+         "decimalOdds": {
+          "decimalOdds": 1.87719298245614
+         },
+         "fractionalOdds": {
+          "numerator": 100,
+          "denominator": 114
+         }
+        }
+       }
+      ]
+     },
+     {
+      "selectionId": 48103562,
+      "handicap": 247.5,
+      "runnerName": "Drake Maye Under",
+      "sortPriority": 2,
+      "result": {
+       "type": "UNDER"
+      },
+      "runnerStatus": "ACTIVE",
+      "logo": "https://assets.sportsbook.fanduel.com/images/team/nfl/new_england_patriots_jersey.png",
+      "secondaryLogo": "https://assets.sportsbook.fanduel.com/images/team/nfl/new_england_patriots.png",
+      "isPlayerSelection": true,
+      "jersey": {
+       "jerseyNumber": "10",
+       "jerseyBg": "dark"
+      },
+      "winRunnerOdds": {
+       "americanDisplayOdds": {
+        "americanOdds": -113,
+        "americanOddsInt": -113
+       },
+       "trueOdds": {
+        "decimalOdds": {
+         "decimalOdds": 1.884955752212389
+        },
+        "fractionalOdds": {
+         "numerator": 100,
+         "denominator": 113
+        }
+       }
+      },
+      "previousWinRunnerOdds": [
+       {
+        "americanDisplayOdds": {
+         "americanOdds": -114,
+         "americanOddsInt": -114
+        },
+        "trueOdds": {
+         "decimalOdds": {
+          "decimalOdds": 1.87719298245614
+         },
+         "fractionalOdds": {
+          "numerator": 100,
+          "denominator": 114
+         }
+        }
+       }
+      ]
+     }
+    ],
+    "canTurnInPlay": true,
+    "associatedMarkets": [
+     {
+      "eventId": 36190129,
+      "eventTypeId": 6423,
+      "externalMarketId": "42.617700524"
+     }
+    ],
+    "isSuperSubEnabled": false,
+    "isBetProtectEligible": true,
+    "shouldDisplayStatsInRunner": true,
+    "eachwayAvailable": false,
+    "legTypes": [
+     "SIMPLE_SELECTION"
+    ]
+   }
+  }
+ }
+}

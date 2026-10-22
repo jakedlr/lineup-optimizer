@@ -1,0 +1,309 @@
+{
+ "events": [
+  {
+   "id": "34118033",
+   "seoIdentifier": "NE Patriots @ CHI Bears",
+   "sportId": "3",
+   "leagueId": "88808",
+   "name": "NE Patriots @ CHI Bears",
+   "startEventDate": "2026-10-23T00:15:00.0000000Z",
+   "participants": [
+    {
+     "id": "18312",
+     "name": "CHI Bears",
+     "venueRole": "Home",
+     "type": "Team",
+     "metadata": {
+      "retailRotNumber": "101",
+      "rosettaTeamId": "18312",
+      "rosettaTeamName": "Bears",
+      "shortName": "CHI",
+      "teamColor": "#0B162A",
+      "teamColorSecondary": "#C83803",
+      "teamColorTertiary": "#FFFFFF"
+     },
+     "sortOrder": 2,
+     "seoIdentifier": "Bears",
+     "isNationalTeam": false,
+     "countryCode": "US"
+    },
+    {
+     "id": "18415",
+     "name": "NE Patriots",
+     "venueRole": "Away",
+     "type": "Team",
+     "metadata": {
+      "retailRotNumber": "100",
+      "rosettaTeamId": "18415",
+      "rosettaTeamName": "Patriots",
+      "shortName": "NE",
+      "teamColor": "#002244",
+      "teamColorSecondary": "#C60C30",
+      "teamColorTertiary": "#B0B7BC"
+     },
+     "sortOrder": 1,
+     "seoIdentifier": "Patriots",
+     "isNationalTeam": false,
+     "countryCode": "US"
+    }
+   ],
+   "eventParticipantType": "TwoTeam",
+   "status": "NOT_STARTED",
+   "eventScorecard": {
+    "scorecardComponentId": 1
+   },
+   "tags": [
+    "EarlyExit",
+    "EarlyExitPlus",
+    "FeaturedSubcategory",
+    "OSB",
+    "SGP",
+    "SgpDynamicOdds",
+    "YourBetEligible"
+   ],
+   "metadata": {
+    "masterLeagueId": "40",
+    "numberOfParts": "4",
+    "secondsInOnePart": "900"
+   },
+   "sortOrder": 168577033,
+   "subscriptionKey": "league-events-88808"
+  }
+ ],
+ "markets": [
+  {
+   "id": "380410368",
+   "eventId": "34118033",
+   "sportId": "3",
+   "leagueId": "88808",
+   "name": "Drake Maye Passing Yards O/U",
+   "subcategoryId": 9524,
+   "marketType": {
+    "id": "13552",
+    "betOfferTypeId": 0,
+    "name": "Passing Yards O/U"
+   },
+   "subscriptionKey": "league-events-88808",
+   "sortOrder": 8,
+   "tags": [
+    "SGP",
+    "YourBetEligible",
+    "Cashout",
+    "EarlyExit",
+    "EarlyExitPlus",
+    "IgnoreSortOrderOnPush",
+    "MicroMarketDelayRemoval",
+    "OSB",
+    "PlayerProps"
+   ],
+   "correlatedId": "34118033|13552|2:145955",
+   "dynamicMetadata": {}
+  },
+  {
+   "id": "380409791",
+   "eventId": "34118033",
+   "sportId": "3",
+   "leagueId": "88808",
+   "name": "Caleb Williams Passing Yards O/U",
+   "subcategoryId": 9524,
+   "marketType": {
+    "id": "13552",
+    "betOfferTypeId": 0,
+    "name": "Passing Yards O/U"
+   },
+   "subscriptionKey": "league-events-88808",
+   "sortOrder": 9,
+   "tags": [
+    "SGP",
+    "YourBetEligible",
+    "Cashout",
+    "EarlyExit",
+    "EarlyExitPlus",
+    "IgnoreSortOrderOnPush",
+    "MicroMarketDelayRemoval",
+    "OSB",
+    "PlayerProps"
+   ],
+   "correlatedId": "34118033|13552|2:123644",
+   "dynamicMetadata": {}
+  }
+ ],
+ "selections": [
+  {
+   "id": "0QA380409791#2327667755_13L88808Q11243973812Q20",
+   "marketId": "380409791",
+   "label": "Over",
+   "displayOdds": {
+    "american": "\u2212111",
+    "decimal": "1.90",
+    "fractional": "100/111",
+    "percentage": "52%",
+    "multiplier": "1.90x"
+   },
+   "trueOdds": 1.90090091,
+   "points": 246.5,
+   "outcomeType": "Over",
+   "participants": [
+    {
+     "id": "779692",
+     "name": "Caleb Williams",
+     "type": "Player",
+     "seoIdentifier": "Caleb Williams",
+     "statistic": {
+      "prefix": "YDS/G",
+      "value": 237.3,
+      "stringValue": "237.3",
+      "showRecentStats": true
+     },
+     "venueRole": "HomePlayer",
+     "isNationalTeam": false,
+     "metadata": {
+      "sdid": "123644"
+     }
+    }
+   ],
+   "sortOrder": 246500,
+   "tags": [
+    "MainPointLine",
+    "SGP",
+    "1stFavorite",
+    "EarlyExitPlus",
+    "EarlyExit",
+    "OSB"
+   ],
+   "main": true,
+   "metadata": {}
+  },
+  {
+   "id": "0QA380409791#2327667756_13L88808Q1-686944226Q20",
+   "marketId": "380409791",
+   "label": "Under",
+   "displayOdds": {
+    "american": "\u2212113",
+    "decimal": "1.88",
+    "fractional": "100/113",
+    "percentage": "53%",
+    "multiplier": "1.88x"
+   },
+   "trueOdds": 1.88495576,
+   "points": 246.5,
+   "outcomeType": "Under",
+   "participants": [
+    {
+     "id": "779692",
+     "name": "Caleb Williams",
+     "type": "Player",
+     "seoIdentifier": "Caleb Williams",
+     "statistic": {
+      "prefix": "YDS/G",
+      "value": 237.3,
+      "stringValue": "237.3",
+      "showRecentStats": true
+     },
+     "venueRole": "HomePlayer",
+     "isNationalTeam": false,
+     "metadata": {
+      "sdid": "123644"
+     }
+    }
+   ],
+   "sortOrder": 246502,
+   "tags": [
+    "MainPointLine",
+    "SGP",
+    "1stFavorite",
+    "OSB"
+   ],
+   "main": true,
+   "metadata": {}
+  },
+  {
+   "id": "0QA380410368#2328134241_13L88808Q1-951879229Q20",
+   "marketId": "380410368",
+   "label": "Over",
+   "displayOdds": {
+    "american": "\u2212111",
+    "decimal": "1.90",
+    "fractional": "100/111",
+    "percentage": "52%",
+    "multiplier": "1.90x"
+   },
+   "trueOdds": 1.90090091,
+   "points": 249.5,
+   "outcomeType": "Over",
+   "participants": [
+    {
+     "id": "779819",
+     "name": "Drake Maye",
+     "type": "Player",
+     "seoIdentifier": "Drake Maye",
+     "statistic": {
+      "prefix": "YDS/G",
+      "value": 243.8,
+      "stringValue": "243.8",
+      "showRecentStats": true
+     },
+     "venueRole": "AwayPlayer",
+     "isNationalTeam": false,
+     "metadata": {
+      "sdid": "145955"
+     }
+    }
+   ],
+   "sortOrder": 249500,
+   "tags": [
+    "MainPointLine",
+    "SGP",
+    "1stFavorite",
+    "EarlyExitPlus",
+    "EarlyExit",
+    "OSB"
+   ],
+   "main": true,
+   "metadata": {}
+  },
+  {
+   "id": "0QA380410368#2328134242_13L88808Q1-1114282029Q20",
+   "marketId": "380410368",
+   "label": "Under",
+   "displayOdds": {
+    "american": "\u2212113",
+    "decimal": "1.88",
+    "fractional": "100/113",
+    "percentage": "53%",
+    "multiplier": "1.88x"
+   },
+   "trueOdds": 1.88495576,
+   "points": 249.5,
+   "outcomeType": "Under",
+   "participants": [
+    {
+     "id": "779819",
+     "name": "Drake Maye",
+     "type": "Player",
+     "seoIdentifier": "Drake Maye",
+     "statistic": {
+      "prefix": "YDS/G",
+      "value": 243.8,
+      "stringValue": "243.8",
+      "showRecentStats": true
+     },
+     "venueRole": "AwayPlayer",
+     "isNationalTeam": false,
+     "metadata": {
+      "sdid": "145955"
+     }
+    }
+   ],
+   "sortOrder": 249502,
+   "tags": [
+    "MainPointLine",
+    "SGP",
+    "1stFavorite",
+    "OSB"
+   ],
+   "main": true,
+   "metadata": {}
+  }
+ ]
+}

@@ -1,0 +1,20 @@
+[project]
+name = "ppopt"
+version = "0.1.0"
+description = "PrizePicks EV optimizer"
+requires-python = ">=3.11"
+dependencies = ["scrapling[fetchers]>=0.3"]
+
+[project.optional-dependencies]
+dev = ["pytest"]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]

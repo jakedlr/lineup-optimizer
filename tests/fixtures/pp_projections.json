@@ -1,0 +1,1369 @@
+{
+ "data": [
+  {
+   "type": "projection",
+   "id": "16010968",
+   "attributes": {
+    "adjusted_odds": true,
+    "allowed_wager_types": "under_or_over",
+    "board_time": "2026-10-20T17:01:00.000-04:00",
+    "custom_image": null,
+    "description": "NE",
+    "discount_name": "taco",
+    "discount_percentage": 12,
+    "end_time": "2026-10-22T20:15:00.000-04:00",
+    "event_type": "team",
+    "flash_sale_line_score": 215.5,
+    "game_id": "NFL_game_Bd0PTq8gA3PGakrbM8RYobJI",
+    "group_key": "210552-16-NFL_game_Bd0PTq8gA3PGakrbM8RYobJI-11-true",
+    "hr_20": true,
+    "in_game": false,
+    "is_live": false,
+    "is_live_scored": true,
+    "is_promo": true,
+    "line_score": 246.5,
+    "odds_type": "standard",
+    "projection_type": "Single Stat",
+    "rank": 1,
+    "refundable": true,
+    "start_time": "2026-10-22T20:15:00.000-04:00",
+    "stat_display_name": "Pass Yards",
+    "stat_type": "Pass Yards",
+    "status": "pre_game",
+    "today": true,
+    "trending_count": 447618,
+    "tv_channel": null,
+    "updated_at": "2026-10-20T17:00:15.179-04:00"
+   },
+   "relationships": {
+    "duration": {
+     "data": {
+      "type": "duration",
+      "id": "11"
+     }
+    },
+    "game": {
+     "data": {
+      "type": "game",
+      "id": "189302"
+     }
+    },
+    "league": {
+     "data": {
+      "type": "league",
+      "id": "9"
+     }
+    },
+    "new_player": {
+     "data": {
+      "type": "new_player",
+      "id": "210552"
+     }
+    },
+    "projection_type": {
+     "data": {
+      "type": "projection_type",
+      "id": "2"
+     }
+    },
+    "score": {
+     "data": null
+    },
+    "stat_type": {
+     "data": {
+      "type": "stat_type",
+      "id": "16"
+     }
+    }
+   }
+  },
+  {
+   "type": "projection",
+   "id": "16023412",
+   "attributes": {
+    "adjusted_odds": true,
+    "allowed_wager_types": "under_or_over",
+    "board_time": "2026-10-21T00:19:59.186-04:00",
+    "custom_image": null,
+    "description": "CLE",
+    "end_time": null,
+    "event_type": "team",
+    "flash_sale_line_score": null,
+    "game_id": "NBA_game_FgFfaasEEcOSMEKsN6fW1dmQ",
+    "group_key": "187996-106-NBA_game_FgFfaasEEcOSMEKsN6fW1dmQ-11-false",
+    "hr_20": true,
+    "in_game": false,
+    "is_live": false,
+    "is_live_scored": true,
+    "is_promo": false,
+    "league_ppid": "NBA",
+    "line_score": 35.5,
+    "odds_type": "standard",
+    "projection_type": "Single Stat",
+    "rank": 61,
+    "refundable": true,
+    "start_time": "2026-10-22T19:00:00.000-04:00",
+    "stat_display_name": "PRA",
+    "stat_type": "Pts+Rebs+Asts",
+    "status": "pre_game",
+    "today": true,
+    "trending_count": 8781,
+    "tv_channel": null,
+    "updated_at": "2026-10-22T18:06:59.401-04:00"
+   },
+   "relationships": {
+    "duration": {
+     "data": {
+      "type": "duration",
+      "id": "11"
+     }
+    },
+    "game": {
+     "data": {
+      "type": "game",
+      "id": "189080"
+     }
+    },
+    "league": {
+     "data": {
+      "type": "league",
+      "id": "7"
+     }
+    },
+    "new_player": {
+     "data": {
+      "type": "new_player",
+      "id": "187996"
+     }
+    },
+    "projection_type": {
+     "data": {
+      "type": "projection_type",
+      "id": "2"
+     }
+    },
+    "score": {
+     "data": null
+    },
+    "stat_type": {
+     "data": {
+      "type": "stat_type",
+      "id": "106"
+     }
+    }
+   }
+  },
+  {
+   "type": "projection",
+   "id": "16024445",
+   "attributes": {
+    "adjusted_odds": true,
+    "allowed_wager_types": "under_or_over",
+    "board_time": "2026-10-21T00:44:59.262-04:00",
+    "custom_image": null,
+    "description": "PHI",
+    "end_time": null,
+    "event_type": "team",
+    "flash_sale_line_score": null,
+    "game_id": "NBA_game_FgFfaasEEcOSMEKsN6fW1dmQ",
+    "group_key": "188006-106-NBA_game_FgFfaasEEcOSMEKsN6fW1dmQ-11-false",
+    "hr_20": true,
+    "in_game": false,
+    "is_live": false,
+    "is_live_scored": true,
+    "is_promo": false,
+    "league_ppid": "NBA",
+    "line_score": 35.5,
+    "odds_type": "standard",
+    "projection_type": "Single Stat",
+    "rank": 65,
+    "refundable": true,
+    "start_time": "2026-10-22T19:00:00.000-04:00",
+    "stat_display_name": "PRA",
+    "stat_type": "Pts+Rebs+Asts",
+    "status": "pre_game",
+    "today": true,
+    "trending_count": 6724,
+    "tv_channel": null,
+    "updated_at": "2026-10-21T18:41:45.335-04:00"
+   },
+   "relationships": {
+    "duration": {
+     "data": {
+      "type": "duration",
+      "id": "11"
+     }
+    },
+    "game": {
+     "data": {
+      "type": "game",
+      "id": "189080"
+     }
+    },
+    "league": {
+     "data": {
+      "type": "league",
+      "id": "7"
+     }
+    },
+    "new_player": {
+     "data": {
+      "type": "new_player",
+      "id": "188006"
+     }
+    },
+    "projection_type": {
+     "data": {
+      "type": "projection_type",
+      "id": "2"
+     }
+    },
+    "score": {
+     "data": null
+    },
+    "stat_type": {
+     "data": {
+      "type": "stat_type",
+      "id": "106"
+     }
+    }
+   }
+  },
+  {
+   "type": "projection",
+   "id": "16023407",
+   "attributes": {
+    "adjusted_odds": true,
+    "allowed_wager_types": "under_or_over",
+    "board_time": "2026-10-21T00:19:59.084-04:00",
+    "custom_image": null,
+    "description": "CLE",
+    "end_time": null,
+    "event_type": "team",
+    "flash_sale_line_score": null,
+    "game_id": "NBA_game_FgFfaasEEcOSMEKsN6fW1dmQ",
+    "group_key": "188005-106-NBA_game_FgFfaasEEcOSMEKsN6fW1dmQ-11-false",
+    "hr_20": true,
+    "in_game": false,
+    "is_live": false,
+    "is_live_scored": true,
+    "is_promo": false,
+    "league_ppid": "NBA",
+    "line_score": 32.5,
+    "odds_type": "standard",
+    "projection_type": "Single Stat",
+    "rank": 80,
+    "refundable": true,
+    "start_time": "2026-10-22T19:00:00.000-04:00",
+    "stat_display_name": "PRA",
+    "stat_type": "Pts+Rebs+Asts",
+    "status": "pre_game",
+    "today": true,
+    "trending_count": 5343,
+    "tv_channel": null,
+    "updated_at": "2026-10-22T17:46:38.623-04:00"
+   },
+   "relationships": {
+    "duration": {
+     "data": {
+      "type": "duration",
+      "id": "11"
+     }
+    },
+    "game": {
+     "data": {
+      "type": "game",
+      "id": "189080"
+     }
+    },
+    "league": {
+     "data": {
+      "type": "league",
+      "id": "7"
+     }
+    },
+    "new_player": {
+     "data": {
+      "type": "new_player",
+      "id": "188005"
+     }
+    },
+    "projection_type": {
+     "data": {
+      "type": "projection_type",
+      "id": "2"
+     }
+    },
+    "score": {
+     "data": null
+    },
+    "stat_type": {
+     "data": {
+      "type": "stat_type",
+      "id": "106"
+     }
+    }
+   }
+  },
+  {
+   "type": "projection",
+   "id": "15977107",
+   "attributes": {
+    "adjusted_odds": true,
+    "allowed_wager_types": "over",
+    "board_time": "2026-10-20T05:24:21.019-04:00",
+    "custom_image": null,
+    "description": "APP",
+    "end_time": null,
+    "event_type": "team",
+    "flash_sale_line_score": null,
+    "game_id": "NCAAFB_game_vU5LWEdKSC9qNfj3k5ukPhMj",
+    "group_key": "340489-16-NCAAFB_game_vU5LWEdKSC9qNfj3k5ukPhMj-11-false",
+    "hr_20": true,
+    "in_game": false,
+    "is_live": false,
+    "is_live_scored": true,
+    "is_promo": false,
+    "league_ppid": "NCAAFB",
+    "line_score": 374.5,
+    "odds_type": "demon",
+    "projection_type": "Single Stat",
+    "rank": 1057,
+    "refundable": true,
+    "start_time": "2026-10-22T19:00:00.000-04:00",
+    "stat_display_name": "Pass Yards",
+    "stat_type": "Pass Yards",
+    "status": "pre_game",
+    "today": true,
+    "tv_channel": null,
+    "updated_at": "2026-10-22T17:22:03.201-04:00"
+   },
+   "relationships": {
+    "duration": {
+     "data": {
+      "type": "duration",
+      "id": "11"
+     }
+    },
+    "game": {
+     "data": {
+      "type": "game",
+      "id": "189103"
+     }
+    },
+    "league": {
+     "data": {
+      "type": "league",
+      "id": "15"
+     }
+    },
+    "new_player": {
+     "data": {
+      "type": "new_player",
+      "id": "340489"
+     }
+    },
+    "projection_type": {
+     "data": {
+      "type": "projection_type",
+      "id": "2"
+     }
+    },
+    "score": {
+     "data": null
+    },
+    "stat_type": {
+     "data": {
+      "type": "stat_type",
+      "id": "16"
+     }
+    }
+   }
+  },
+  {
+   "type": "projection",
+   "id": "16029297",
+   "attributes": {
+    "adjusted_odds": false,
+    "allowed_wager_types": "over",
+    "board_time": "2026-10-01T00:05:00.000-04:00",
+    "custom_image": null,
+    "description": "CLE/PHI",
+    "end_time": null,
+    "event_type": "combo",
+    "flash_sale_line_score": null,
+    "game_id": "NBA_game_FgFfaasEEcOSMEKsN6fW1dmQ",
+    "group_key": "355396-425-NBA_game_FgFfaasEEcOSMEKsN6fW1dmQ-11-false",
+    "hr_20": true,
+    "in_game": false,
+    "is_live": false,
+    "is_live_scored": true,
+    "is_promo": false,
+    "league_ppid": "NBA",
+    "line_score": 49.5,
+    "odds_type": "standard",
+    "projection_type": "Single Stat",
+    "rank": 3545,
+    "refundable": true,
+    "start_time": "2026-10-22T19:10:00.000-04:00",
+    "stat_display_name": "Points",
+    "stat_type": "Points (Combo)",
+    "status": "pre_game",
+    "today": true,
+    "trending_count": 661,
+    "tv_channel": null,
+    "updated_at": "2026-10-21T19:23:36.628-04:00"
+   },
+   "relationships": {
+    "duration": {
+     "data": {
+      "type": "duration",
+      "id": "11"
+     }
+    },
+    "game": {
+     "data": {
+      "type": "game",
+      "id": "189080"
+     }
+    },
+    "league": {
+     "data": {
+      "type": "league",
+      "id": "7"
+     }
+    },
+    "new_player": {
+     "data": {
+      "type": "new_player",
+      "id": "355396"
+     }
+    },
+    "projection_type": {
+     "data": {
+      "type": "projection_type",
+      "id": "2"
+     }
+    },
+    "score": {
+     "data": null
+    },
+    "stat_type": {
+     "data": {
+      "type": "stat_type",
+      "id": "425"
+     }
+    }
+   }
+  },
+  {
+   "type": "projection",
+   "id": "16092661",
+   "attributes": {
+    "adjusted_odds": false,
+    "allowed_wager_types": "over",
+    "board_time": "2026-10-01T00:05:00.000-04:00",
+    "custom_image": null,
+    "description": "CHI/NE",
+    "end_time": null,
+    "event_type": "combo",
+    "flash_sale_line_score": null,
+    "game_id": "NFL_game_Bd0PTq8gA3PGakrbM8RYobJI",
+    "group_key": "355278-1528-NFL_game_Bd0PTq8gA3PGakrbM8RYobJI-11-false",
+    "hr_20": true,
+    "in_game": false,
+    "is_live": false,
+    "is_live_scored": true,
+    "is_promo": false,
+    "league_ppid": "NFL",
+    "line_score": 15,
+    "odds_type": "standard",
+    "projection_type": "Single Stat",
+    "rank": 5086,
+    "refundable": true,
+    "start_time": "2026-10-22T20:15:00.000-04:00",
+    "stat_display_name": "Kicking Points (Combo)",
+    "stat_type": "Kicking Points (Combo)",
+    "status": "pre_game",
+    "today": true,
+    "tv_channel": null,
+    "updated_at": "2026-10-22T15:05:38.101-04:00"
+   },
+   "relationships": {
+    "duration": {
+     "data": {
+      "type": "duration",
+      "id": "11"
+     }
+    },
+    "game": {
+     "data": {
+      "type": "game",
+      "id": "189302"
+     }
+    },
+    "league": {
+     "data": {
+      "type": "league",
+      "id": "9"
+     }
+    },
+    "new_player": {
+     "data": {
+      "type": "new_player",
+      "id": "355278"
+     }
+    },
+    "projection_type": {
+     "data": {
+      "type": "projection_type",
+      "id": "2"
+     }
+    },
+    "score": {
+     "data": null
+    },
+    "stat_type": {
+     "data": {
+      "type": "stat_type",
+      "id": "1528"
+     }
+    }
+   }
+  },
+  {
+   "type": "projection",
+   "id": "15900706",
+   "attributes": {
+    "adjusted_odds": true,
+    "allowed_wager_types": "under_or_over",
+    "board_time": "2026-10-18T22:17:09.302-04:00",
+    "custom_image": null,
+    "description": "CHI",
+    "end_time": null,
+    "event_type": "team",
+    "flash_sale_line_score": null,
+    "game_id": "NFL_game_Bd0PTq8gA3PGakrbM8RYobJI",
+    "group_key": "215664-260-NFL_game_Bd0PTq8gA3PGakrbM8RYobJI-11-false",
+    "hr_20": true,
+    "in_game": false,
+    "is_live": false,
+    "is_live_scored": true,
+    "is_promo": false,
+    "league_ppid": "NFL",
+    "line_score": 279.5,
+    "odds_type": "standard",
+    "projection_type": "Single Stat",
+    "rank": 5098,
+    "refundable": true,
+    "start_time": "2026-10-22T20:15:00.000-04:00",
+    "stat_display_name": "Pass+Rush Yds",
+    "stat_type": "Pass+Rush Yds",
+    "status": "pre_game",
+    "today": true,
+    "trending_count": 1374,
+    "tv_channel": null,
+    "updated_at": "2026-10-21T18:29:44.843-04:00"
+   },
+   "relationships": {
+    "duration": {
+     "data": {
+      "type": "duration",
+      "id": "11"
+     }
+    },
+    "game": {
+     "data": {
+      "type": "game",
+      "id": "189302"
+     }
+    },
+    "league": {
+     "data": {
+      "type": "league",
+      "id": "9"
+     }
+    },
+    "new_player": {
+     "data": {
+      "type": "new_player",
+      "id": "215664"
+     }
+    },
+    "projection_type": {
+     "data": {
+      "type": "projection_type",
+      "id": "2"
+     }
+    },
+    "score": {
+     "data": null
+    },
+    "stat_type": {
+     "data": {
+      "type": "stat_type",
+      "id": "260"
+     }
+    }
+   }
+  },
+  {
+   "type": "projection",
+   "id": "15961148",
+   "attributes": {
+    "adjusted_odds": true,
+    "allowed_wager_types": "over",
+    "board_time": "2026-10-19T20:40:42.188-04:00",
+    "custom_image": null,
+    "description": "CHI",
+    "end_time": null,
+    "event_type": "team",
+    "flash_sale_line_score": null,
+    "game_id": "NFL_game_Bd0PTq8gA3PGakrbM8RYobJI",
+    "group_key": "215664-260-NFL_game_Bd0PTq8gA3PGakrbM8RYobJI-11-false",
+    "hr_20": true,
+    "in_game": false,
+    "is_live": false,
+    "is_live_scored": true,
+    "is_promo": false,
+    "league_ppid": "NFL",
+    "line_score": 274.5,
+    "odds_type": "goblin",
+    "projection_type": "Single Stat",
+    "rank": 5101,
+    "refundable": true,
+    "start_time": "2026-10-22T20:15:00.000-04:00",
+    "stat_display_name": "Pass+Rush Yds",
+    "stat_type": "Pass+Rush Yds",
+    "status": "pre_game",
+    "today": true,
+    "tv_channel": null,
+    "updated_at": "2026-10-22T18:07:07.158-04:00"
+   },
+   "relationships": {
+    "duration": {
+     "data": {
+      "type": "duration",
+      "id": "11"
+     }
+    },
+    "game": {
+     "data": {
+      "type": "game",
+      "id": "189302"
+     }
+    },
+    "league": {
+     "data": {
+      "type": "league",
+      "id": "9"
+     }
+    },
+    "new_player": {
+     "data": {
+      "type": "new_player",
+      "id": "215664"
+     }
+    },
+    "projection_type": {
+     "data": {
+      "type": "projection_type",
+      "id": "2"
+     }
+    },
+    "score": {
+     "data": null
+    },
+    "stat_type": {
+     "data": {
+      "type": "stat_type",
+      "id": "260"
+     }
+    }
+   }
+  },
+  {
+   "type": "projection",
+   "id": "15900746",
+   "attributes": {
+    "adjusted_odds": true,
+    "allowed_wager_types": "under_or_over",
+    "board_time": "2026-10-18T22:17:51.054-04:00",
+    "custom_image": null,
+    "description": "NE",
+    "end_time": null,
+    "event_type": "team",
+    "flash_sale_line_score": null,
+    "game_id": "NFL_game_Bd0PTq8gA3PGakrbM8RYobJI",
+    "group_key": "210552-260-NFL_game_Bd0PTq8gA3PGakrbM8RYobJI-11-false",
+    "hr_20": true,
+    "in_game": false,
+    "is_live": false,
+    "is_live_scored": true,
+    "is_promo": false,
+    "league_ppid": "NFL",
+    "line_score": 266.5,
+    "odds_type": "standard",
+    "projection_type": "Single Stat",
+    "rank": 5102,
+    "refundable": true,
+    "start_time": "2026-10-22T20:15:00.000-04:00",
+    "stat_display_name": "Pass+Rush Yds",
+    "stat_type": "Pass+Rush Yds",
+    "status": "pre_game",
+    "today": true,
+    "trending_count": 2437,
+    "tv_channel": null,
+    "updated_at": "2026-10-22T13:49:46.920-04:00"
+   },
+   "relationships": {
+    "duration": {
+     "data": {
+      "type": "duration",
+      "id": "11"
+     }
+    },
+    "game": {
+     "data": {
+      "type": "game",
+      "id": "189302"
+     }
+    },
+    "league": {
+     "data": {
+      "type": "league",
+      "id": "9"
+     }
+    },
+    "new_player": {
+     "data": {
+      "type": "new_player",
+      "id": "210552"
+     }
+    },
+    "projection_type": {
+     "data": {
+      "type": "projection_type",
+      "id": "2"
+     }
+    },
+    "score": {
+     "data": null
+    },
+    "stat_type": {
+     "data": {
+      "type": "stat_type",
+      "id": "260"
+     }
+    }
+   }
+  },
+  {
+   "type": "projection",
+   "id": "15900665",
+   "attributes": {
+    "adjusted_odds": true,
+    "allowed_wager_types": "under_or_over",
+    "board_time": "2026-10-07T15:44:00.000-04:00",
+    "custom_image": null,
+    "description": "CHI",
+    "end_time": null,
+    "event_type": "team",
+    "flash_sale_line_score": null,
+    "game_id": "NFL_game_Bd0PTq8gA3PGakrbM8RYobJI",
+    "group_key": "215664-16-NFL_game_Bd0PTq8gA3PGakrbM8RYobJI-11-false",
+    "hr_20": true,
+    "in_game": false,
+    "is_live": false,
+    "is_live_scored": true,
+    "is_promo": false,
+    "league_ppid": "NFL",
+    "line_score": 249.5,
+    "odds_type": "standard",
+    "projection_type": "Single Stat",
+    "rank": 5108,
+    "refundable": true,
+    "start_time": "2026-10-22T20:15:00.000-04:00",
+    "stat_display_name": "Pass Yards",
+    "stat_type": "Pass Yards",
+    "status": "pre_game",
+    "today": true,
+    "trending_count": 24466,
+    "tv_channel": null,
+    "updated_at": "2026-10-20T15:00:41.488-04:00"
+   },
+   "relationships": {
+    "duration": {
+     "data": {
+      "type": "duration",
+      "id": "11"
+     }
+    },
+    "game": {
+     "data": {
+      "type": "game",
+      "id": "189302"
+     }
+    },
+    "league": {
+     "data": {
+      "type": "league",
+      "id": "9"
+     }
+    },
+    "new_player": {
+     "data": {
+      "type": "new_player",
+      "id": "215664"
+     }
+    },
+    "projection_type": {
+     "data": {
+      "type": "projection_type",
+      "id": "2"
+     }
+    },
+    "score": {
+     "data": null
+    },
+    "stat_type": {
+     "data": {
+      "type": "stat_type",
+      "id": "16"
+     }
+    }
+   }
+  }
+ ],
+ "included": [
+  {
+   "type": "projection_type",
+   "id": "2",
+   "attributes": {
+    "name": "Single Stat"
+   }
+  },
+  {
+   "type": "stat_type",
+   "id": "106",
+   "attributes": {
+    "lfg_ignored_leagues": [],
+    "name": "Pts+Rebs+Asts",
+    "rank": 2
+   }
+  },
+  {
+   "type": "new_player",
+   "id": "187996",
+   "attributes": {
+    "combo": false,
+    "display_name": "Joel Embiid",
+    "image_url": "https://static.prizepicks.com/images/players/NBA/Joel_Embiid_NBA_player_UhZzicEIsGHhbOqDDZRX5V6V-450.webp",
+    "jersey_number": "21",
+    "league": "NBA",
+    "league_id": 7,
+    "market": "Philadelphia",
+    "name": "Joel Embiid",
+    "position": "C-F",
+    "ppid": "NBA_player_UhZzicEIsGHhbOqDDZRX5V6V",
+    "team": "PHI",
+    "team_name": "76ers"
+   },
+   "relationships": {
+    "league": {
+     "data": {
+      "type": "league",
+      "id": "7"
+     }
+    },
+    "team_data": {
+     "data": {
+      "type": "team",
+      "id": "210"
+     }
+    }
+   }
+  },
+  {
+   "type": "new_player",
+   "id": "355396",
+   "attributes": {
+    "combo": true,
+    "display_name": "Tyrese Maxey + Donovan Mitchell",
+    "image_url": "https://static.prizepicks.com/images/players/CMBO_group_Xv0dV2HbKVDotCuTUOmPg6R8.webp",
+    "jersey_number": "0 + 45",
+    "league": "NBA",
+    "league_id": 7,
+    "market": null,
+    "name": "Tyrese Maxey + Donovan Mitchell",
+    "position": "G",
+    "ppid": "CMBO_group_Xv0dV2HbKVDotCuTUOmPg6R8",
+    "team": "PHI/CLE",
+    "team_name": "76ers/Cavaliers"
+   },
+   "relationships": {
+    "league": {
+     "data": {
+      "type": "league",
+      "id": "7"
+     }
+    },
+    "team_data": {
+     "data": {
+      "type": "team",
+      "id": "27552"
+     }
+    }
+   }
+  },
+  {
+   "type": "new_player",
+   "id": "188006",
+   "attributes": {
+    "combo": false,
+    "display_name": "Donovan Mitchell",
+    "image_url": "https://static.prizepicks.com/images/players/NBA/Donovan_Mitchell_NBA_player_0rXe2XnXarwUqJPvhfPBDUy2-450.webp",
+    "jersey_number": "45",
+    "league": "NBA",
+    "league_id": 7,
+    "market": "Cleveland",
+    "name": "Donovan Mitchell",
+    "position": "G",
+    "ppid": "NBA_player_0rXe2XnXarwUqJPvhfPBDUy2",
+    "team": "CLE",
+    "team_name": "Cavaliers"
+   },
+   "relationships": {
+    "league": {
+     "data": {
+      "type": "league",
+      "id": "7"
+     }
+    },
+    "team_data": {
+     "data": {
+      "type": "team",
+      "id": "207"
+     }
+    }
+   }
+  },
+  {
+   "type": "stat_type",
+   "id": "16",
+   "attributes": {
+    "lfg_ignored_leagues": [],
+    "name": "Pass Yards",
+    "rank": 0
+   }
+  },
+  {
+   "type": "new_player",
+   "id": "355278",
+   "attributes": {
+    "combo": true,
+    "display_name": "Andy Borregales + Cairo Santos",
+    "image_url": "https://static.prizepicks.com/images/players/CMBO_group_kl3XsV5rnzDY7Skr3cU5Bjzl.webp",
+    "jersey_number": "8",
+    "league": "NFL",
+    "league_id": 9,
+    "market": null,
+    "name": "Andy Borregales + Cairo Santos",
+    "position": "K",
+    "ppid": "CMBO_group_kl3XsV5rnzDY7Skr3cU5Bjzl",
+    "team": "NE/CHI",
+    "team_name": "Patriots/Bears"
+   },
+   "relationships": {
+    "league": {
+     "data": {
+      "type": "league",
+      "id": "9"
+     }
+    },
+    "team_data": {
+     "data": {
+      "type": "team",
+      "id": "22612"
+     }
+    }
+   }
+  },
+  {
+   "type": "stat_type",
+   "id": "425",
+   "attributes": {
+    "lfg_ignored_leagues": [
+     7,
+     8
+    ],
+    "name": "Points (Combo)",
+    "rank": 34
+   }
+  },
+  {
+   "type": "stat_type",
+   "id": "260",
+   "attributes": {
+    "lfg_ignored_leagues": [],
+    "name": "Pass+Rush Yds",
+    "rank": 13
+   }
+  },
+  {
+   "type": "new_player",
+   "id": "340489",
+   "attributes": {
+    "combo": false,
+    "display_name": "Camden Coleman",
+    "image_url": "https://static.prizepicks.com/images/players/NCAAFB/Camden_Coleman_NCAAFB_player_vouRFrTrfFbLNfogWSmaEjIW-450.webp",
+    "jersey_number": "7",
+    "league": "CFB",
+    "league_id": 15,
+    "market": "James Madison",
+    "name": "Camden Coleman",
+    "position": "QB",
+    "ppid": "NCAAFB_player_vouRFrTrfFbLNfogWSmaEjIW",
+    "team": "JMU",
+    "team_name": "Dukes"
+   },
+   "relationships": {
+    "league": {
+     "data": {
+      "type": "league",
+      "id": "15"
+     }
+    },
+    "team_data": {
+     "data": {
+      "type": "team",
+      "id": "42981"
+     }
+    }
+   }
+  },
+  {
+   "type": "game",
+   "id": "189103",
+   "attributes": {
+    "created_at": "2026-09-22T00:11:10.322-04:00",
+    "end_time": null,
+    "external_game_id": "NCAAFB_game_vU5LWEdKSC9qNfj3k5ukPhMj",
+    "is_live": false,
+    "metadata": {
+     "game_id": "NCAAFB_game_vU5LWEdKSC9qNfj3k5ukPhMj",
+     "game_info": {
+      "teams": {
+       "away": {
+        "abbreviation": "JMU"
+       },
+       "home": {
+        "abbreviation": "APP"
+       }
+      }
+     },
+     "league_name": "CFB",
+     "status": "created"
+    },
+    "start_time": "2026-10-22T19:00:00.000-04:00",
+    "status": "created",
+    "updated_at": "2026-10-22T00:11:05.722-04:00"
+   },
+   "relationships": {
+    "away_team_data": {
+     "data": {
+      "type": "team",
+      "id": "42981"
+     }
+    },
+    "home_team_data": {
+     "data": {
+      "type": "team",
+      "id": "295"
+     }
+    }
+   }
+  },
+  {
+   "type": "game",
+   "id": "189302",
+   "attributes": {
+    "created_at": "2026-09-23T00:11:03.501-04:00",
+    "end_time": null,
+    "external_game_id": "NFL_game_Bd0PTq8gA3PGakrbM8RYobJI",
+    "is_live": false,
+    "metadata": {
+     "game_id": "NFL_game_Bd0PTq8gA3PGakrbM8RYobJI",
+     "game_info": {
+      "teams": {
+       "away": {
+        "abbreviation": "NE"
+       },
+       "home": {
+        "abbreviation": "CHI"
+       }
+      }
+     },
+     "league_name": "NFL",
+     "status": "created"
+    },
+    "start_time": "2026-10-22T20:15:00.000-04:00",
+    "status": "created",
+    "updated_at": "2026-10-21T18:11:00.623-04:00"
+   },
+   "relationships": {
+    "away_team_data": {
+     "data": {
+      "type": "team",
+      "id": "1232"
+     }
+    },
+    "home_team_data": {
+     "data": {
+      "type": "team",
+      "id": "104"
+     }
+    }
+   }
+  },
+  {
+   "type": "new_player",
+   "id": "210552",
+   "attributes": {
+    "combo": false,
+    "display_name": "",
+    "image_url": "https://static.prizepicks.com/images/teams/nfl/NFL_team_0YfEnoemuc9kqhqIkdwEcnPK/18.webp",
+    "jersey_number": "18",
+    "league": "NFL",
+    "league_id": 9,
+    "market": "Chicago",
+    "name": "Caleb Williams",
+    "position": "QB",
+    "ppid": "NFL_player_tQdljvhUFAsMihFCWnevC8Ov",
+    "team": "CHI",
+    "team_name": "Bears"
+   },
+   "relationships": {
+    "league": {
+     "data": {
+      "type": "league",
+      "id": "9"
+     }
+    },
+    "team_data": {
+     "data": {
+      "type": "team",
+      "id": "104"
+     }
+    }
+   }
+  },
+  {
+   "type": "stat_type",
+   "id": "1528",
+   "attributes": {
+    "lfg_ignored_leagues": null,
+    "name": "Kicking Points (Combo)",
+    "rank": null
+   }
+  },
+  {
+   "type": "league",
+   "id": "9",
+   "attributes": {
+    "active": true,
+    "f2p_enabled": true,
+    "full_logo": null,
+    "has_live_projections": false,
+    "icon": "football",
+    "image_url": "https://static.prizepicks.com/images/leagues/production/30.svg",
+    "last_five_games_enabled": true,
+    "league_icon_id": 30,
+    "logo": null,
+    "name": "NFL",
+    "parent_id": null,
+    "parent_name": null,
+    "player_headshot_fallback": null,
+    "projections_count": 0,
+    "rank": null,
+    "show_trending": true
+   },
+   "relationships": {
+    "projection_filters": {
+     "data": []
+    }
+   }
+  },
+  {
+   "type": "game",
+   "id": "189080",
+   "attributes": {
+    "created_at": "2026-09-22T00:11:03.481-04:00",
+    "end_time": null,
+    "external_game_id": "NBA_game_FgFfaasEEcOSMEKsN6fW1dmQ",
+    "is_live": false,
+    "metadata": {
+     "game_id": "NBA_game_FgFfaasEEcOSMEKsN6fW1dmQ",
+     "game_info": {
+      "teams": {
+       "away": {
+        "abbreviation": "CLE"
+       },
+       "home": {
+        "abbreviation": "PHI"
+       }
+      }
+     },
+     "league_name": "NBA",
+     "status": "created"
+    },
+    "start_time": "2026-10-22T19:00:00.000-04:00",
+    "status": "created",
+    "updated_at": "2026-10-22T10:11:03.570-04:00"
+   },
+   "relationships": {
+    "away_team_data": {
+     "data": {
+      "type": "team",
+      "id": "207"
+     }
+    },
+    "home_team_data": {
+     "data": {
+      "type": "team",
+      "id": "210"
+     }
+    }
+   }
+  },
+  {
+   "type": "league",
+   "id": "7",
+   "attributes": {
+    "active": true,
+    "f2p_enabled": true,
+    "full_logo": "https://static.prizepicks.com/production/3peehp8jkljh288s795sbelw2aje-NBA_Logoman_word_onDkBkgd.png",
+    "has_live_projections": false,
+    "icon": "basketball",
+    "image_url": "https://static.prizepicks.com/images/leagues/production/128.svg",
+    "last_five_games_enabled": true,
+    "league_icon_id": 128,
+    "logo": "https://static.prizepicks.com/production/2ws9gunjf9w20587f3a68wwben7x-NBA%20%281%29.png",
+    "name": "NBA",
+    "parent_id": null,
+    "parent_name": null,
+    "player_headshot_fallback": null,
+    "projections_count": 0,
+    "rank": 3,
+    "show_trending": true
+   },
+   "relationships": {
+    "projection_filters": {
+     "data": []
+    }
+   }
+  },
+  {
+   "type": "new_player",
+   "id": "215664",
+   "attributes": {
+    "combo": false,
+    "display_name": "",
+    "image_url": "https://static.prizepicks.com/images/teams/nfl/NFL_team_OqHm2WrR1koV4WNCwbEs7ZvG/10.webp",
+    "jersey_number": "10",
+    "league": "NFL",
+    "league_id": 9,
+    "market": "New England",
+    "name": "Drake Maye",
+    "position": "QB",
+    "ppid": "NFL_player_3X2sVkS5qsEqC9ftBbXeFzc5",
+    "team": "NE",
+    "team_name": "Patriots"
+   },
+   "relationships": {
+    "league": {
+     "data": {
+      "type": "league",
+      "id": "9"
+     }
+    },
+    "team_data": {
+     "data": {
+      "type": "team",
+      "id": "1232"
+     }
+    }
+   }
+  },
+  {
+   "type": "duration",
+   "id": "11",
+   "attributes": {
+    "name": "Full"
+   }
+  },
+  {
+   "type": "league",
+   "id": "15",
+   "attributes": {
+    "active": true,
+    "f2p_enabled": true,
+    "full_logo": null,
+    "has_live_projections": false,
+    "icon": "football",
+    "image_url": "https://static.prizepicks.com/images/leagues/production/41.svg",
+    "last_five_games_enabled": true,
+    "league_icon_id": 41,
+    "logo": null,
+    "name": "CFB",
+    "parent_id": null,
+    "parent_name": null,
+    "player_headshot_fallback": "https://static.prizepicks.com/production/p5tx33d4clfczh5p4oxrsz43mpsh-cffbfall.webp",
+    "projections_count": 0,
+    "rank": 4,
+    "show_trending": true
+   },
+   "relationships": {
+    "projection_filters": {
+     "data": []
+    }
+   }
+  },
+  {
+   "type": "new_player",
+   "id": "188005",
+   "attributes": {
+    "combo": false,
+    "display_name": "Tyrese Maxey",
+    "image_url": "https://static.prizepicks.com/images/players/NBA/Tyrese_Maxey_NBA_player_2Em7ba9RgTz4wL2vdHJo0xwR-450.webp",
+    "jersey_number": "0",
+    "league": "NBA",
+    "league_id": 7,
+    "market": "Philadelphia",
+    "name": "Tyrese Maxey",
+    "position": "G",
+    "ppid": "NBA_player_2Em7ba9RgTz4wL2vdHJo0xwR",
+    "team": "PHI",
+    "team_name": "76ers"
+   },
+   "relationships": {
+    "league": {
+     "data": {
+      "type": "league",
+      "id": "7"
+     }
+    },
+    "team_data": {
+     "data": {
+      "type": "team",
+      "id": "210"
+     }
+    }
+   }
+  }
+ ],
+ "meta": {
+  "current_page": 1,
+  "total_pages": 1
+ }
+}

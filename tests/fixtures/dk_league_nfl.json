@@ -1,0 +1,1080 @@
+{
+ "events": [
+  {
+   "id": "34118033",
+   "seoIdentifier": "NE Patriots @ CHI Bears",
+   "sportId": "3",
+   "leagueId": "88808",
+   "name": "NE Patriots @ CHI Bears",
+   "startEventDate": "2026-10-23T00:15:00.0000000Z",
+   "participants": [
+    {
+     "id": "18312",
+     "name": "CHI Bears",
+     "venueRole": "Home",
+     "type": "Team",
+     "metadata": {
+      "retailRotNumber": "101",
+      "rosettaTeamId": "18312",
+      "rosettaTeamName": "Bears",
+      "shortName": "CHI",
+      "teamColor": "#0B162A",
+      "teamColorSecondary": "#C83803",
+      "teamColorTertiary": "#FFFFFF"
+     },
+     "sortOrder": 2,
+     "seoIdentifier": "Bears",
+     "isNationalTeam": false,
+     "countryCode": "US"
+    },
+    {
+     "id": "18415",
+     "name": "NE Patriots",
+     "venueRole": "Away",
+     "type": "Team",
+     "metadata": {
+      "retailRotNumber": "100",
+      "rosettaTeamId": "18415",
+      "rosettaTeamName": "Patriots",
+      "shortName": "NE",
+      "teamColor": "#002244",
+      "teamColorSecondary": "#C60C30",
+      "teamColorTertiary": "#B0B7BC"
+     },
+     "sortOrder": 1,
+     "seoIdentifier": "Patriots",
+     "isNationalTeam": false,
+     "countryCode": "US"
+    }
+   ],
+   "eventParticipantType": "TwoTeam",
+   "status": "NOT_STARTED",
+   "eventScorecard": {
+    "scorecardComponentId": 1
+   },
+   "tags": [
+    "EarlyExit",
+    "EarlyExitPlus",
+    "FeaturedSubcategory",
+    "OSB",
+    "SGP",
+    "SgpDynamicOdds",
+    "YourBetEligible"
+   ],
+   "metadata": {
+    "masterLeagueId": "40",
+    "numberOfParts": "4",
+    "secondsInOnePart": "900"
+   },
+   "sortOrder": 168577033,
+   "subscriptionKey": "league-events-88808"
+  },
+  {
+   "id": "34118009",
+   "seoIdentifier": "PIT Steelers @ NO Saints",
+   "sportId": "3",
+   "leagueId": "88808",
+   "name": "PIT Steelers @ NO Saints",
+   "startEventDate": "2026-10-25T13:30:00.0000000Z",
+   "participants": [
+    {
+     "id": "18423",
+     "name": "NO Saints",
+     "venueRole": "Home",
+     "type": "Team",
+     "metadata": {
+      "retailRotNumber": "103",
+      "rosettaTeamId": "18423",
+      "rosettaTeamName": "Saints",
+      "shortName": "NO",
+      "teamColor": "#D3BC8D",
+      "teamColorSecondary": "#000000",
+      "teamColorTertiary": "#FFFFFF"
+     },
+     "sortOrder": 2,
+     "seoIdentifier": "Saints",
+     "isNationalTeam": false,
+     "countryCode": "US"
+    },
+    {
+     "id": "18456",
+     "name": "PIT Steelers",
+     "venueRole": "Away",
+     "type": "Team",
+     "metadata": {
+      "retailRotNumber": "102",
+      "rosettaTeamId": "18456",
+      "rosettaTeamName": "Steelers",
+      "shortName": "PIT",
+      "teamColor": "#000000",
+      "teamColorSecondary": "#FFB612",
+      "teamColorTertiary": "#003087"
+     },
+     "sortOrder": 1,
+     "seoIdentifier": "Steelers",
+     "isNationalTeam": false,
+     "countryCode": "US"
+    }
+   ],
+   "eventParticipantType": "TwoTeam",
+   "status": "NOT_STARTED",
+   "eventScorecard": {
+    "scorecardComponentId": 1
+   },
+   "tags": [
+    "EarlyExit",
+    "EarlyExitPlus",
+    "FeaturedSubcategory",
+    "OSB",
+    "SGP",
+    "SgpDynamicOdds",
+    "YourBetEligible"
+   ],
+   "metadata": {
+    "masterLeagueId": "40",
+    "numberOfParts": "4",
+    "secondsInOnePart": "900"
+   },
+   "sortOrder": 168822009,
+   "subscriptionKey": "league-events-88808"
+  },
+  {
+   "id": "34118031",
+   "seoIdentifier": "CHI Bears @ SEA Seahawks",
+   "sportId": "3",
+   "leagueId": "88808",
+   "name": "CHI Bears @ SEA Seahawks",
+   "startEventDate": "2026-11-03T01:20:00.0000000Z",
+   "participants": [
+    {
+     "id": "18471",
+     "name": "SEA Seahawks",
+     "venueRole": "Home",
+     "type": "Team",
+     "metadata": {
+      "retailRotNumber": "145",
+      "rosettaTeamId": "18471",
+      "rosettaTeamName": "Seahawks",
+      "shortName": "SEA",
+      "teamColor": "#002244",
+      "teamColorSecondary": "#69BE28",
+      "teamColorTertiary": "#A5ACAF"
+     },
+     "sortOrder": 2,
+     "seoIdentifier": "Seahawks",
+     "isNationalTeam": false,
+     "countryCode": "US"
+    },
+    {
+     "id": "18312",
+     "name": "CHI Bears",
+     "venueRole": "Away",
+     "type": "Team",
+     "metadata": {
+      "retailRotNumber": "144",
+      "rosettaTeamId": "18312",
+      "rosettaTeamName": "Bears",
+      "shortName": "CHI",
+      "teamColor": "#0B162A",
+      "teamColorSecondary": "#C83803",
+      "teamColorTertiary": "#FFFFFF"
+     },
+     "sortOrder": 1,
+     "seoIdentifier": "Bears",
+     "isNationalTeam": false,
+     "countryCode": "US"
+    }
+   ],
+   "eventParticipantType": "TwoTeam",
+   "status": "NOT_STARTED",
+   "eventScorecard": {
+    "scorecardComponentId": 1
+   },
+   "tags": [
+    "FeaturedSubcategory",
+    "OSB",
+    "SGP",
+    "SgpDynamicOdds",
+    "YourBetEligible"
+   ],
+   "metadata": {
+    "masterLeagueId": "40",
+    "numberOfParts": "4",
+    "secondsInOnePart": "900"
+   },
+   "sortOrder": 169637031,
+   "subscriptionKey": "league-events-88808"
+  }
+ ],
+ "categories": [
+  {
+   "id": 492,
+   "name": "Game Lines",
+   "sortOrder": 492,
+   "tags": [
+    "SGP"
+   ]
+  },
+  {
+   "id": 1003,
+   "name": "TD Scorers",
+   "sortOrder": 532,
+   "tags": [
+    "SGP"
+   ]
+  },
+  {
+   "id": 1000,
+   "name": "Passing Props ",
+   "sortOrder": 550,
+   "tags": [
+    "SGP"
+   ]
+  },
+  {
+   "id": 1342,
+   "name": "Receiving Props",
+   "sortOrder": 634,
+   "tags": [
+    "SGP"
+   ]
+  },
+  {
+   "id": 1001,
+   "name": "Rushing Props",
+   "sortOrder": 638,
+   "tags": [
+    "SGP"
+   ]
+  },
+  {
+   "id": 1743,
+   "name": "Special Teams Props",
+   "sortOrder": 771,
+   "tags": [
+    "SGP"
+   ]
+  },
+  {
+   "id": 862,
+   "name": "Player Specials",
+   "sortOrder": 782
+  },
+  {
+   "id": 1644,
+   "name": "Game Specials",
+   "sortOrder": 785
+  },
+  {
+   "id": 1653,
+   "name": "Weekly Specials",
+   "sortOrder": 786
+  },
+  {
+   "id": 999,
+   "name": "DK Squares",
+   "sortOrder": 814
+  },
+  {
+   "id": 1303,
+   "name": "1st Drive",
+   "sortOrder": 856,
+   "tags": [
+    "MicroMarket"
+   ]
+  },
+  {
+   "id": 1559,
+   "name": "1st of Game",
+   "sortOrder": 857,
+   "tags": [
+    "MicroMarket",
+    "SGP"
+   ]
+  },
+  {
+   "id": 526,
+   "name": "Halves",
+   "sortOrder": 966,
+   "tags": [
+    "SGP"
+   ]
+  },
+  {
+   "id": 527,
+   "name": "Quarters",
+   "sortOrder": 967,
+   "tags": [
+    "SGP"
+   ]
+  },
+  {
+   "id": 528,
+   "name": "Game Props",
+   "sortOrder": 974,
+   "tags": [
+    "SGP"
+   ]
+  },
+  {
+   "id": 530,
+   "name": "Team Props",
+   "sortOrder": 976,
+   "tags": [
+    "SGP"
+   ]
+  },
+  {
+   "id": 529,
+   "name": "Futures",
+   "sortOrder": 985
+  },
+  {
+   "id": 787,
+   "name": "Awards",
+   "sortOrder": 986
+  },
+  {
+   "id": 1076,
+   "name": "Playoffs",
+   "sortOrder": 987
+  },
+  {
+   "id": 1286,
+   "name": "Wins",
+   "sortOrder": 999
+  },
+  {
+   "id": 1595,
+   "name": "Stat Leaders",
+   "sortOrder": 1024
+  },
+  {
+   "id": 1304,
+   "name": "Quick Hits",
+   "sortOrder": 1075,
+   "tags": [
+    "MicroMarket"
+   ]
+  },
+  {
+   "id": 1185,
+   "name": "H2H Player Props",
+   "categoryType": "H2H",
+   "sortOrder": 1095,
+   "tags": [
+    "SGP"
+   ]
+  },
+  {
+   "id": 638,
+   "name": "Kicking Props",
+   "sortOrder": 1296
+  },
+  {
+   "id": 1744,
+   "name": "Defensive Props",
+   "sortOrder": 1730,
+   "tags": [
+    "SGP"
+   ]
+  },
+  {
+   "id": 1900,
+   "name": "Tight End Day",
+   "sortOrder": 1881
+  },
+  {
+   "id": 1972,
+   "name": "Drive Props",
+   "sortOrder": 1953,
+   "tags": [
+    "MicroMarket",
+    "SGP"
+   ]
+  },
+  {
+   "id": 1984,
+   "name": "Draft",
+   "sortOrder": 1965
+  }
+ ],
+ "subcategories": [
+  {
+   "id": 14114,
+   "categoryId": 1342,
+   "name": "Rec Yards O/U",
+   "componentId": 8,
+   "sortOrder": 14085,
+   "tags": [
+    "SGP"
+   ]
+  },
+  {
+   "id": 14115,
+   "categoryId": 1342,
+   "name": "Receptions O/U",
+   "componentId": 8,
+   "sortOrder": 14182,
+   "tags": [
+    "SGP"
+   ]
+  },
+  {
+   "id": 14124,
+   "categoryId": 1342,
+   "name": "Most Receiving Yards",
+   "componentId": 204,
+   "sortOrder": 14931,
+   "tags": [
+    "SGP"
+   ]
+  },
+  {
+   "id": 14126,
+   "categoryId": 1001,
+   "name": "Most Rushing Yards",
+   "componentId": 204,
+   "sortOrder": 14975,
+   "tags": [
+    "SGP"
+   ]
+  },
+  {
+   "id": 15004,
+   "categoryId": 1000,
+   "name": "Pass Yards - 1Q O/U",
+   "componentId": 8,
+   "sortOrder": 12659,
+   "tags": [
+    "SGP"
+   ]
+  },
+  {
+   "id": 15006,
+   "categoryId": 1342,
+   "name": "Rec Yards - 1Q O/U",
+   "componentId": 8,
+   "sortOrder": 14857,
+   "tags": [
+    "SGP"
+   ]
+  },
+  {
+   "id": 15008,
+   "categoryId": 1001,
+   "name": "Rush Yards - 1Q O/U",
+   "componentId": 8,
+   "sortOrder": 10551,
+   "tags": [
+    "SGP"
+   ]
+  },
+  {
+   "id": 15937,
+   "categoryId": 1000,
+   "name": "Interceptions O/U",
+   "componentId": 8,
+   "sortOrder": 10648,
+   "tags": [
+    "SGP"
+   ]
+  },
+  {
+   "id": 15948,
+   "categoryId": 1342,
+   "name": "Longest Reception O/U",
+   "componentId": 8,
+   "sortOrder": 16527,
+   "tags": []
+  },
+  {
+   "id": 15968,
+   "categoryId": 1000,
+   "name": "Longest Completion O/U",
+   "componentId": 8,
+   "sortOrder": 12622,
+   "tags": []
+  },
+  {
+   "id": 16568,
+   "categoryId": 1000,
+   "name": "Pass TDs",
+   "componentId": 331,
+   "sortOrder": 9490,
+   "tags": [
+    "Featured",
+    "SGP"
+   ]
+  },
+  {
+   "id": 16569,
+   "categoryId": 1000,
+   "name": "Pass Yards",
+   "componentId": 331,
+   "sortOrder": 9482,
+   "tags": [
+    "Featured",
+    "SGP"
+   ]
+  },
+  {
+   "id": 16570,
+   "categoryId": 1342,
+   "name": "Receiving Yards",
+   "componentId": 331,
+   "sortOrder": 14074,
+   "tags": [
+    "Featured",
+    "SGP"
+   ]
+  },
+  {
+   "id": 16571,
+   "categoryId": 1001,
+   "name": "Rush Yards",
+   "componentId": 331,
+   "sortOrder": 9479,
+   "tags": [
+    "Featured",
+    "SGP"
+   ]
+  },
+  {
+   "id": 16572,
+   "categoryId": 1001,
+   "name": "Rush + Rec Yards",
+   "componentId": 331,
+   "sortOrder": 9480,
+   "tags": [
+    "Featured",
+    "SGP"
+   ]
+  },
+  {
+   "id": 16573,
+   "categoryId": 1000,
+   "name": "Pass Yards - 1Q",
+   "componentId": 331,
+   "sortOrder": 9594,
+   "tags": [
+    "SGP"
+   ]
+  },
+  {
+   "id": 16574,
+   "categoryId": 1342,
+   "name": "Rec Yards - 1Q",
+   "componentId": 331,
+   "sortOrder": 14077,
+   "tags": [
+    "SGP"
+   ]
+  },
+  {
+   "id": 16575,
+   "categoryId": 1001,
+   "name": "Rush Yards - 1Q",
+   "componentId": 331,
+   "sortOrder": 9489,
+   "tags": [
+    "SGP"
+   ]
+  },
+  {
+   "id": 16819,
+   "categoryId": 1000,
+   "name": "Interceptions",
+   "componentId": 331,
+   "sortOrder": 9595,
+   "tags": [
+    "SGP"
+   ]
+  },
+  {
+   "id": 16820,
+   "categoryId": 1001,
+   "name": "Rush Attempts",
+   "componentId": 331,
+   "sortOrder": 9485,
+   "tags": [
+    "SGP"
+   ]
+  },
+  {
+   "id": 16821,
+   "categoryId": 1342,
+   "name": "Receptions",
+   "componentId": 331,
+   "sortOrder": 14075,
+   "tags": [
+    "Featured",
+    "SGP"
+   ]
+  },
+  {
+   "id": 16888,
+   "categoryId": 1000,
+   "name": "Pass Attempts",
+   "componentId": 331,
+   "sortOrder": 9492,
+   "tags": [
+    "SGP"
+   ]
+  },
+  {
+   "id": 16889,
+   "categoryId": 1000,
+   "name": "Completions",
+   "componentId": 331,
+   "sortOrder": 9498,
+   "tags": [
+    "SGP"
+   ]
+  },
+  {
+   "id": 16896,
+   "categoryId": 1000,
+   "name": "Pass + Rush Yards",
+   "componentId": 331,
+   "sortOrder": 9572,
+   "tags": [
+    "SGP"
+   ]
+  },
+  {
+   "id": 16923,
+   "categoryId": 1001,
+   "name": "Longest Rush",
+   "componentId": 331,
+   "sortOrder": 17177,
+   "tags": [
+    "SGP"
+   ]
+  },
+  {
+   "id": 16924,
+   "categoryId": 1342,
+   "name": "Longest Reception",
+   "componentId": 331,
+   "sortOrder": 17101,
+   "tags": [
+    "SGP"
+   ]
+  },
+  {
+   "id": 18493,
+   "categoryId": 1000,
+   "name": "Pass Yards - 1H",
+   "componentId": 331,
+   "sortOrder": 18479,
+   "tags": [
+    "SGP"
+   ]
+  },
+  {
+   "id": 18494,
+   "categoryId": 1001,
+   "name": "Rush Yards - 1H",
+   "componentId": 331,
+   "sortOrder": 18454,
+   "tags": [
+    "SGP"
+   ]
+  },
+  {
+   "id": 18495,
+   "categoryId": 1342,
+   "name": "Rec Yards - 1H",
+   "componentId": 331,
+   "sortOrder": 18455,
+   "tags": [
+    "SGP"
+   ]
+  },
+  {
+   "id": 18525,
+   "categoryId": 1001,
+   "name": "Rush + Rec Yards - 1Q",
+   "componentId": 331,
+   "sortOrder": 18500,
+   "tags": [
+    "SGP"
+   ]
+  },
+  {
+   "id": 18527,
+   "categoryId": 1342,
+   "name": "Receptions - 1Q",
+   "componentId": 331,
+   "sortOrder": 18504,
+   "tags": [
+    "SGP"
+   ]
+  },
+  {
+   "id": 18876,
+   "categoryId": 1000,
+   "name": "Pass Yards - 1H O/U",
+   "componentId": 8,
+   "sortOrder": 18833,
+   "tags": [
+    "SGP"
+   ]
+  },
+  {
+   "id": 18883,
+   "categoryId": 1001,
+   "name": "Rush Yards - 1H O/U",
+   "componentId": 8,
+   "sortOrder": 18840,
+   "tags": [
+    "SGP"
+   ]
+  },
+  {
+   "id": 18884,
+   "categoryId": 1342,
+   "name": "Rec Yards - 1H O/U",
+   "componentId": 8,
+   "sortOrder": 18841,
+   "tags": [
+    "SGP"
+   ]
+  },
+  {
+   "id": 18947,
+   "categoryId": 1000,
+   "name": "Longest Completion",
+   "componentId": 331,
+   "sortOrder": 18904,
+   "tags": [
+    "SGP"
+   ]
+  },
+  {
+   "id": 19080,
+   "categoryId": 1000,
+   "name": "Passing TDs - 1Q",
+   "componentId": 331,
+   "sortOrder": 19037,
+   "tags": [
+    "SGP"
+   ]
+  },
+  {
+   "id": 9514,
+   "categoryId": 1001,
+   "name": "Rush Yards O/U",
+   "componentId": 8,
+   "sortOrder": 9493,
+   "tags": [
+    "SGP"
+   ]
+  },
+  {
+   "id": 9517,
+   "categoryId": 1000,
+   "name": "Pass Attempts O/U",
+   "componentId": 8,
+   "sortOrder": 10649,
+   "tags": [
+    "SGP"
+   ]
+  },
+  {
+   "id": 9518,
+   "categoryId": 1001,
+   "name": "Rush Attempts O/U",
+   "componentId": 8,
+   "sortOrder": 9591,
+   "tags": [
+    "SGP"
+   ]
+  },
+  {
+   "id": 9522,
+   "categoryId": 1000,
+   "name": "Completions O/U",
+   "componentId": 8,
+   "sortOrder": 11931,
+   "tags": [
+    "SGP"
+   ]
+  },
+  {
+   "id": 9523,
+   "categoryId": 1001,
+   "name": "Rush + Rec Yards O/U",
+   "componentId": 8,
+   "sortOrder": 9592,
+   "tags": [
+    "SGP"
+   ]
+  },
+  {
+   "id": 9524,
+   "categoryId": 1000,
+   "name": "Pass Yards O/U",
+   "componentId": 8,
+   "sortOrder": 10550,
+   "tags": [
+    "SGP"
+   ]
+  },
+  {
+   "id": 9525,
+   "categoryId": 1000,
+   "name": "Pass TDs O/U",
+   "componentId": 8,
+   "sortOrder": 10556,
+   "tags": [
+    "SGP"
+   ]
+  },
+  {
+   "id": 9532,
+   "categoryId": 1000,
+   "name": "Pass + Rush Yards O/U",
+   "componentId": 8,
+   "sortOrder": 12055,
+   "tags": [
+    "SGP"
+   ]
+  },
+  {
+   "id": 9533,
+   "categoryId": 1001,
+   "name": "Longest Rush O/U",
+   "componentId": 8,
+   "sortOrder": 12562,
+   "tags": []
+  },
+  {
+   "id": 18498,
+   "categoryId": 1342,
+   "name": "Combined Rec Yards",
+   "componentId": 331,
+   "sortOrder": 18459,
+   "tags": [
+    "SGP"
+   ]
+  },
+  {
+   "id": 18502,
+   "categoryId": 1342,
+   "name": "Either Player Rec Yards",
+   "componentId": 331,
+   "sortOrder": 18477,
+   "tags": [
+    "SGP"
+   ]
+  },
+  {
+   "id": 12352,
+   "categoryId": 1001,
+   "name": "Race to X Rush Yds",
+   "componentId": 204,
+   "sortOrder": 12314,
+   "tags": [
+    "SGP"
+   ]
+  },
+  {
+   "id": 14125,
+   "categoryId": 1342,
+   "name": "Most Receptions",
+   "componentId": 204,
+   "sortOrder": 14934,
+   "tags": [
+    "SGP"
+   ]
+  },
+  {
+   "id": 18496,
+   "categoryId": 1000,
+   "name": "Combined Pass Yards",
+   "componentId": 331,
+   "sortOrder": 18480,
+   "tags": [
+    "SGP"
+   ]
+  },
+  {
+   "id": 18497,
+   "categoryId": 1001,
+   "name": "Combined Rush Yards",
+   "componentId": 331,
+   "sortOrder": 18458,
+   "tags": [
+    "SGP"
+   ]
+  },
+  {
+   "id": 18500,
+   "categoryId": 1000,
+   "name": "Either Player Pass Yards",
+   "componentId": 331,
+   "sortOrder": 18501,
+   "tags": [
+    "SGP"
+   ]
+  },
+  {
+   "id": 18501,
+   "categoryId": 1001,
+   "name": "Either Player Rush Yards",
+   "componentId": 331,
+   "sortOrder": 18481,
+   "tags": [
+    "SGP"
+   ]
+  },
+  {
+   "id": 18522,
+   "categoryId": 1000,
+   "name": "Pass Attempts - 1Q",
+   "componentId": 331,
+   "sortOrder": 18505,
+   "tags": [
+    "SGP"
+   ]
+  },
+  {
+   "id": 18523,
+   "categoryId": 1000,
+   "name": "Pass Completions - 1Q",
+   "componentId": 331,
+   "sortOrder": 18506,
+   "tags": [
+    "SGP"
+   ]
+  },
+  {
+   "id": 18524,
+   "categoryId": 1001,
+   "name": "Rush Attempts - 1Q",
+   "componentId": 331,
+   "sortOrder": 18482,
+   "tags": [
+    "SGP"
+   ]
+  },
+  {
+   "id": 18526,
+   "categoryId": 1000,
+   "name": "Interceptions Thrown - 1Q",
+   "componentId": 331,
+   "sortOrder": 18508,
+   "tags": []
+  },
+  {
+   "id": 18778,
+   "categoryId": 1342,
+   "name": "Race to X Rec Yds",
+   "componentId": 204,
+   "sortOrder": 18735,
+   "tags": [
+    "SGP"
+   ]
+  },
+  {
+   "id": 18956,
+   "categoryId": 1342,
+   "name": "Race to X Receptions",
+   "componentId": 29,
+   "sortOrder": 18913,
+   "tags": [
+    "SGP"
+   ]
+  },
+  {
+   "id": 20257,
+   "categoryId": 1001,
+   "name": "Player Rushing Yds in Each Half",
+   "componentId": 331,
+   "sortOrder": 20208,
+   "tags": []
+  },
+  {
+   "id": 20258,
+   "categoryId": 1001,
+   "name": "Player Rush Yds in Each Quarter",
+   "componentId": 331,
+   "sortOrder": 20209,
+   "tags": []
+  },
+  {
+   "id": 20259,
+   "categoryId": 1342,
+   "name": "Player Rec Yds in Each Quarter",
+   "componentId": 331,
+   "sortOrder": 20210,
+   "tags": []
+  },
+  {
+   "id": 20260,
+   "categoryId": 1000,
+   "name": "Player Pass Yds in Each Quarter",
+   "componentId": 331,
+   "sortOrder": 20211,
+   "tags": []
+  },
+  {
+   "id": 20261,
+   "categoryId": 1342,
+   "name": "Player Rec Yds in Each Half",
+   "componentId": 331,
+   "sortOrder": 20212,
+   "tags": []
+  },
+  {
+   "id": 20262,
+   "categoryId": 1000,
+   "name": "Player Pass Yds in Each Half",
+   "componentId": 331,
+   "sortOrder": 20213,
+   "tags": []
+  },
+  {
+   "id": 20264,
+   "categoryId": 1000,
+   "name": "Each Player Pass Yds in Each Quarter",
+   "componentId": 331,
+   "sortOrder": 20215,
+   "tags": []
+  },
+  {
+   "id": 20266,
+   "categoryId": 1001,
+   "name": "Each Player Rush Yards in Each Quarter",
+   "componentId": 331,
+   "sortOrder": 20217,
+   "tags": []
+  },
+  {
+   "id": 20267,
+   "categoryId": 1000,
+   "name": "Each Player Pass Yds in Each Half",
+   "componentId": 331,
+   "sortOrder": 20218,
+   "tags": []
+  },
+  {
+   "id": 20268,
+   "categoryId": 1342,
+   "name": "Each Player Rec Yards in Each Half",
+   "componentId": 331,
+   "sortOrder": 20219,
+   "tags": []
+  },
+  {
+   "id": 17101,
+   "categoryId": 1342,
+   "name": "1st Reception",
+   "componentId": 29,
+   "sortOrder": 17169,
+   "tags": []
+  }
+ ]
+}

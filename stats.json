@@ -1,0 +1,232 @@
+{
+  "_note": "Per sport: 'prizepicks' maps PrizePicks stat_type names to canonical stats (verify names against samples/projections.json); 'models' sets the promo-line distribution per canonical stat. cv = assumed coefficient of variation for the normal model.",
+  "NBA": {
+    "prizepicks": {
+      "Points": "points",
+      "Rebounds": "rebounds",
+      "Assists": "assists",
+      "Pts+Rebs+Asts": "pts_rebs_asts",
+      "Pts+Rebs": "pts_rebs",
+      "Pts+Asts": "pts_asts",
+      "Rebs+Asts": "rebs_asts",
+      "3-PT Made": "threes",
+      "Blocked Shots": "blocks",
+      "Steals": "steals",
+      "Blks+Stls": "blocks_steals",
+      "Turnovers": "turnovers"
+    },
+    "models": {
+      "points": {
+        "model": "normal",
+        "cv": 0.3
+      },
+      "rebounds": {
+        "model": "poisson"
+      },
+      "assists": {
+        "model": "poisson"
+      },
+      "pts_rebs_asts": {
+        "model": "normal",
+        "cv": 0.25
+      },
+      "pts_rebs": {
+        "model": "normal",
+        "cv": 0.27
+      },
+      "pts_asts": {
+        "model": "normal",
+        "cv": 0.27
+      },
+      "rebs_asts": {
+        "model": "normal",
+        "cv": 0.3
+      },
+      "threes": {
+        "model": "poisson"
+      },
+      "blocks": {
+        "model": "poisson"
+      },
+      "steals": {
+        "model": "poisson"
+      },
+      "blocks_steals": {
+        "model": "poisson"
+      },
+      "turnovers": {
+        "model": "poisson"
+      }
+    }
+  },
+  "NFL": {
+    "prizepicks": {
+      "Pass Yards": "pass_yards",
+      "Pass Attempts": "pass_attempts",
+      "Pass Completions": "pass_completions",
+      "Pass TDs": "pass_tds",
+      "Rush Yards": "rush_yards",
+      "Rush Attempts": "rush_attempts",
+      "Receiving Yards": "rec_yards",
+      "Receptions": "receptions",
+      "Rush+Rec Yds": "rush_rec_yards",
+      "Pass+Rush Yds": "pass_rush_yards",
+      "INT": "pass_ints",
+      "Longest Reception": "longest_reception",
+      "Longest Rush": "longest_rush",
+      "Longest Completion": "longest_completion"
+    },
+    "models": {
+      "pass_yards": {
+        "model": "normal",
+        "cv": 0.25
+      },
+      "pass_attempts": {
+        "model": "normal",
+        "cv": 0.18
+      },
+      "pass_completions": {
+        "model": "normal",
+        "cv": 0.22
+      },
+      "pass_tds": {
+        "model": "poisson"
+      },
+      "rush_yards": {
+        "model": "normal",
+        "cv": 0.45
+      },
+      "rush_attempts": {
+        "model": "poisson"
+      },
+      "rec_yards": {
+        "model": "normal",
+        "cv": 0.55
+      },
+      "receptions": {
+        "model": "poisson"
+      },
+      "rush_rec_yards": {
+        "model": "normal",
+        "cv": 0.4
+      },
+      "pass_rush_yards": {
+        "model": "normal",
+        "cv": 0.25
+      },
+      "pass_ints": {
+        "model": "poisson"
+      },
+      "longest_reception": {
+        "model": "normal",
+        "cv": 0.5
+      },
+      "longest_rush": {
+        "model": "normal",
+        "cv": 0.6
+      },
+      "longest_completion": {
+        "model": "normal",
+        "cv": 0.35
+      }
+    }
+  },
+  "MLB": {
+    "prizepicks": {
+      "Pitcher Strikeouts": "pitcher_strikeouts",
+      "Hits Allowed": "hits_allowed",
+      "Earned Runs Allowed": "earned_runs",
+      "Walks Allowed": "walks_allowed",
+      "Pitching Outs": "pitching_outs",
+      "Hits": "hits",
+      "Total Bases": "total_bases",
+      "Runs": "runs",
+      "RBIs": "rbis",
+      "Hits+Runs+RBIs": "hits_runs_rbis",
+      "Hitter Strikeouts": "batter_strikeouts",
+      "Singles": "singles",
+      "Doubles": "doubles",
+      "Stolen Bases": "stolen_bases",
+      "Walks": "batter_walks"
+    },
+    "models": {
+      "pitcher_strikeouts": {
+        "model": "poisson"
+      },
+      "hits_allowed": {
+        "model": "poisson"
+      },
+      "earned_runs": {
+        "model": "poisson"
+      },
+      "walks_allowed": {
+        "model": "poisson"
+      },
+      "pitching_outs": {
+        "model": "normal",
+        "cv": 0.22
+      },
+      "hits": {
+        "model": "poisson"
+      },
+      "total_bases": {
+        "model": "poisson"
+      },
+      "runs": {
+        "model": "poisson"
+      },
+      "rbis": {
+        "model": "poisson"
+      },
+      "hits_runs_rbis": {
+        "model": "poisson"
+      },
+      "batter_strikeouts": {
+        "model": "poisson"
+      },
+      "singles": {
+        "model": "poisson"
+      },
+      "doubles": {
+        "model": "poisson"
+      },
+      "stolen_bases": {
+        "model": "poisson"
+      },
+      "batter_walks": {
+        "model": "poisson"
+      }
+    }
+  },
+  "NHL": {
+    "prizepicks": {
+      "Shots On Goal": "shots_on_goal",
+      "Points": "points",
+      "Goals": "goals",
+      "Assists": "assists",
+      "Goalie Saves": "saves",
+      "Blocked Shots": "blocked_shots"
+    },
+    "models": {
+      "shots_on_goal": {
+        "model": "poisson"
+      },
+      "points": {
+        "model": "poisson"
+      },
+      "goals": {
+        "model": "poisson"
+      },
+      "assists": {
+        "model": "poisson"
+      },
+      "saves": {
+        "model": "normal",
+        "cv": 0.2
+      },
+      "blocked_shots": {
+        "model": "poisson"
+      }
+    }
+  }
+}
