@@ -167,6 +167,8 @@ that's blocked.
 - **Edge**: Prob minus the per-pick break-even of the reference lineup (shown at the top).
   Positive means the pick beats break-even for that lineup. For `--bonus`, break-even is still
   calculated as a regular cash entry, since a free entry never loses money.
+- **Matchup**: the two teams in the pick's game, listed alphabetically (e.g. `CHI vs NE`), so it
+  doesn't show which team is home. Best slips show it too, alongside the sport.
 - **Books**: each book's probability. *books differ* flags a gap of 3 percentage points or more.
 - **Notes**: *same game* marks a pick from a game already listed higher up. It's shown, but
   never put in the same lineup. *taco (modelled)* marks an estimated promo line (see below).

@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from ppopt.matching import Config, normalize_name, parse_game, parse_pick, parse_promo_leg, game_id
+from ppopt.matching import Config, normalize_name, parse_game, parse_pick, parse_promo_leg, game_id, matchup_label
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -65,6 +65,11 @@ def test_parse_game_rejects_missing_separator(cfg):
 
 def test_game_id_is_order_insensitive():
     assert game_id("NFL", frozenset({"NE", "CHI"})) == game_id("NFL", frozenset({"CHI", "NE"})) == "NFL:CHI-NE"
+
+
+def test_matchup_label_lists_teams_alphabetically():
+    assert matchup_label("NFL:CHI-NE") == "CHI vs NE"
+    assert matchup_label(game_id("NBA", frozenset({"PHI", "CLE"}))) == "CLE vs PHI"
 
 
 def test_pp_stat_mapping(cfg):

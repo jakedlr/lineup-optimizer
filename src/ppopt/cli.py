@@ -9,7 +9,7 @@ from collections import Counter
 from datetime import datetime, timezone
 from pathlib import Path
 
-from .matching import Config, game_id, parse_promo_leg
+from .matching import Config, game_id, matchup_label, parse_promo_leg
 from .odds import DEVIG_METHODS
 from .payouts import break_even, load_payouts
 from .pricing import PromoError, price_lines, price_promo
@@ -238,7 +238,7 @@ def format_report(report: dict, top: int, verbose: bool) -> str:
         f"Edge vs {ref['type']}{ref['size']} break-even {_pct(ref['break_even']).strip()} per leg",
         "",
         f"TOP LEGS ({min(top, len(report['legs']))} of {len(report['legs'])})",
-        f"{'#':>3}  {'Prob':>6}  {'Edge':>6}  {'Sport':<5}  {'Player':<24}  {'Pick':<34}  {'Books':<18}  Notes",
+        f"{'#':>3}  {'Prob':>6}  {'Edge':>6}  {'Sport':<5}  {'Matchup':<10}  {'Player':<24}  {'Pick':<34}  {'Books':<18}  Notes",
     ]
     for i, row in enumerate(report["legs"][:top], 1):
         books = " ".join(f"{BOOK_ABBR.get(b, b)} {p * 100:.1f}" for b, p in sorted(row["books"].items()))
@@ -250,7 +250,7 @@ def format_report(report: dict, top: int, verbose: bool) -> str:
         if row["disagreement"] >= 0.03:
             notes.append(f"books differ {row['disagreement'] * 100:.1f}pts")
         out.append(f"{i:>3}  {_pct(row['prob'])}  {row['edge'] * 100:+5.1f}%  {row['sport']:<5}  "
-                   f"{row['player'][:24]:<24}  {_pick(row)[:34]:<34}  {books:<18}  {', '.join(notes)}")
+                   f"{matchup_label(row['game']):<10}  {row['player'][:24]:<24}  {_pick(row)[:34]:<34}  {books:<18}  {', '.join(notes)}")
 
     out += ["", "BEST SLIPS (one leg per game)"]
     if not report["slips"]:
@@ -259,7 +259,8 @@ def format_report(report: dict, top: int, verbose: bool) -> str:
         out.append(f"  {slip['type'].title()} {slip['size']}: EV ${slip['ev']:+.2f} ({slip['ev_pct'] * 100:+.1f}%)")
         for leg in slip["legs"]:
             tag = f"  [{leg['promo_type']}]" if leg["promo_type"] else ""
-            out.append(f"      {_pct(leg['prob'])}  {leg['player']} - {_pick(leg)}{tag}")
+            out.append(f"      {_pct(leg['prob'])}  {leg['sport']:<4}  {matchup_label(leg['game']):<10}  "
+                       f"{leg['player']} - {_pick(leg)}{tag}")
 
     if report["unmatched"]:
         counts = ", ".join(f"{n} {r}" for r, n in sorted(report["unmatched"].items(), key=lambda x: -x[1]))

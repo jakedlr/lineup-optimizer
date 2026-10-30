@@ -172,6 +172,42 @@ def test_main_table_output(tmp_path, capsys, monkeypatch):
     assert cli.main(["--pp-file", str(pp_file)], root=ROOT) == 0
     out = capsys.readouterr().out
     assert "Drake Maye" in out and "BEST SLIPS" in out and "taco" in out
+    top_legs, best_slips = out.split("BEST SLIPS")
+    assert "CHI vs NE" in top_legs and "CHI vs NE" in best_slips
+
+
+def _row(sport, game, player, line, stat_label, prob, promo_type=""):
+    return {
+        "sport": sport, "game": game, "player": player, "side": "over", "line": line,
+        "stat_label": stat_label, "prob": prob, "books": {"draftkings": prob}, "disagreement": 0.0,
+        "promo_type": promo_type, "modelled": False, "edge": 0.05, "same_game": False,
+    }
+
+
+def test_format_report_shows_sport_and_matchup():
+    maye = _row("NFL", "NFL:CHI-NE", "Drake Maye", 249.5, "Pass Yards", 0.623, promo_type="taco")
+    embiid = _row("NBA", "NBA:CLE-PHI", "Joel Embiid", 35.5, "Pts+Rebs+Asts", 0.581)
+    report = {
+        "settings": {"sports": ["NFL", "NBA"], "hours": 24, "stake": 10.0, "devig": "multiplicative", "mode": "cash"},
+        "ref_slip": {"type": "power", "size": 2, "break_even": 0.573},
+        "legs": [maye, embiid],
+        "slips": [{"type": "power", "size": 2, "ev": 1.23, "ev_pct": 0.123, "legs": [maye, embiid]}],
+        "unmatched": {}, "unmatched_lines": [], "warnings": [],
+    }
+    lines = cli.format_report(report, top=25, verbose=False).splitlines()
+
+    header = next(l for l in lines if l.lstrip().startswith("#"))
+    row = next(l for l in lines if l.lstrip().startswith("1 "))
+    assert header.index("Sport") < header.index("Matchup") < header.index("Player")
+    assert row.index("NFL") == header.index("Sport")
+    assert row.index("CHI vs NE") == header.index("Matchup")
+    assert row.index("Drake Maye") == header.index("Player")
+
+    slip_legs = lines[lines.index("  Power 2: EV $+1.23 (+12.3%)") + 1:][:2]
+    assert slip_legs == [
+        "       62.3%  NFL   CHI vs NE   Drake Maye - Over 249.5 Pass Yards  [taco]",
+        "       58.1%  NBA   CLE vs PHI  Joel Embiid - Over 35.5 Pts+Rebs+Asts",
+    ]
 
 
 def test_main_reports_user_errors(capsys, monkeypatch, tmp_path):

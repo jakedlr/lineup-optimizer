@@ -93,6 +93,11 @@ def game_id(sport: str, teams: frozenset[str]) -> str:
     return f"{sport}:{'-'.join(sorted(teams))}"
 
 
+def matchup_label(gid: str) -> str:
+    """'NFL:CHI-NE' -> 'CHI vs NE' (inverse of game_id)."""
+    return " vs ".join(gid.split(":", 1)[1].split("-"))
+
+
 def parse_game(sport: str, text: str, cfg: Config) -> frozenset[str]:
     """'CHI vs NE' / 'NE @ CHI' / 'Bears - Patriots' -> {'CHI', 'NE'}."""
     parts = [p for p in _GAME_SEPARATOR.split(text.strip()) if p]
