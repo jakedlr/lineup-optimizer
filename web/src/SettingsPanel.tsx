@@ -80,7 +80,7 @@ export function SettingsPanel({ options, settings, onChange, noCache, onNoCache 
             <select value={settings.devig} onChange={(e) => set('devig', e.target.value)}>
               {options.devig.map((d) => (
                 <option key={d} value={d}>
-                  {d}
+                  {d === 'worst' ? 'Worst case (lowest of four)' : d}
                 </option>
               ))}
             </select>

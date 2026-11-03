@@ -10,9 +10,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from .matching import Config, config_file, game_id, matchup_label, parse_promo_leg
-from .odds import DEVIG_METHODS
 from .payouts import break_even, load_payouts
-from .pricing import PromoError, price_lines, price_promo
+from .pricing import PRICING_METHODS, WORST, PromoError, price_lines, price_promo
 from .slips import best_slips
 from .sources import draftkings, fanduel, prizepicks
 from .sources.http import FetchError, Http
@@ -67,7 +66,8 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     src.add_argument("--no-cache", action="store_true", help="ignore cached responses and fetch fresh odds")
 
     price = p.add_argument_group("pricing")
-    price.add_argument("--devig", choices=DEVIG_METHODS, default="multiplicative", help="vig removal method (default: multiplicative)")
+    price.add_argument("--devig", choices=PRICING_METHODS, default=WORST,
+                       help="vig removal method; worst prices each leg under all four and keeps the lowest (default: worst)")
     price.add_argument("--stake", type=_positive, default=10.0, help="entry amount in dollars (default: 10)")
     price.add_argument("--payouts", type=Path, help="alternative payouts.json")
 

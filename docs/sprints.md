@@ -149,3 +149,23 @@ Ten findings, all fixed test-first:
 - The board was parsed twice per run: `report_for` hands its parse to `run`.
 - The board cache could hand out a stale payload between concurrent requests: it's swapped whole under a lock.
 - "Legs to show" took 0.5 and showed an empty table: whole numbers of 1 or more only.
+
+## Worst-case devig as the default
+
+Every leg is priced under all four devig methods and keeps the lowest win probability for its side; the four
+methods stay selectable. Terms are in `GLOSSARY.md` (*Devig method*, *Worst-case devig*).
+
+**Done criteria**
+- [x] `--devig worst` is the CLI default; `multiplicative`, `additive`, `power`, `shin` still selectable
+- [x] Worst case is per leg: the leg is priced whole under each method (book average, promo main-line reprice), and
+      the lowest win probability for the leg's side wins
+- [x] Where methods disagree on the side, the leg plays the side whose worst case is higher; forced sides
+      (over-only lines, promo legs) keep their side
+- [x] `/api/options` lists `worst` first and defaults to it; `/api/run` accepts it
+- [x] The devig dropdown opens on "Worst case (lowest of four)"; a devig saved before this change moves to worst
+      case once, then the user's choice is remembered
+
+**Notes**
+- On a two-way market the methods always rank the same way: multiplicative gives the favourite its lowest
+  probability, power gives the underdog its lowest, and Shin equals additive. So worst case usually matches
+  multiplicative and only differs for legs played on their less likely side or where books disagree.

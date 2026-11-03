@@ -11,3 +11,7 @@
 **Slip**: A PrizePicks entry of 2–6 legs, played as either Power (all legs must hit) or Flex (partial payouts), valued by its expected value at the chosen stake.
 
 **Board**: A snapshot of the lines PrizePicks is offering, saved from the user's browser at a moment in time. Lines move, so a board goes stale; legs are only ever drawn from the current board.
+
+**Devig method**: A rule for removing the sportsbook's margin from a two-sided market to get true probabilities: *multiplicative*, *additive*, *power* or *Shin*. On a two-way market Shin and additive agree.
+
+**Worst-case devig**: The default way legs are priced: each leg is priced under every devig method and keeps the lowest win probability for the side it is played on. It is a property of a leg, not of a single market. On a leg's more likely side it is usually the same as multiplicative.

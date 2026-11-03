@@ -18,6 +18,8 @@ export interface Settings {
 }
 
 const KEY = 'ppopt.settings.v1'
+/** Marks settings saved since worst-case devig became the default; older saves had multiplicative by default. */
+const DEVIG_DEFAULT = 'worst'
 export const DEFAULT_TOP = 25
 
 export function defaults(o: Options): Settings {
@@ -60,7 +62,8 @@ export function load(o: Options): Settings {
     sports: sports.length ? sports : base.sports,
     stake: pos(saved.stake) ?? base.stake,
     hours: pos(saved.hours) ?? base.hours,
-    devig: o.devig.includes(saved.devig as string) ? (saved.devig as string) : base.devig,
+    devig:
+      saved.devigDefault === DEVIG_DEFAULT && o.devig.includes(saved.devig as string) ? (saved.devig as string) : base.devig,
     refSlip: o.ref_slips.includes(saved.refSlip as string) ? (saved.refSlip as string) : base.refSlip,
     top: str(saved.top) !== null && count(str(saved.top)!) !== null ? str(saved.top)! : base.top,
     slipType: ['all', 'power', 'flex'].includes(saved.slipType as string) ? (saved.slipType as Settings['slipType']) : 'all',
@@ -70,7 +73,7 @@ export function load(o: Options): Settings {
 
 export function save(s: Settings) {
   try {
-    localStorage.setItem(KEY, JSON.stringify(s))
+    localStorage.setItem(KEY, JSON.stringify({ ...s, devigDefault: DEVIG_DEFAULT }))
   } catch {
     // private mode or storage full: settings just won't be remembered
   }

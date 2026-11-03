@@ -24,7 +24,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 from . import cli
 from .matching import Config, config_file, game_id, matchup_label
 from .models import BookMarket
-from .odds import DEVIG_METHODS
+from .pricing import PRICING_METHODS
 from .payouts import load_payouts
 from .progress import Progress, RunCancelled
 from .sources import prizepicks
@@ -71,7 +71,7 @@ class RunSettings(BaseModel):
     sports: list[Literal[tuple(cli.SPORTS)]] | None = Field(None, min_length=1)
     stake: float | None = Field(None, gt=0)
     hours: float | None = Field(None, gt=0)
-    devig: Literal[DEVIG_METHODS] | None = None
+    devig: Literal[PRICING_METHODS] | None = None
     ref_slip: str | None = Field(None, pattern=r"^(power|flex)[2-6]$")
     no_cache: bool = False
     # Promotions: at most one kind per run, as on the CLI.
@@ -171,7 +171,7 @@ def create_app(static_dir=None, data_dir=None, root=None, collect=None, now=None
         table = load_payouts(config_file(root, "payouts.json"))
         return {
             "sports": cli.SPORTS,
-            "devig": list(DEVIG_METHODS),
+            "devig": list(PRICING_METHODS),
             "ref_slips": [f"{t}{n}" for t in table for n in sorted(table[t])],
             "defaults": {"sports": defaults.sports, "hours": defaults.hours, "stake": defaults.stake,
                          "devig": defaults.devig, "ref_slip": None},

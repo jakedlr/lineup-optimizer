@@ -27,7 +27,7 @@ test('settings change the run, filters work without re-running, settings are rem
   page.on('request', (r) => r.url().endsWith('/api/run') && runs.push(r.postData() ?? ''))
   await page.getByRole('button', { name: 'Run', exact: true }).click()
 
-  await expect(page.getByText('$20 stake · cash · devig multiplicative · NFL, NBA · next 24 h')).toBeVisible()
+  await expect(page.getByText('$20 stake · cash · devig worst · NFL, NBA · next 24 h')).toBeVisible()
   await expect(page.getByText(/against the flex 6 break-even/)).toBeVisible()
 
   const slips = page.getByRole('region', { name: 'Best Slips' })

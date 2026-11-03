@@ -65,7 +65,7 @@ export function routes(table: Record<string, Route>) {
 
 export const options: Options = {
   sports: ['NFL', 'NBA', 'NHL', 'MLB'],
-  devig: ['multiplicative', 'additive', 'power', 'shin'],
+  devig: ['worst', 'multiplicative', 'additive', 'power', 'shin'],
   ref_slips: ['power2', 'power3', 'power4', 'power5', 'power6', 'flex2', 'flex3', 'flex4', 'flex5', 'flex6'],
-  defaults: { sports: ['NFL', 'NBA', 'NHL', 'MLB'], hours: 24, stake: 10, devig: 'multiplicative', ref_slip: null },
+  defaults: { sports: ['NFL', 'NBA', 'NHL', 'MLB'], hours: 24, stake: 10, devig: 'worst', ref_slip: null },
 }

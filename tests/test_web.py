@@ -144,10 +144,10 @@ import pytest
 def test_options_come_from_the_engine(tmp_path):
     opts = engine_app(tmp_path).get("/api/options").json()
     assert opts["sports"] == ["NFL", "NBA", "NHL", "MLB"]
-    assert opts["devig"] == ["multiplicative", "additive", "power", "shin"]
+    assert opts["devig"] == ["worst", "multiplicative", "additive", "power", "shin"]
     assert opts["ref_slips"] == [f"{t}{n}" for t in ("power", "flex") for n in range(2, 7)]
     assert opts["defaults"] == {"sports": ["NFL", "NBA", "NHL", "MLB"], "hours": 24, "stake": 10.0,
-                                "devig": "multiplicative", "ref_slip": None}
+                                "devig": "worst", "ref_slip": None}
 
 
 def test_run_applies_settings(tmp_path):
@@ -166,6 +166,13 @@ def test_run_applies_settings(tmp_path):
     assert report["settings"] == {"sports": ["NBA"], "hours": 12, "stake": 20.0, "devig": "shin", "mode": "cash"}
     assert report["ref_slip"]["type"] == "flex" and report["ref_slip"]["size"] == 6
     assert {l["sport"] for l in report["legs"]} == {"NBA"}
+
+
+def test_run_accepts_worst_case_devig(tmp_path):
+    client = engine_app(tmp_path)
+    upload(client)
+    report = client.post("/api/run", json={"devig": "worst"}).json()
+    assert report["settings"]["devig"] == "worst"
 
 
 def test_run_settings_are_all_optional(tmp_path):

@@ -58,6 +58,29 @@ def test_devig_method_is_passed_through(cfg):
     assert leg.prob == pytest.approx(devig(-300, 240, "power")[0])
 
 
+
+# --- worst-case devig ---------------------------------------------------------
+
+def test_worst_case_prices_a_favoured_leg_like_multiplicative(cfg):
+    [leg], _ = price_lines([pp()], [mkt(over=-300, under=230)], cfg, method="worst")
+    assert leg.side == "over"
+    assert leg.prob == pytest.approx(0.7122, abs=1e-4)
+
+
+def test_worst_case_on_an_underdog_side_is_lower_than_multiplicative(cfg):
+    [leg], _ = price_lines([pp(sides=("over",))], [mkt(over=120, under=-150)], cfg, method="worst")
+    assert leg.side == "over"
+    assert leg.prob == pytest.approx(0.4253, abs=1e-4)  # power; multiplicative gives 0.4310
+
+
+def test_worst_case_takes_the_side_whose_worst_case_is_higher(cfg):
+    # Multiplicative leans under; additive, power and Shin lean over. Worst-case over
+    # (0.49948, multiplicative) beats worst-case under (0.49816, power).
+    markets = [mkt("fanduel", over=-200, under=-180), mkt("draftkings", over=-110, under=-120)]
+    [leg], _ = price_lines([pp()], markets, cfg, method="worst")
+    assert leg.side == "over"
+    assert leg.prob == pytest.approx(0.49948, abs=1e-5)
+
 @pytest.mark.parametrize(
     "line, markets, reason",
     [
@@ -140,3 +163,19 @@ def test_promo_under_side(cfg):
 def test_promo_errors(cfg, p, markets, match):
     with pytest.raises(PromoError, match=match):
         price_promo(p, markets, cfg)
+
+
+def test_promo_worst_case_on_an_underdog_side(cfg):
+    leg = price_promo(promo(side="under"), [mkt(over=-150, under=120)], cfg, method="worst")
+    assert leg.side == "under"
+    assert leg.prob == pytest.approx(0.4253, abs=1e-4)  # power; multiplicative gives 0.4310
+
+
+def test_promo_worst_case_is_the_lowest_of_the_four_when_repriced(cfg):
+    markets = [mkt("fanduel", over=-150, under=120), mkt("draftkings", over=-130, under=100)]
+    each = [price_promo(promo(line=250.5), markets, cfg, method=m).prob
+            for m in ("multiplicative", "additive", "power", "shin")]
+    leg = price_promo(promo(line=250.5), markets, cfg, method="worst")
+    assert leg.modelled
+    assert leg.prob == pytest.approx(min(each))
+    assert min(each) < max(each)

@@ -36,8 +36,8 @@ connection, so it can't be hosted for you.
 2. **Drop it on the page,** or use *Choose file*. The page shows how old the board is and warns after
    30 minutes, because lines move during the day.
 3. **Pick your settings.** Leagues and stake are on the page. *Advanced* has hours ahead, the devig
-   method, which slip the edge is measured against, how many legs to list, and *Fresh odds* to skip
-   the 5-minute odds cache for one run.
+   method (worst case of the four by default), which slip the edge is measured against, how many legs to
+   list, and *Fresh odds* to skip the 5-minute odds cache for one run.
 4. **Choose a promotion,** if you have one: a bonus (free) entry, a payout boost, or promo legs picked
    from the board (search a player, choose the stat, set Over/Under and the discounted line). Promo
    lines already in the feed, such as tacos, are included unless you untick them.
@@ -167,7 +167,7 @@ that's blocked.
 | Option | Default | Meaning |
 |---|---|---|
 | `--stake N` | `10` | Entry amount in dollars. EV is shown in dollars and as a % of this |
-| `--devig METHOD` | `multiplicative` | How the vig is removed: `multiplicative`, `additive`, `power`, `shin` |
+| `--devig METHOD` | `worst` | How the vig is removed: `worst` prices each leg under all four methods and keeps its lowest win probability; or one of `multiplicative`, `additive`, `power`, `shin` |
 | `--payouts PATH` | `payouts.json` | Use a different payout table |
 
 **Promotions.** Only one kind can be used per run, and combining them is an error.

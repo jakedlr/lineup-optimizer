@@ -4,8 +4,11 @@ from collections import defaultdict
 
 from .matching import Config, game_id
 from .models import BookMarket, Leg, PPLine, PromoLeg
-from .odds import devig
+from .odds import DEVIG_METHODS, devig
 from .promo_model import reprice
+
+WORST = "worst"
+PRICING_METHODS = (WORST, *DEVIG_METHODS)  # worst-case devig first: it is the default
 
 
 class PromoError(ValueError):
@@ -42,8 +45,20 @@ def _leg(sport, teams, player, stat, line, book_over: dict[str, float], side=Non
     )
 
 
+def _price_under(method: str, price, sides) -> Leg:
+    """Price a leg under one devig method, or under worst-case devig.
+
+    `price(method, side)` prices the leg; side None lets it pick the likelier side.
+    Worst case takes each side's least likely pricing and plays the better of those.
+    """
+    if method != WORST:
+        return price(method, None)
+    worst = (min((price(m, side) for m in DEVIG_METHODS), key=lambda leg: leg.prob) for side in sides)
+    return max(worst, key=lambda leg: leg.prob)
+
+
 def price_lines(
-    lines: list[PPLine], markets: list[BookMarket], cfg: Config, method: str = "multiplicative"
+    lines: list[PPLine], markets: list[BookMarket], cfg: Config, method: str = WORST
 ) -> tuple[list[Leg], list[tuple[PPLine, str]]]:
     """Price standard half-point PrizePicks lines against exact, two-sided book lines.
 
@@ -74,13 +89,15 @@ def price_lines(
         if not two_sided:
             unmatched.append((line, "one-sided only"))
             continue
-        book_over = {m.book: devig(m.over_odds, m.under_odds, method)[0] for m in two_sided}
-        legs.append(_leg(line.sport, line.teams, line.player, line.stat, line.line, book_over, sides=line.sides))
+        legs.append(_price_under(method, lambda meth, side: _leg(
+            line.sport, line.teams, line.player, line.stat, line.line,
+            {m.book: devig(m.over_odds, m.under_odds, meth)[0] for m in two_sided}, side=side, sides=line.sides,
+        ), line.sides))
     return legs, unmatched
 
 
 def price_promo(
-    promo: PromoLeg, markets: list[BookMarket], cfg: Config, method: str = "multiplicative"
+    promo: PromoLeg, markets: list[BookMarket], cfg: Config, method: str = WORST
 ) -> Leg:
     """Price a manually entered promo leg.
 
@@ -96,22 +113,26 @@ def price_promo(
     if not two_sided:
         raise PromoError(f"{promo.player} {promo.stat} has no two-sided book odds")
 
-    by_book = defaultdict(list)
-    for m in two_sided:
-        by_book[m.book].append((m, devig(m.over_odds, m.under_odds, method)[0]))
-
     model, cv = cfg.stat_model(promo.sport, promo.stat)
-    book_over, modelled = {}, False
-    for book, priced in by_book.items():
-        exact = [p for m, p in priced if _same_line(m.line, promo.line)]
-        if exact:
-            book_over[book] = exact[0]
-            continue
-        main, p_over = min(priced, key=lambda mp: abs(mp[1] - 0.5))
-        book_over[book] = reprice(main.line, p_over, promo.line, "over", model, cv)
-        modelled = True
 
-    return _leg(
-        promo.sport, promo.teams, promo.player, promo.stat, promo.line, book_over,
-        side=promo.side, promo=True, modelled=modelled, promo_type=promo.promo_type,
-    )
+    def price(method: str, _side) -> Leg:
+        by_book = defaultdict(list)
+        for m in two_sided:
+            by_book[m.book].append((m, devig(m.over_odds, m.under_odds, method)[0]))
+
+        book_over, modelled = {}, False
+        for book, priced in by_book.items():
+            exact = [p for m, p in priced if _same_line(m.line, promo.line)]
+            if exact:
+                book_over[book] = exact[0]
+                continue
+            main, p_over = min(priced, key=lambda mp: abs(mp[1] - 0.5))
+            book_over[book] = reprice(main.line, p_over, promo.line, "over", model, cv)
+            modelled = True
+
+        return _leg(
+            promo.sport, promo.teams, promo.player, promo.stat, promo.line, book_over,
+            side=promo.side, promo=True, modelled=modelled, promo_type=promo.promo_type,
+        )
+
+    return _price_under(method, price, (promo.side,))

@@ -39,8 +39,13 @@ def run(argv):
 def test_defaults():
     args = cli.parse_args([])
     assert args.sports == ["NFL", "NBA", "NHL", "MLB"]
-    assert (args.hours, args.stake, args.devig) == (24, 10.0, "multiplicative")
+    assert (args.hours, args.stake, args.devig) == (24, 10.0, "worst")
     assert not args.bonus and args.boost is None and args.promo_legs == []
+
+
+@pytest.mark.parametrize("method", ["worst", "multiplicative", "additive", "power", "shin"])
+def test_every_devig_method_is_selectable(method):
+    assert cli.parse_args(["--devig", method]).devig == method
 
 
 def test_sports_are_comma_separated_and_uppercased():

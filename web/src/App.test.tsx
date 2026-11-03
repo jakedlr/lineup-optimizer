@@ -189,7 +189,7 @@ describe('Run settings', () => {
     await screen.findByRole('region', { name: /best slips/i })
     expect(runBodies(fetchMock)).toEqual([
       {
-        sports: ['NFL', 'NBA', 'NHL', 'MLB'], stake: 10, hours: 24, devig: 'multiplicative', ref_slip: null, no_cache: false,
+        sports: ['NFL', 'NBA', 'NHL', 'MLB'], stake: 10, hours: 24, devig: 'worst', ref_slip: null, no_cache: false,
         bonus: false, boost: null, promo_legs: [], feed_promos: true,
       },
     ])
@@ -252,6 +252,30 @@ describe('Run settings', () => {
     expect(screen.getByLabelText(/stake/i)).toHaveValue(5)
     expect(screen.getByLabelText(/devig/i)).toHaveValue('power')
     expect(screen.getByLabelText(/fresh odds/i)).not.toBeChecked()
+  })
+
+  it('opens on worst-case devig, with the four methods selectable', async () => {
+    await ready()
+    await userEvent.click(screen.getByText(/advanced/i))
+    const devig = screen.getByLabelText(/devig/i)
+    expect(devig).toHaveValue('worst')
+    expect(within(devig).getAllByRole('option').map((o) => o.textContent)).toEqual([
+      'Worst case (lowest of four)', 'multiplicative', 'additive', 'power', 'shin',
+    ])
+  })
+
+  it('moves a devig saved before worst case was the default onto worst case, once', async () => {
+    localStorage.setItem('ppopt.settings.v1', JSON.stringify({ devig: 'multiplicative', stake: '7' }))
+    await ready()
+    expect(screen.getByLabelText(/devig/i)).toHaveValue('worst')
+    expect(screen.getByLabelText(/stake/i)).toHaveValue(7)
+
+    await userEvent.click(screen.getByText(/advanced/i))
+    await userEvent.selectOptions(screen.getByLabelText(/devig/i), 'multiplicative')
+    cleanup()
+
+    await ready()
+    expect(screen.getByLabelText(/devig/i)).toHaveValue('multiplicative')
   })
 
   it('ignores remembered settings the engine no longer offers', async () => {
