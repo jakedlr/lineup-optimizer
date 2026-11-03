@@ -30,9 +30,10 @@ function LegLine({ leg }: { leg: Leg }) {
     <li className="slip-leg">
       <span className="num">{pct(leg.prob)}</span>
       <span className="tag">{leg.sport}</span>
-      <span className="muted matchup">{leg.matchup}</span>
-      <span className="who">
-        {leg.player} <span className="muted">· {pick(leg)}</span>
+      <span className="muted">{leg.matchup}</span>
+      <span className="who">{leg.player}</span>
+      <span className="pick">
+        {pick(leg)}
         {leg.promo_type && <span className="badge">{leg.promo_type}</span>}
       </span>
     </li>
