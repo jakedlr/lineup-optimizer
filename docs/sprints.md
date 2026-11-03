@@ -21,11 +21,11 @@ architecture is in `docs/adr/0001-web-app-single-container.md`.
 - [x] `ppopt.web` FastAPI app: `/api/health`, SPA fallback, unknown `/api/*` → 404 (pytest)
 - [x] Dockerfile (node build stage → python slim runtime, no stealth browser), compose file with data volume and optional `config/` mount, Makefile
 - [x] Node LTS installed (v26 "Lithium" via nvm; image builds on `node:26-alpine`)
-- [ ] Emil Kowalski's skills installed user-wide (`emilkowalski/skills` → `~/.claude/skills`; blocked on permission, needs user)
+- [x] Emil Kowalski's skills installed user-wide (`npx skills add emilkowalski/skills -g` → `~/.agents/skills`, symlinked into `~/.claude/skills`)
 - [x] `web/` scaffold: React + TS + Vite, Vitest + Testing Library, Playwright; one failing-then-passing component test
 - [x] `docker compose up` serves the shell; e2e smoke hits it
 
-**Review:** _pending_ (one open item: the skills install)
+**Review:** done 2026-11-02. All criteria met; `make test` green (190 pytest + 3 Vitest), e2e smoke green against the container.
 
 **Notes**
 - The e2e smoke caught a real bug: `ppopt` is pip-installed in the image, so the `__file__`-relative
