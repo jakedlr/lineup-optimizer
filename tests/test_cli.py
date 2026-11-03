@@ -218,3 +218,40 @@ def test_main_reports_user_errors(capsys, monkeypatch, tmp_path):
     code = cli.main(["--pp-file", str(pp_file), "--promoLeg", "NFL", "CHI vs XYZ", "A", "Over 1.5 Pass TDs"], root=ROOT)
     assert code == 2
     assert "XYZ" in capsys.readouterr().err
+
+
+def test_legs_carry_a_matchup_label():
+    report = run([])
+    maye = next(l for l in report["legs"] if l["player"] == "Drake Maye")
+    assert maye["matchup"] == "CHI vs NE"
+    assert all("matchup" in l for s in report["slips"] for l in s["legs"])
+
+
+def test_report_for_collects_markets_for_the_board_and_merges_warnings():
+    seen = {}
+
+    def collect(http, cfg, books, sports, now, hours, wanted):
+        seen["wanted"] = wanted
+        return markets(), ["fanduel unavailable: test"]
+
+    args = cli.parse_args([])
+    report = cli.report_for(args, ROOT, pp_payload(), http=None, now=NOW, collect=collect)
+    assert CHI_NE in seen["wanted"]
+    assert "fanduel unavailable: test" in report["warnings"]
+    assert report["legs"]
+
+
+def test_report_for_without_any_odds_is_a_user_error():
+    args = cli.parse_args([])
+    with pytest.raises(cli.UserError, match="no sportsbook odds"):
+        cli.report_for(args, ROOT, pp_payload(), http=None, now=NOW, collect=lambda *a: ([], ["x down"]))
+
+
+def test_report_for_a_board_with_no_games_in_the_window_says_so_without_fetching():
+    def collect(*a):
+        raise AssertionError("should not fetch odds")
+
+    args = cli.parse_args([])
+    later = datetime(2026, 11, 2, 19, 0, tzinfo=timezone.utc)  # every fixture game has started
+    with pytest.raises(cli.UserError, match="no games on the board start in the next 24 hours"):
+        cli.report_for(args, ROOT, pp_payload(), http=None, now=later, collect=collect)

@@ -96,6 +96,7 @@ def _leg_dict(leg, cfg: Config) -> dict:
     return {
         "sport": leg.sport,
         "game": leg.game_id,
+        "matchup": matchup_label(leg.game_id),
         "player": leg.player,
         "side": leg.side,
         "line": leg.line,
@@ -202,6 +203,28 @@ def collect_markets(http: Http, cfg: Config, books: dict, sports, now, hours, wa
     return markets, warnings
 
 
+def report_for(args, root: Path, payload: dict, http: Http, now: datetime, collect=None) -> dict:
+    """Fetch odds for the games on the board and build the report. Shared by the CLI and the web app."""
+    collect = collect or collect_markets
+    cfg = Config.load(root)
+    lines, promos = prizepicks.parse_projections(payload, cfg, args.sports, now, args.hours)
+    wanted = {l.teams for l in lines} | {p.teams for p in promos}
+    try:
+        wanted |= {parse_promo_leg(v, cfg).teams for v in args.promo_legs}
+    except ValueError as e:
+        raise UserError(f"--promoLeg: {e}") from e
+    if not wanted:
+        raise UserError(f"no games on the board start in the next {args.hours:g} hours "
+                        f"in {','.join(args.sports)}; save a fresh board from PrizePicks")
+    books = json.loads((root / "books.json").read_text())
+    markets, book_warnings = collect(http, cfg, books, args.sports, now, args.hours, wanted)
+    if not markets:
+        raise UserError("no sportsbook odds available: " + "; ".join(book_warnings or ["no markets in window"]))
+    report = run(args, root, payload, markets, now)
+    report["warnings"] = book_warnings + report["warnings"]
+    return report
+
+
 def load_prizepicks(args, http: Http) -> tuple[dict, list[str]]:
     if args.pp_file:
         if not args.pp_file.exists():
@@ -276,25 +299,14 @@ def format_report(report: dict, top: int, verbose: bool) -> str:
 def main(argv: list[str] | None = None, root: Path = ROOT) -> int:
     args = parse_args(sys.argv[1:] if argv is None else argv)
     now = utcnow()
-    cfg = Config.load(root)
     http = Http(root / ".cache", use_cache=not args.no_cache)
     try:
         payload, warnings = load_prizepicks(args, http)
-        lines, promos = prizepicks.parse_projections(payload, cfg, args.sports, now, args.hours)
-        wanted = {l.teams for l in lines} | {p.teams for p in promos}
-        try:
-            wanted |= {parse_promo_leg(v, cfg).teams for v in args.promo_legs}
-        except ValueError as e:
-            raise UserError(f"--promoLeg: {e}") from e
-        books = json.loads((root / "books.json").read_text())
-        markets, book_warnings = collect_markets(http, cfg, books, args.sports, now, args.hours, wanted)
-        if not markets:
-            raise UserError("no sportsbook odds available: " + "; ".join(book_warnings or ["no markets in window"]))
-        report = run(args, root, payload, markets, now)
+        report = report_for(args, root, payload, http, now)
     except UserError as e:
         print(f"error: {e}", file=sys.stderr)
         return 2
-    report["warnings"] = warnings + book_warnings + report["warnings"]
+    report["warnings"] = warnings + report["warnings"]
 
     print(json.dumps(report, indent=2) if args.json else format_report(report, args.top, args.verbose))
     return 0

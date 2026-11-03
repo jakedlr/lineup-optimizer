@@ -8,7 +8,7 @@ RUN npm run build
 
 # --- runtime ---
 FROM python:3.13-slim
-ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 PPOPT_DATA=/data PPOPT_WEB_DIST=/app/web/dist
+ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 PPOPT_DATA=/data PPOPT_WEB_DIST=/app/web/dist PPOPT_ROOT=/app
 WORKDIR /app
 COPY pyproject.toml ./
 COPY src/ src/

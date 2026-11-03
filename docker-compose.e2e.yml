@@ -1,0 +1,8 @@
+# Overlay for the e2e suite: canned sportsbook odds instead of live FanDuel/DraftKings, so runs are
+# deterministic and work from anywhere. Used by `make e2e` as a separate project on port 8001.
+services:
+  app:
+    environment:
+      PPOPT_ODDS_FILE: /fixtures/markets.json
+    volumes:
+      - ./tests/fixtures:/fixtures:ro

@@ -1,0 +1,80 @@
+[
+ {
+  "book": "draftkings",
+  "sport": "NFL",
+  "teams": [
+   "CHI",
+   "NE"
+  ],
+  "player": "Drake Maye",
+  "stat": "pass_yards",
+  "line": 249.5,
+  "over_odds": -125,
+  "under_odds": -105
+ },
+ {
+  "book": "fanduel",
+  "sport": "NFL",
+  "teams": [
+   "CHI",
+   "NE"
+  ],
+  "player": "Drake Maye",
+  "stat": "pass_yards",
+  "line": 249.5,
+  "over_odds": -120,
+  "under_odds": -110
+ },
+ {
+  "book": "draftkings",
+  "sport": "NFL",
+  "teams": [
+   "CHI",
+   "NE"
+  ],
+  "player": "Caleb Williams",
+  "stat": "pass_yards",
+  "line": 246.5,
+  "over_odds": -111,
+  "under_odds": -113
+ },
+ {
+  "book": "draftkings",
+  "sport": "NFL",
+  "teams": [
+   "CHI",
+   "NE"
+  ],
+  "player": "Caleb Williams",
+  "stat": "pass_rush_yards",
+  "line": 266.5,
+  "over_odds": -115,
+  "under_odds": -105
+ },
+ {
+  "book": "draftkings",
+  "sport": "NBA",
+  "teams": [
+   "CLE",
+   "PHI"
+  ],
+  "player": "Joel Embiid",
+  "stat": "pts_rebs_asts",
+  "line": 35.5,
+  "over_odds": -130,
+  "under_odds": 100
+ },
+ {
+  "book": "draftkings",
+  "sport": "NBA",
+  "teams": [
+   "CLE",
+   "PHI"
+  ],
+  "player": "Tyrese Maxey",
+  "stat": "pts_rebs_asts",
+  "line": 32.5,
+  "over_odds": -105,
+  "under_odds": -115
+ }
+]
