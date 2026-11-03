@@ -15,14 +15,16 @@ from pathlib import Path
 
 from typing import Annotated, Literal
 
-from fastapi import Body, FastAPI, HTTPException, UploadFile
+from fastapi import Body, FastAPI, HTTPException, Query, UploadFile
 from fastapi.responses import FileResponse
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from . import cli
+from .matching import Config, game_id, matchup_label
 from .models import BookMarket
 from .odds import DEVIG_METHODS
 from .payouts import load_payouts
+from .sources import prizepicks
 from .sources.http import Http
 
 REPO = Path(__file__).resolve().parents[2]
@@ -42,6 +44,22 @@ def markets_from_file(path: Path):
     return collect
 
 
+class PromoLegIn(BaseModel):
+    """A promo pick chosen from the board, at its discounted line (the web form of --promoLeg)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    sport: Literal[tuple(cli.SPORTS)]
+    matchup: str = Field(min_length=1)
+    player: str = Field(min_length=1)
+    stat_label: str = Field(min_length=1)
+    side: Literal["over", "under"]
+    line: float
+
+    def cli_values(self) -> list[str]:
+        return [self.sport, self.matchup, self.player, f"{self.side.title()} {self.line:g} {self.stat_label}"]
+
+
 class RunSettings(BaseModel):
     """What the web app may change about a run. Anything left out takes the CLI default."""
 
@@ -53,6 +71,17 @@ class RunSettings(BaseModel):
     devig: Literal[DEVIG_METHODS] | None = None
     ref_slip: str | None = Field(None, pattern=r"^(power|flex)[2-6]$")
     no_cache: bool = False
+    # Promotions: at most one kind per run, as on the CLI.
+    bonus: bool = False
+    boost: float | None = Field(None, gt=1)
+    promo_legs: list[PromoLegIn] = []
+    feed_promos: bool = True
+
+    @model_validator(mode="after")
+    def one_promotion(self):
+        if sum([self.bonus, self.boost is not None, bool(self.promo_legs)]) > 1:
+            raise ValueError("use only one promotion per run: bonus, boost or promo legs")
+        return self
 
     def apply(self, args):
         for name in ("sports", "stake", "hours", "devig"):
@@ -61,6 +90,10 @@ class RunSettings(BaseModel):
         if self.ref_slip:
             args.ref_slip = (self.ref_slip[:-1], int(self.ref_slip[-1]))
         args.no_cache = self.no_cache
+        args.bonus = self.bonus
+        args.boost = self.boost
+        args.promo_legs = [leg.cli_values() for leg in self.promo_legs]
+        args.no_promos = not self.feed_promos
         return args
 
 
@@ -74,6 +107,16 @@ def create_app(static_dir=None, data_dir=None, root=None, collect=None, now=None
 
     board_path, meta_path = data_dir / BOARD, data_dir / BOARD_META
     app = FastAPI(title="PrizePicks EV Optimizer")
+    cache: dict = {}
+
+    def load_board() -> dict:
+        """The saved board, parsed once per upload (real boards run to tens of MB)."""
+        if not board_path.is_file():
+            raise HTTPException(409, "upload a board first")
+        mtime = board_path.stat().st_mtime_ns
+        if cache.get("mtime") != mtime:
+            cache.update(mtime=mtime, payload=json.loads(board_path.read_text()))
+        return cache["payload"]
 
     def board_info() -> dict | None:
         if not board_path.is_file() or not meta_path.is_file():
@@ -105,6 +148,24 @@ def create_app(static_dir=None, data_dir=None, root=None, collect=None, now=None
             raise HTTPException(404, "no board uploaded yet")
         return info
 
+    @app.get("/api/board/lines")
+    def board_lines(sports: Annotated[str | None, Query()] = None,
+                    hours: Annotated[float | None, Query(gt=0)] = None) -> list[dict]:
+        """Priceable standard lines on the board, for building promo legs."""
+        payload = load_board()
+        defaults = cli.parse_args([])
+        wanted = [x.strip().upper() for x in sports.split(",")] if sports else defaults.sports
+        cfg = Config.load(root)
+        lines, _ = prizepicks.parse_projections(payload, cfg, wanted, now(), hours or defaults.hours)
+        rows = {
+            (l.player, cfg.stat_label(l.sport, l.stat), l.line, l.sport, matchup_label(game_id(l.sport, l.teams)))
+            for l in lines if l.stat
+        }
+        return [
+            {"sport": sport, "matchup": matchup, "player": player, "stat_label": label, "line": line}
+            for player, label, line, sport, matchup in sorted(rows)
+        ]
+
     @app.put("/api/board")
     async def put_board(file: UploadFile) -> dict:
         raw = await file.read()
@@ -126,7 +187,7 @@ def create_app(static_dir=None, data_dir=None, root=None, collect=None, now=None
     def run(settings: Annotated[RunSettings | None, Body()] = None) -> dict:
         if not board_path.is_file():
             raise HTTPException(409, "upload a board before running")
-        payload = json.loads(board_path.read_text())
+        payload = load_board()
         args = (settings or RunSettings()).apply(cli.parse_args([]))
         http = Http(data_dir / "cache", use_cache=not args.no_cache)
         try:

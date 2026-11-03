@@ -70,3 +70,19 @@ architecture is in `docs/adr/0001-web-app-single-container.md`.
 - [x] e2e: change leagues, stake and reference slip, run, filter, download, reload and see settings kept
 
 **Review:** _pending_
+
+## Sprint 3: Promotions
+
+**Goal:** every CLI promotion is available on the page, with promo legs picked from the board instead of typed.
+
+**Done criteria**
+- [x] `POST /api/run` takes `bonus`, `boost` (> 1), `promo_legs` and `feed_promos`; more than one kind of promotion is a 422, as on the CLI
+- [x] Promo legs arrive structured (`sport, matchup, player, stat_label, side, line`) and go through the CLI's own `--promoLeg` parsing, so an unpriceable leg is a 422 carrying the engine's message
+- [x] `GET /api/board/lines?sports=&hours=` lists the board's priceable standard lines in the window (deduped, sorted); the parsed board is cached per upload
+- [x] Promotion control: None / Bonus entry / Boost × / Promo legs; Run blocked with a reason for a boost ≤ 1 or Promo legs with none added
+- [x] Feed promos toggle; disabled with a note under Bonus or Boost, where the engine ignores them
+- [x] Promo-leg picker: search the board's lines, choose one, pick Over/Under and a half-point promo line, add; remove from the list
+- [x] Promotions are never remembered
+- [x] e2e: a promo leg picked from the board shows up priced (`manual`) in Top Legs; Bonus entry runs Power slips only
+
+**Review:** _pending_

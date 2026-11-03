@@ -178,7 +178,10 @@ describe('Run settings', () => {
     await userEvent.click(screen.getByRole('button', { name: /^run$/i }))
     await screen.findByRole('region', { name: /best slips/i })
     expect(runBodies(fetchMock)).toEqual([
-      { sports: ['NFL', 'NBA', 'NHL', 'MLB'], stake: 10, hours: 24, devig: 'multiplicative', ref_slip: null, no_cache: false },
+      {
+        sports: ['NFL', 'NBA', 'NHL', 'MLB'], stake: 10, hours: 24, devig: 'multiplicative', ref_slip: null, no_cache: false,
+        bonus: false, boost: null, promo_legs: [], feed_promos: true,
+      },
     ])
   })
 
@@ -213,6 +216,7 @@ describe('Run settings', () => {
     await screen.findByRole('region', { name: /best slips/i })
     expect(runBodies(fetchMock)[0]).toEqual({
       sports: ['NFL', 'NBA', 'NHL', 'MLB'], stake: 25, hours: 6, devig: 'shin', ref_slip: 'flex6', no_cache: true,
+      bonus: false, boost: null, promo_legs: [], feed_promos: true,
     })
   })
 
@@ -302,5 +306,129 @@ describe('Report controls (no re-run)', () => {
     expect(a.download).toMatch(/^ppopt-report-\d{4}-\d{2}-\d{2}T\d{2}-\d{2}\.json$/)
     expect(JSON.parse(await blobs[0].text())).toEqual(report)
     click.mockRestore()
+  })
+})
+
+describe('Promotions', () => {
+  const withBoard = { 'GET /api/board': () => Response.json({ saved_at: minutesAgo(1), projections: 11 }) }
+  const LINES = 'GET /api/board/lines?sports=NFL%2CNBA%2CNHL%2CMLB&hours=24'
+  const boardLines = [
+    { sport: 'NBA', matchup: 'CLE vs PHI', player: 'Joel Embiid', stat_label: 'Points', line: 27.5 },
+    { sport: 'NBA', matchup: 'CLE vs PHI', player: 'Joel Embiid', stat_label: 'Pts+Rebs+Asts', line: 35.5 },
+    { sport: 'NFL', matchup: 'CHI vs NE', player: 'Drake Maye', stat_label: 'Pass Yards', line: 249.5 },
+  ]
+
+  async function ready() {
+    const fetchMock = stub({
+      ...withBoard,
+      [LINES]: () => Response.json(boardLines),
+      'POST /api/run': () => Response.json(report),
+    })
+    render(<App />)
+    await screen.findByRole('button', { name: 'NBA', pressed: true })
+    return fetchMock
+  }
+
+  const promotion = () => screen.getByRole('group', { name: /promotion/i })
+
+  async function runBody(fetchMock: ReturnType<typeof stub>) {
+    await userEvent.click(screen.getByRole('button', { name: /^run$/i }))
+    await screen.findByRole('region', { name: /best slips/i })
+    const call = fetchMock.mock.calls.find(([url]) => url === '/api/run')!
+    return JSON.parse(String(call[1]!.body))
+  }
+
+  it('defaults to none, with feed promos on', async () => {
+    await ready()
+    expect(within(promotion()).getByRole('button', { name: 'None' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByLabelText(/promo lines from the board/i)).toBeChecked()
+  })
+
+  it('sends a bonus entry and sets feed promos aside', async () => {
+    const fetchMock = await ready()
+    await userEvent.click(within(promotion()).getByRole('button', { name: /bonus/i }))
+    expect(screen.getByLabelText(/promo lines from the board/i)).toBeDisabled()
+    const body = await runBody(fetchMock)
+    expect(body).toMatchObject({ bonus: true, boost: null, promo_legs: [] })
+  })
+
+  it('sends a boost, and needs it above 1', async () => {
+    const fetchMock = await ready()
+    await userEvent.click(within(promotion()).getByRole('button', { name: /boost/i }))
+    const boost = screen.getByLabelText(/boost ×/i)
+    await userEvent.clear(boost)
+    await userEvent.type(boost, '1')
+    expect(screen.getByRole('button', { name: /^run$/i })).toBeDisabled()
+    expect(screen.getByText(/boost must be more than 1/i)).toBeInTheDocument()
+
+    await userEvent.clear(boost)
+    await userEvent.type(boost, '1.4')
+    expect(await runBody(fetchMock)).toMatchObject({ bonus: false, boost: 1.4, promo_legs: [] })
+  })
+
+  it('can leave out feed promos', async () => {
+    const fetchMock = await ready()
+    await userEvent.click(screen.getByLabelText(/promo lines from the board/i))
+    expect(await runBody(fetchMock)).toMatchObject({ feed_promos: false })
+  })
+
+  it('builds promo legs from the board', async () => {
+    const fetchMock = await ready()
+    await userEvent.click(within(promotion()).getByRole('button', { name: /promo legs/i }))
+    expect(screen.getByRole('button', { name: /^run$/i })).toBeDisabled()
+    expect(screen.getByText(/add a promo leg/i)).toBeInTheDocument()
+
+    await userEvent.type(await screen.findByLabelText(/find a line/i), 'embiid pts')
+    const results = screen.getByRole('listbox', { name: /board lines/i })
+    expect(within(results).getAllByRole('option')).toHaveLength(1)
+    await userEvent.click(within(results).getByRole('option', { name: /joel embiid.*pts\+rebs\+asts.*35\.5/i }))
+
+    const line = screen.getByLabelText('Promo line')
+    expect(line).toHaveValue(35.5)
+    await userEvent.clear(line)
+    await userEvent.type(line, '30.5')
+    await userEvent.click(screen.getByRole('button', { name: /add promo leg/i }))
+
+    const added = screen.getByRole('list', { name: /promo legs/i })
+    expect(within(added).getByText(/joel embiid/i)).toHaveTextContent(/over 30\.5 pts\+rebs\+asts/i)
+
+    expect(await runBody(fetchMock)).toMatchObject({
+      bonus: false,
+      boost: null,
+      promo_legs: [
+        { sport: 'NBA', matchup: 'CLE vs PHI', player: 'Joel Embiid', stat_label: 'Pts+Rebs+Asts', side: 'over', line: 30.5 },
+      ],
+    })
+  })
+
+  it('needs a half-point promo line and can remove a leg', async () => {
+    await ready()
+    await userEvent.click(within(promotion()).getByRole('button', { name: /promo legs/i }))
+    await userEvent.type(await screen.findByLabelText(/find a line/i), 'maye')
+    await userEvent.click(screen.getByRole('option', { name: /drake maye/i }))
+    await userEvent.click(screen.getByRole('button', { name: 'Under' }))
+    const line = screen.getByLabelText('Promo line')
+    await userEvent.clear(line)
+    await userEvent.type(line, '260')
+    expect(screen.getByRole('button', { name: /add promo leg/i })).toBeDisabled()
+    expect(screen.getByText(/half-point/i)).toBeInTheDocument()
+
+    await userEvent.clear(line)
+    await userEvent.type(line, '260.5')
+    await userEvent.click(screen.getByRole('button', { name: /add promo leg/i }))
+    const added = screen.getByRole('list', { name: /promo legs/i })
+    expect(within(added).getByText(/drake maye/i)).toHaveTextContent(/under 260\.5 pass yards/i)
+
+    await userEvent.click(within(added).getByRole('button', { name: /remove/i }))
+    expect(screen.queryByRole('list', { name: /promo legs/i })).not.toBeInTheDocument()
+  })
+
+  it('is not remembered', async () => {
+    await ready()
+    await userEvent.click(within(promotion()).getByRole('button', { name: /bonus/i }))
+    await userEvent.click(screen.getByRole('button', { name: 'MLB' })) // a remembered change, to force a save
+    cleanup()
+    await ready()
+    expect(within(promotion()).getByRole('button', { name: 'None' })).toHaveAttribute('aria-pressed', 'true')
   })
 })

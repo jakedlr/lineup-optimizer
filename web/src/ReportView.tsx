@@ -1,5 +1,6 @@
 import type { Leg, Report } from './api'
 import { bookAbbr, pct, pick, signedDollars, signedPct } from './format'
+import { Segmented } from './Segmented'
 import type { Settings } from './settings'
 
 type SlipFilter = Pick<Settings, 'slipType' | 'slipSize'>
@@ -8,28 +9,6 @@ interface Props extends SlipFilter {
   report: Report
   top: number
   onFilter: (f: Partial<SlipFilter>) => void
-}
-
-function Segmented<T extends string | number>({
-  label,
-  value,
-  options,
-  onPick,
-}: {
-  label: string
-  value: T
-  options: { value: T; label: string }[]
-  onPick: (v: T) => void
-}) {
-  return (
-    <div className="segmented" role="group" aria-label={label}>
-      {options.map((o) => (
-        <button key={o.value} type="button" aria-pressed={o.value === value} onClick={() => onPick(o.value)}>
-          {o.label}
-        </button>
-      ))}
-    </div>
-  )
 }
 
 function stamp(d = new Date()) {

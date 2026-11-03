@@ -1,4 +1,4 @@
-import type { Options, RunSettings } from './api'
+import type { Options, PromoLeg, RunSettings } from './api'
 
 /**
  * Everything the user can set, as typed into the form. Numbers stay strings so a half-typed value
@@ -70,14 +70,43 @@ export function save(s: Settings) {
   }
 }
 
+/** One promotion per run, as on the CLI. Lives only in memory: never remembered. */
+export interface Promotion {
+  kind: 'none' | 'bonus' | 'boost' | 'legs'
+  boost: string
+  legs: PromoLeg[]
+  feedPromos: boolean
+}
+
+export const NO_PROMOTION: Promotion = { kind: 'none', boost: '1.5', legs: [], feedPromos: true }
+
 export type Problem = string | null
 
 /** The request for these settings, or the reason they can't be run yet. */
-export function toRun(s: Settings, noCache: boolean): RunSettings | Problem {
+export function toRun(s: Settings, noCache: boolean, promo: Promotion = NO_PROMOTION): RunSettings | Problem {
   if (s.sports.length === 0) return 'Pick at least one league.'
   const stake = positive(s.stake)
   if (stake === null) return 'Stake must be more than $0.'
   const hours = positive(s.hours)
   if (hours === null) return 'Hours ahead must be more than 0.'
-  return { sports: s.sports, stake, hours, devig: s.devig, ref_slip: s.refSlip || null, no_cache: noCache }
+
+  let boost: number | null = null
+  if (promo.kind === 'boost') {
+    boost = positive(promo.boost)
+    if (boost === null || boost <= 1) return 'Boost must be more than 1 (e.g. 1.4).'
+  }
+  if (promo.kind === 'legs' && promo.legs.length === 0) return 'Add a promo leg, or set Promotion to None.'
+
+  return {
+    sports: s.sports,
+    stake,
+    hours,
+    devig: s.devig,
+    ref_slip: s.refSlip || null,
+    no_cache: noCache,
+    bonus: promo.kind === 'bonus',
+    boost,
+    promo_legs: promo.kind === 'legs' ? promo.legs : [],
+    feed_promos: promo.feedPromos,
+  }
 }

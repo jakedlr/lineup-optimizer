@@ -58,6 +58,18 @@ export interface Options {
   defaults: { sports: string[]; hours: number; stake: number; devig: string; ref_slip: string | null }
 }
 
+export interface BoardLine {
+  sport: string
+  matchup: string
+  player: string
+  stat_label: string
+  line: number
+}
+
+export interface PromoLeg extends BoardLine {
+  side: Side
+}
+
 export interface RunSettings {
   sports: string[]
   stake: number
@@ -65,6 +77,10 @@ export interface RunSettings {
   devig: string
   ref_slip: string | null
   no_cache: boolean
+  bonus: boolean
+  boost: number | null
+  promo_legs: PromoLeg[]
+  feed_promos: boolean
 }
 
 export class ApiError extends Error {}
@@ -91,6 +107,11 @@ export async function putBoard(file: File): Promise<BoardInfo> {
   const body = new FormData()
   body.append('file', file)
   return json(await fetch('/api/board', { method: 'PUT', body }))
+}
+
+export async function getBoardLines(sports: string[], hours: number): Promise<BoardLine[]> {
+  const query = new URLSearchParams({ sports: sports.join(','), hours: String(hours) })
+  return json(await fetch(`/api/board/lines?${query}`))
 }
 
 export async function getOptions(): Promise<Options> {

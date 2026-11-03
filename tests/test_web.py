@@ -190,3 +190,72 @@ def test_run_rejects_bad_settings(tmp_path, body):
     upload(client)
     r = client.post("/api/run", json=body)
     assert r.status_code == 422, body
+
+
+# --- promotions --------------------------------------------------------------
+
+def ran(tmp_path, body):
+    client = engine_app(tmp_path)
+    upload(client)
+    return client.post("/api/run", json=body)
+
+
+def test_bonus_entry(tmp_path):
+    report = ran(tmp_path, {"bonus": True}).json()
+    assert report["settings"]["mode"] == "bonus"
+    assert all(s["type"] == "power" for s in report["slips"])
+
+
+def test_boost(tmp_path):
+    plain = ran(tmp_path, {"feed_promos": False}).json()
+    boosted = ran(tmp_path, {"boost": 1.5}).json()
+    assert boosted["settings"]["mode"] == "boost 1.5x"
+    best = lambda r: max(s["ev"] for s in r["slips"] if s["type"] == "power" and s["size"] == 2)
+    assert best(boosted) > best(plain)
+
+
+def test_feed_promos_can_be_turned_off(tmp_path):
+    assert any(l["promo_type"] == "taco" for l in ran(tmp_path, {}).json()["legs"])
+    assert not any(l["promo_type"] for l in ran(tmp_path, {"feed_promos": False}).json()["legs"])
+
+
+def test_promo_legs_are_priced(tmp_path):
+    leg = {"sport": "NBA", "matchup": "CLE vs PHI", "player": "Joel Embiid",
+           "stat_label": "Pts+Rebs+Asts", "side": "over", "line": 30.5}
+    report = ran(tmp_path, {"promo_legs": [leg]}).json()
+    manual = [l for l in report["legs"] if l["promo_type"] == "manual"]
+    assert len(manual) == 1 and manual[0]["line"] == 30.5 and manual[0]["side"] == "over"
+
+
+def test_unpriceable_promo_leg_is_422_with_the_engine_message(tmp_path):
+    leg = {"sport": "NFL", "matchup": "CHI vs NE", "player": "Nobody",
+           "stat_label": "Pass Yards", "side": "over", "line": 200.5}
+    r = ran(tmp_path, {"promo_legs": [leg]})
+    assert r.status_code == 422 and "Nobody" in r.json()["detail"]
+
+
+@pytest.mark.parametrize("body", [
+    {"bonus": True, "boost": 1.4},
+    {"bonus": True, "promo_legs": [{"sport": "NBA", "matchup": "CLE vs PHI", "player": "Joel Embiid",
+                                    "stat_label": "Points", "side": "over", "line": 20.5}]},
+    {"boost": 1.0},
+    {"promo_legs": [{"sport": "NBA", "matchup": "CLE vs PHI", "player": "Joel Embiid",
+                     "stat_label": "Points", "side": "sideways", "line": 20.5}]},
+])
+def test_bad_promotions_are_422(tmp_path, body):
+    assert ran(tmp_path, body).status_code == 422, body
+
+
+def test_board_lines_list_priceable_lines_in_the_window(tmp_path):
+    client = engine_app(tmp_path)
+    assert client.get("/api/board/lines").status_code == 409
+    upload(client)
+    lines = client.get("/api/board/lines").json()
+    assert {"sport": "NFL", "matchup": "CHI vs NE", "player": "Drake Maye",
+            "stat_label": "Pass Yards", "line": 249.5} in lines
+    assert lines == sorted(lines, key=lambda l: (l["player"], l["stat_label"], l["line"]))
+    assert len({tuple(l.values()) for l in lines}) == len(lines)
+
+    nba = client.get("/api/board/lines", params={"sports": "NBA", "hours": 24}).json()
+    assert nba and {l["sport"] for l in nba} == {"NBA"}
+    assert client.get("/api/board/lines", params={"hours": 0.0001}).json() == []

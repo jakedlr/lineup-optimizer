@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react'
 import { getBoard, getOptions, putBoard, runReport, type BoardInfo, type Options, type Report } from './api'
 import { BoardPanel } from './BoardPanel'
 import { ReportView } from './ReportView'
-import { DEFAULT_TOP, load, positive, save, toRun, type Settings } from './settings'
+import { PromoPanel } from './PromoPanel'
+import { DEFAULT_TOP, load, NO_PROMOTION, positive, save, toRun, type Promotion, type Settings } from './settings'
 import { SettingsPanel } from './SettingsPanel'
 
 type Engine = 'checking' | 'online' | 'offline'
@@ -42,6 +43,7 @@ function App() {
   const [options, setOptions] = useState<Options | null>(null)
   const [settings, setSettings] = useState<Settings | null>(null)
   const [noCache, setNoCache] = useState(false)
+  const [promotion, setPromotion] = useState<Promotion>(NO_PROMOTION)
 
   useEffect(() => {
     getBoard()
@@ -60,7 +62,7 @@ function App() {
     save(next)
   }
 
-  const request = settings ? toRun(settings, noCache) : null
+  const request = settings ? toRun(settings, noCache, promotion) : null
   const problem = typeof request === 'string' ? request : null
 
   const upload = async (file: File) => {
@@ -101,7 +103,16 @@ function App() {
       <BoardPanel board={board} uploading={uploading} onFile={upload} />
 
       {options && settings && (
-        <SettingsPanel options={options} settings={settings} onChange={change} noCache={noCache} onNoCache={setNoCache} />
+        <>
+          <SettingsPanel options={options} settings={settings} onChange={change} noCache={noCache} onNoCache={setNoCache} />
+          <PromoPanel
+            promotion={promotion}
+            onChange={setPromotion}
+            sports={settings.sports}
+            hours={positive(settings.hours)}
+            boardKey={board?.saved_at ?? null}
+          />
+        </>
       )}
 
       <div className="actions">
