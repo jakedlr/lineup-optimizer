@@ -196,7 +196,9 @@ def collect_markets(http: Http, cfg: Config, books: dict, sports, now, hours, wa
     markets, warnings = [], []
     for name, collect in (("draftkings", draftkings.collect), ("fanduel", fanduel.collect)):
         try:
-            kwargs = {"wanted_games": wanted_games} if name == "fanduel" else {}
+            kwargs = {"warnings": warnings}
+            if name == "fanduel":
+                kwargs["wanted_games"] = wanted_games
             markets += collect(http, cfg, books[name], sports, now, hours, **kwargs)
         except (FetchError, KeyError, ValueError) as e:
             warnings.append(f"{name} unavailable: {e}")

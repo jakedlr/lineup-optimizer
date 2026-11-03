@@ -296,3 +296,14 @@ def test_a_failing_book_is_closed_out_of_the_progress(monkeypatch):
     p.plan("draftkings", "NFL", 15)
     cli.collect_markets(http, None, {"draftkings": {}, "fanduel": {}}, ["NFL"], NOW, 24, set())
     assert p.planned == {("draftkings", "*"): 1}
+
+
+def test_collect_markets_passes_on_book_warnings(monkeypatch):
+    def dk(http, cfg, conf, sports, now, hours, warnings):
+        warnings.append("DraftKings has no NHL player props posted yet for 2 games in the window")
+        return []
+
+    monkeypatch.setattr(cli.draftkings, "collect", dk)
+    monkeypatch.setattr(cli.fanduel, "collect", lambda *a, **k: [])
+    _, warnings = cli.collect_markets(None, None, {"draftkings": {}, "fanduel": {}}, ["NHL"], NOW, 24, set())
+    assert warnings == ["DraftKings has no NHL player props posted yet for 2 games in the window"]

@@ -10,7 +10,7 @@ from datetime import datetime
 
 from ..matching import Config
 from ..models import BookMarket
-from .http import Http, in_window, parse_time
+from .http import Http, in_window, no_props_warning, parse_time
 
 # Public app key FanDuel's own website sends with every odds request; not a personal credential.
 API_KEY = "FhMFpcPWXMeyZxOx"
@@ -78,6 +78,7 @@ def collect(
     now: datetime,
     hours: float,
     wanted_games: set[frozenset[str]] | None = None,
+    warnings: list[str] | None = None,
 ) -> list[BookMarket]:
     """Markets for every event in the window, optionally only games PrizePicks lists."""
     markets = []
@@ -95,8 +96,12 @@ def collect(
         }
         if progress:
             progress.plan("fanduel", sport, 1 + len(events) * len(sport_conf["tabs"]))
+        found = []
         for event_id, teams in events.items():
             for tab in sport_conf["tabs"]:
                 url = EVENT.format(state=conf["state"], key=API_KEY, event=event_id, tab=tab)
-                markets += parse_event_markets(http.get_json(url), sport, teams, sport_conf["markets"])
+                found += parse_event_markets(http.get_json(url), sport, teams, sport_conf["markets"])
+        if events and not found and warnings is not None:
+            warnings.append(no_props_warning("FanDuel", sport, len(events)))
+        markets += found
     return markets

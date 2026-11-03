@@ -8,6 +8,11 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 
+def no_props_warning(book: str, sport: str, games: int) -> str:
+    """A book lists games in the window but no player props for any of them (often: not posted yet)."""
+    return f"{book} has no {sport} player props posted yet for {games} game{'s' if games != 1 else ''} in the window"
+
+
 class FetchError(RuntimeError):
     """A request failed, was blocked, or did not return JSON."""
 

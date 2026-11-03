@@ -8,7 +8,7 @@ from datetime import datetime
 
 from ..matching import Config
 from ..models import BookMarket
-from .http import Http, in_window, parse_time
+from .http import Http, in_window, no_props_warning, parse_time
 
 BASE = "https://sportsbook-nash.draftkings.com/api/sportscontent/dkus{state}/v1/leagues/{league}"
 
@@ -76,7 +76,10 @@ def parse_markets(payload: dict, sport: str, stat: str, events: dict[str, frozen
     return out
 
 
-def collect(http: Http, cfg: Config, conf: dict, sports: list[str], now: datetime, hours: float) -> list[BookMarket]:
+def collect(
+    http: Http, cfg: Config, conf: dict, sports: list[str], now: datetime, hours: float,
+    warnings: list[str] | None = None,
+) -> list[BookMarket]:
     markets = []
     for sport in sports:
         sport_conf = conf["sports"].get(sport)
@@ -91,7 +94,11 @@ def collect(http: Http, cfg: Config, conf: dict, sports: list[str], now: datetim
         subcats = subcategory_ids(league, sport_conf["subcategories"]) if events else {}
         if progress:
             progress.plan("draftkings", sport, 1 + len(subcats))
+        found = []
         for stat, (cat, sub) in subcats.items():
             payload = http.get_json(f"{base}/categories/{cat}/subcategories/{sub}")
-            markets += parse_markets(payload, sport, stat, events)
+            found += parse_markets(payload, sport, stat, events)
+        if events and not found and warnings is not None:
+            warnings.append(no_props_warning("DraftKings", sport, len(events)))
+        markets += found
     return markets
