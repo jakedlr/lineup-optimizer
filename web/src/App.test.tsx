@@ -123,6 +123,16 @@ describe('Board instructions', () => {
 })
 
 describe('Run', () => {
+  it('shows what a run will produce before the first one', async () => {
+    stub({ 'GET /api/board': () => Response.json({ saved_at: minutesAgo(1), projections: 11 }), 'POST /api/run': () => Response.json(report) })
+    render(<App />)
+    const empty = await screen.findByRole('region', { name: /no report yet/i })
+    expect(empty).toHaveTextContent(/best slips, top legs/i)
+    await userEvent.click(await screen.findByRole('button', { name: /^run$/i }))
+    await screen.findByRole('region', { name: /best slips/i })
+    expect(screen.queryByRole('region', { name: /no report yet/i })).not.toBeInTheDocument()
+  })
+
   const withBoard = { 'GET /api/board': () => Response.json({ saved_at: minutesAgo(1), projections: 11 }) }
 
   it('runs with defaults and renders the report', async () => {
@@ -510,5 +520,38 @@ describe('Run progress', () => {
     run.event({ type: 'progress', done: 1, total: 4, step: 'DraftKings NFL' })
     run.close()
     expect(await screen.findByRole('alert')).toHaveTextContent(/ended before/i)
+  })
+})
+
+describe('Theme', () => {
+  afterEach(() => {
+    delete document.documentElement.dataset.theme
+  })
+
+  it('follows the system by default and can be forced light or dark, remembered', async () => {
+    stub({ 'GET /api/board': noBoard })
+    render(<App />)
+    const theme = screen.getByRole('group', { name: /theme/i })
+    expect(within(theme).getByRole('button', { name: 'System' })).toHaveAttribute('aria-pressed', 'true')
+    expect(document.documentElement.dataset.theme).toBeUndefined()
+
+    await userEvent.click(within(theme).getByRole('button', { name: 'Dark' }))
+    expect(document.documentElement.dataset.theme).toBe('dark')
+    expect(localStorage.getItem('ppopt.theme')).toBe('dark')
+
+    await userEvent.click(within(theme).getByRole('button', { name: 'System' }))
+    expect(document.documentElement.dataset.theme).toBeUndefined()
+    expect(localStorage.getItem('ppopt.theme')).toBeNull()
+  })
+
+  it('starts from the remembered theme', async () => {
+    localStorage.setItem('ppopt.theme', 'light')
+    stub({ 'GET /api/board': noBoard })
+    render(<App />)
+    expect(within(screen.getByRole('group', { name: /theme/i })).getByRole('button', { name: 'Light' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    )
+    expect(document.documentElement.dataset.theme).toBe('light')
   })
 })

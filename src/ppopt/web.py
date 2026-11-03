@@ -22,7 +22,7 @@ from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from . import cli
-from .matching import Config, game_id, matchup_label
+from .matching import Config, config_file, game_id, matchup_label
 from .models import BookMarket
 from .odds import DEVIG_METHODS
 from .payouts import load_payouts
@@ -135,7 +135,7 @@ def create_app(static_dir=None, data_dir=None, root=None, collect=None, now=None
     @app.get("/api/options")
     def options() -> dict:
         defaults = cli.parse_args([])
-        table = load_payouts(root / "payouts.json")
+        table = load_payouts(config_file(root, "payouts.json"))
         return {
             "sports": cli.SPORTS,
             "devig": list(DEVIG_METHODS),

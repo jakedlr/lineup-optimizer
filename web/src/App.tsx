@@ -6,7 +6,9 @@ import { PromoPanel } from './PromoPanel'
 import { advance, type Shown } from './progress'
 import { RunProgressBar } from './RunProgressBar'
 import { DEFAULT_TOP, load, NO_PROMOTION, positive, save, toRun, type Promotion, type Settings } from './settings'
+import { Segmented } from './Segmented'
 import { SettingsPanel } from './SettingsPanel'
+import { applyTheme, loadTheme, type Theme } from './theme'
 
 type Engine = 'checking' | 'online' | 'offline'
 
@@ -33,6 +35,21 @@ function useEngineStatus(): Engine {
   return engine
 }
 
+/** The product's mark: an entry slip with its picks, drawn in ink. */
+function SlipMark() {
+  return (
+    <svg width="28" height="28" viewBox="0 0 28 28" fill="none" aria-hidden="true">
+      <path
+        d="M6 3.5h16a1.5 1.5 0 0 1 1.5 1.5v6.2a2.8 2.8 0 0 0 0 5.6V23a1.5 1.5 0 0 1-1.5 1.5H6A1.5 1.5 0 0 1 4.5 23v-6.2a2.8 2.8 0 0 0 0-5.6V5A1.5 1.5 0 0 1 6 3.5Z"
+        stroke="currentColor"
+        strokeWidth="1.6"
+      />
+      <path d="m9 9.5 1.6 1.6L13.5 8M9 17.5l1.6 1.6 2.9-3.1" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M16 9.5h3.5M16 17.5h3.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+    </svg>
+  )
+}
+
 const message = (e: unknown) => (e instanceof Error ? e.message : String(e))
 
 function App() {
@@ -47,6 +64,9 @@ function App() {
   const [noCache, setNoCache] = useState(false)
   const [promotion, setPromotion] = useState<Promotion>(NO_PROMOTION)
   const [progress, setProgress] = useState<Shown | null>(null)
+  const [theme, setTheme] = useState<Theme>(loadTheme)
+
+  useEffect(() => applyTheme(theme), [theme])
 
   useEffect(() => {
     getBoard()
@@ -98,10 +118,25 @@ function App() {
   return (
     <main className="shell">
       <header className="top">
-        <h1>PrizePicks EV Optimizer</h1>
-        <p className="engine" data-state={engine} role="status">
-          {ENGINE_LABEL[engine]}
-        </p>
+        <div className="brand">
+          <SlipMark />
+          <div>
+            <h1>PrizePicks EV Optimizer</h1>
+          <p className="engine" data-state={engine} role="status">
+              {ENGINE_LABEL[engine]}
+            </p>
+          </div>
+        </div>
+        <Segmented<Theme>
+          label="Theme"
+          value={theme}
+          options={[
+            { value: 'system', label: 'System' },
+            { value: 'light', label: 'Light' },
+            { value: 'dark', label: 'Dark' },
+          ]}
+          onPick={setTheme}
+        />
       </header>
 
       <BoardPanel board={board} uploading={uploading} onFile={upload} />
@@ -137,6 +172,16 @@ function App() {
         <p className="error" role="alert">
           {error}
         </p>
+      )}
+
+      {!report && !running && (
+        <section className="empty-report" aria-labelledby="empty-h">
+          <h2 id="empty-h">No report yet</h2>
+          <p className="muted">
+            Run prices every line on the board against FanDuel and DraftKings, then lists the Best Slips, Top Legs and
+            anything left unpriced.
+          </p>
+        </section>
       )}
 
       {report && settings && (

@@ -12,7 +12,7 @@ interface Props extends SlipFilter {
 }
 
 function stamp(d = new Date()) {
-  const p = (n: number) => String(n).padStart(2, '0')
+  const p = (n: number) => String(n).padStart(2, '0') // taste-skill-ignore: a timestamp in the file name
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}-${p(d.getMinutes())}`
 }
 
@@ -110,7 +110,7 @@ function TopLegs({ report, top }: { report: Report; top: number }) {
         {legs.length} of {report.legs.length}. Edge is against the {ref.type} {ref.size} break-even of {pct(ref.break_even)} per leg.
       </p>
       <div className="table-wrap">
-        <table>
+        <table className="legs-table">
           <thead>
             <tr>
               <th className="num">Prob</th>
@@ -132,19 +132,19 @@ function TopLegs({ report, top }: { report: Report; top: number }) {
               ].filter(Boolean)
               return (
                 <tr key={`${l.game}|${l.player}|${l.stat}|${l.side}|${l.line}`}>
-                  <td className="num">{pct(l.prob)}</td>
-                  <td className={`num ${(l.edge ?? 0) >= 0 ? 'pos' : 'neg'}`}>{signedPct(l.edge ?? 0)}</td>
-                  <td>{l.sport}</td>
-                  <td className="nowrap">{l.matchup}</td>
-                  <td className="nowrap">{l.player}</td>
-                  <td>{pick(l)}</td>
-                  <td className="nowrap muted small">
+                  <td className="num c-prob">{pct(l.prob)}</td>
+                  <td className={`num c-edge ${(l.edge ?? 0) >= 0 ? 'pos' : 'neg'}`}>{signedPct(l.edge ?? 0)}</td>
+                  <td className="c-sport">{l.sport}</td>
+                  <td className="nowrap c-matchup">{l.matchup}</td>
+                  <td className="nowrap c-player">{l.player}</td>
+                  <td className="c-pick">{pick(l)}</td>
+                  <td className="nowrap muted small c-books">
                     {Object.entries(l.books)
                       .sort()
                       .map(([b, p]) => `${bookAbbr(b)} ${(p * 100).toFixed(1)}`)
                       .join('  ')}
                   </td>
-                  <td className="muted small">{notes.join(', ')}</td>
+                  <td className="muted small c-notes">{notes.join(', ')}</td>
                 </tr>
               )
             })}
@@ -176,15 +176,15 @@ function Unpriced({ report }: { report: Report }) {
           <details>
             <summary>Show lines</summary>
             <div className="table-wrap">
-              <table>
+              <table className="unpriced-table">
                 <tbody>
                   {report.unmatched_lines.map((u, i) => (
                     <tr key={i}>
                       <td>{u.sport}</td>
-                      <td className="nowrap">{u.player}</td>
+                      <td className="nowrap u-player">{u.player}</td>
                       <td>{u.stat}</td>
                       <td className="num">{u.line}</td>
-                      <td className="muted small">{u.reason}</td>
+                      <td className="muted small u-reason">{u.reason}</td>
                     </tr>
                   ))}
                 </tbody>

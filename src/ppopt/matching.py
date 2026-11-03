@@ -30,6 +30,13 @@ def normalize_name(name: str) -> str:
     return " ".join(words)
 
 
+def config_file(root: str | Path, name: str) -> Path:
+    """`root/config/name` if the user dropped an edited copy there, else the built-in `root/name`."""
+    root = Path(root)
+    override = root / "config" / name
+    return override if override.is_file() else root / name
+
+
 def _load(path: Path) -> dict:
     return {k: v for k, v in json.loads(path.read_text()).items() if not k.startswith("_")}
 
@@ -44,9 +51,9 @@ class Config:
     def load(cls, root: str | Path) -> "Config":
         root = Path(root)
         return cls(
-            teams=_load(root / "teams.json"),
-            stats=_load(root / "stats.json"),
-            aliases=_load(root / "aliases.json"),
+            teams=_load(config_file(root, "teams.json")),
+            stats=_load(config_file(root, "stats.json")),
+            aliases=_load(config_file(root, "aliases.json")),
         )
 
     def player_key(self, name: str) -> str:

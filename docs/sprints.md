@@ -97,3 +97,34 @@ architecture is in `docs/adr/0001-web-app-single-container.md`.
 - Live check, 2026-11-02: first estimate 46, actual 41, 66 s with fresh odds.
 
 **Review:** done 2026-11-02, with run progress added.
+
+## Sprint 4: Progress and polish
+
+**Goal:** the app looks and behaves like a finished tool, and the README leads with it.
+
+**Done criteria**
+- [x] Streamed run steps: done in Sprint 3 (progress bar with percentage)
+- [x] No-props warning: a book with games in the window but no player props posted says so, instead of a league
+      silently priced by one book
+- [x] Config override mount: an edited `payouts.json`, `books.json`, `stats.json`, `teams.json` or `aliases.json`
+      in `config/` replaces the built-in one, for the app (mounted read-only) and the CLI, from the next run
+- [x] Motion and interaction pass (`emil-design-eng`): press feedback on every pressable (scale 0.97, 160ms, strong
+      ease-out), hover gated to fine pointers, the disclosure chevron rotates, results arriving fade in once
+      (180ms, opacity only). Filters, chips and typing don't animate. Reduced motion drops the movement.
+- [x] taste-skill review (app-screen run): style **achromatic-ledger** (seed 931360211); face: blue-grey ledger ground
+      under white cards, Geist (self-hosted), an ink slip mark. Before: 2 FAIL (indigo accent, text 15px from the edge),
+      2 WARN, uppercase table headers and badge, 7 type sizes. After: 0 FAIL, 0 WARN on lint and the inspector at
+      1440/768/390; the slip EV is now the screen's largest figure; settings are a card with labelled leagues; an
+      honest "No report yet" state replaces the empty screen.
+- [x] Dark mode: System / Light / Dark switch in the header, remembered, applied before first paint
+- [x] Mobile reflow: below 40rem the Top Legs table becomes one card per leg and the unpriced list wraps; e2e checks
+      nothing scrolls sideways at 375px
+- [x] README leads with the app: quick start with Docker, using the app, then the CLI
+
+**Notes**
+- The app-screen rules say a working screen performs no entrances, so the motion pass's first draft (a staggered
+  slide-in of report sections) was cut back to a single fade when a result arrives. The two skills agree on
+  everything else.
+- The taste inspector runs against Playwright's Chromium: `CHROME_PATH=~/.cache/ms-playwright/chromium-*/chrome-linux64/chrome`.
+
+**Review:** _pending_

@@ -11,3 +11,7 @@ web/dist/
 data/
 test-results/
 playwright-report/
+config/*
+!config/.gitkeep
+!config/README.md
+.taste-skill/

@@ -1,7 +1,8 @@
 # PrizePicks EV Optimizer
 
 Finds the PrizePicks picks with the best expected value (EV) by comparing them against what the
-big sportsbooks think will happen, then builds the best lineups from them.
+big sportsbooks think will happen, then builds the best lineups from them. Drop your PrizePicks
+board on the page, press **Run**, and read the best slips. A command-line version does the same.
 
 > **Disclaimer.** This project is for educational and informational purposes only. Nothing it
 > outputs is financial, betting or any other kind of advice, and its probabilities are estimates
@@ -10,6 +11,44 @@ big sportsbooks think will happen, then builds the best lineups from them.
 > available at 1-800-GAMBLER (US).
 
 ---
+
+## Quick start
+
+You need [Docker](https://docs.docker.com/get-docker/) and a US network location where FanDuel and
+DraftKings load normally (no VPN).
+
+```bash
+git clone https://github.com/jakedlr/lineup-optimizer.git
+cd lineup-optimizer
+docker compose up -d --build
+```
+
+Open <http://localhost:8000>. Stop it with `docker compose down`. Your saved board survives restarts;
+it lives in a Docker volume. To use another port: `PPOPT_PORT=8080 docker compose up -d`.
+
+The app runs on your own machine on purpose: the sportsbooks only answer requests from a US
+connection, so it can't be hosted for you.
+
+## Using the app
+
+1. **Save a board.** PrizePicks blocks automated requests, so the board comes from your own logged-in
+   browser. The page shows the steps and links under *How to get a board* (also below).
+2. **Drop it on the page,** or use *Choose file*. The page shows how old the board is and warns after
+   30 minutes, because lines move during the day.
+3. **Pick your settings.** Leagues and stake are on the page. *Advanced* has hours ahead, the devig
+   method, which slip the edge is measured against, how many legs to list, and *Fresh odds* to skip
+   the 5-minute odds cache for one run.
+4. **Choose a promotion,** if you have one: a bonus (free) entry, a payout boost, or promo legs picked
+   from the board (search a player, choose the stat, set Over/Under and the discounted line). Promo
+   lines already in the feed, such as tacos, are included unless you untick them.
+5. **Run.** A progress bar shows the requests to the sportsbooks as they go (usually under a minute,
+   instant when the odds are cached). Then the report: **Best Slips**, **Top Legs** and anything
+   **Unpriced**, with any warnings above them.
+
+The slip type and size filters and the number of legs change the view without running again.
+*Download JSON* saves the whole report. Settings are remembered in your browser; promotions and
+*Fresh odds* are not, since they apply to one entry. The theme follows your system, or pick Light
+or Dark at the top.
 
 ## How it works
 
@@ -32,30 +71,61 @@ Under −113), and those prices reveal how likely each outcome is. This tool use
 Promotions are supported too: free/bonus entries, payout boosts, and discounted "promo" lines
 such as tacos.
 
-## Stack
+## Getting the PrizePicks board
 
-| Piece | Why it was chosen |
-|---|---|
-| **Python 3.11+** | Readable, ubiquitous, and the standard library covers all of the maths (no NumPy/SciPy needed). |
-| **[Scrapling](https://github.com/D4Vinci/Scrapling)** | Fetches the sportsbooks' internal JSON feeds with browser-like TLS fingerprints, which plain `requests` gets blocked on. It also provides a stealth browser for sites with heavier bot protection. |
-| **Sportsbooks' internal JSON feeds** (FanDuel, DraftKings) | Free and detailed, and far more stable than scraping web pages. FanDuel's prop prices are widely seen as sharp. Using two books adds a cross-check. A paid odds API was considered and set aside on cost. |
-| **PrizePicks projections feed** | The same JSON the PrizePicks website uses. It includes line types (standard/goblin/demon), allowed sides, and promo lines. |
-| **argparse** | Standard-library CLI parsing, with built-in support for mutually exclusive options (used for promotions). |
-| **pytest** | Simple tests. All maths was written test-first, and the scrapers are tested against saved real responses in `tests/fixtures/`, so the suite runs offline. |
-| **JSON config files** | Payouts, stat names, team names and book markets change over time. Keeping them in editable files means most fixes need no code changes. |
+PrizePicks is protected by anti-bot software (DataDome) that blocks automated requests, including
+the stealth browser in testing. The reliable route is to save the board from your own browser:
 
-## Setup
+1. Log in at <https://app.prizepicks.com>.
+2. In the same browser, open
+   `https://api.prizepicks.com/projections?per_page=1000&single_stat=true&game_mode=pickem`
+   and complete the "verify you're human" check if one appears.
+3. Press **Ctrl+S** to save it as a `.json` file, then drop it on the app. For the command line,
+   save it as `samples/projections.json` in this folder. On WSL the path is
+   `\\wsl.localhost\Ubuntu\home\<you>\lineup-optimizer\samples\projections.json`
+   (adjust for your distro and clone location).
 
-### Requirements
+   If that page won't load: open DevTools (**F12**) on app.prizepicks.com, go to **Network**,
+   filter for `projections`, refresh, then right-click the request → **Copy → Copy response**
+   and paste it into that file.
+
+Lines move during the day, so re-save before each session. Both the app and the CLI warn when the
+board is more than 30 minutes old.
+
+## Reading the report
+
+- **Prob**: the estimated chance the pick wins, after removing the vig.
+- **Edge**: Prob minus the per-pick break-even of the reference lineup (shown at the top).
+  Positive means the pick beats break-even for that lineup. For `--bonus`, break-even is still
+  calculated as a regular cash entry, since a free entry never loses money.
+- **Matchup**: the two teams in the pick's game, listed alphabetically (e.g. `CHI vs NE`), so it
+  doesn't show which team is home. Best slips show it too, alongside the sport.
+- **Books**: each book's probability. *books differ* flags a gap of 3 percentage points or more.
+- **Notes**: *same game* marks a pick from a game already listed higher up. It's shown, but
+  never put in the same lineup. *taco (modelled)* marks an estimated promo line (see below).
+- **Best slips**: the top lineup for each type and size, sorted by EV.
+- **Unpriced lines**: PrizePicks lines skipped and why. *Show lines* in the app, or `-v` on the CLI,
+  lists them.
+- **Warnings** include a book that has games in the window but no player props posted yet. Books
+  often post the next day's props in the morning, so a league priced by one book only is usually
+  this, not a problem with the tool.
+
+## The command line
+
+The CLI prints the same report in the terminal. It needs no Docker.
+
+### Setup
+
+#### Requirements
 
 - **Python 3.11 or newer** (developed on 3.14).
 - **Linux, macOS, or Windows via WSL.** `./getOdds` is a bash script. On native Windows, run
   `python -m ppopt.cli` with `src` on `PYTHONPATH` instead.
 - **A US network location where FanDuel and DraftKings load normally** (no VPN). Both block some
   regions. Odds are read from their New Jersey hosts by default (`"state"` in `books.json`).
-- **A browser logged into PrizePicks**, for saving the board (see below).
+- **A browser logged into PrizePicks**, for saving the board (see above).
 
-### Install
+#### Install
 
 ```bash
 git clone https://github.com/jakedlr/lineup-optimizer.git
@@ -72,27 +142,7 @@ sudo .venv/bin/python -m playwright install-deps chromium
 .venv/bin/scrapling install
 ```
 
-### Getting the PrizePicks board
-
-PrizePicks is protected by anti-bot software (DataDome) that blocks automated requests, including
-the stealth browser in testing. The reliable route is to save the board from your own browser:
-
-1. Log in at <https://app.prizepicks.com>.
-2. In the same browser, open
-   `https://api.prizepicks.com/projections?per_page=1000&single_stat=true&game_mode=pickem`
-   and complete the "verify you're human" check if one appears.
-3. Press **Ctrl+S** and save it as `samples/projections.json` in this folder. On WSL the path is
-   `\\wsl.localhost\Ubuntu\home\<you>\lineup-optimizer\samples\projections.json`
-   (adjust for your distro and clone location).
-
-   If that page won't load: open DevTools (**F12**) on app.prizepicks.com, go to **Network**,
-   filter for `projections`, refresh, then right-click the request → **Copy → Copy response**
-   and paste it into that file.
-
-Lines move during the day, so re-save before each session. The tool warns you when the file is
-more than 30 minutes old.
-
-## Usage
+### Usage
 
 ```bash
 ./getOdds --pp-file samples/projections.json
@@ -101,7 +151,7 @@ more than 30 minutes old.
 If you leave out `--pp-file`, it tries to fetch PrizePicks directly and explains what to do if
 that's blocked.
 
-### Options
+#### Options
 
 **Data**
 
@@ -140,7 +190,7 @@ that's blocked.
 | `--json` | off | Machine-readable output |
 | `-v` | off | List every PrizePicks line that couldn't be priced, and why |
 
-### Examples
+#### Examples
 
 ```bash
 # Tonight's NBA only, as 5-pick Flex
@@ -161,19 +211,18 @@ that's blocked.
 `Bears - Patriots`). `PICK` is `Over|Under <line> <stat>`, using PrizePicks' stat names
 (`More`/`Less` work too).
 
-### Reading the output
+## Stack
 
-- **Prob**: the estimated chance the pick wins, after removing the vig.
-- **Edge**: Prob minus the per-pick break-even of the reference lineup (shown at the top).
-  Positive means the pick beats break-even for that lineup. For `--bonus`, break-even is still
-  calculated as a regular cash entry, since a free entry never loses money.
-- **Matchup**: the two teams in the pick's game, listed alphabetically (e.g. `CHI vs NE`), so it
-  doesn't show which team is home. Best slips show it too, alongside the sport.
-- **Books**: each book's probability. *books differ* flags a gap of 3 percentage points or more.
-- **Notes**: *same game* marks a pick from a game already listed higher up. It's shown, but
-  never put in the same lineup. *taco (modelled)* marks an estimated promo line (see below).
-- **Best slips**: the top lineup for each type and size, sorted by EV.
-- **Unpriced lines**: PrizePicks lines skipped and why. `-v` lists them.
+| Piece | Why it was chosen |
+|---|---|
+| **Python 3.11+** | Readable, ubiquitous, and the standard library covers all of the maths (no NumPy/SciPy needed). |
+| **[Scrapling](https://github.com/D4Vinci/Scrapling)** | Fetches the sportsbooks' internal JSON feeds with browser-like TLS fingerprints, which plain `requests` gets blocked on. It also provides a stealth browser for sites with heavier bot protection. |
+| **Sportsbooks' internal JSON feeds** (FanDuel, DraftKings) | Free and detailed, and far more stable than scraping web pages. FanDuel's prop prices are widely seen as sharp. Using two books adds a cross-check. A paid odds API was considered and set aside on cost. |
+| **PrizePicks projections feed** | The same JSON the PrizePicks website uses. It includes line types (standard/goblin/demon), allowed sides, and promo lines. |
+| **argparse** | Standard-library CLI parsing, with built-in support for mutually exclusive options (used for promotions). |
+| **pytest** | Simple tests. All maths was written test-first, and the scrapers are tested against saved real responses in `tests/fixtures/`, so the suite runs offline. |
+| **FastAPI + React (Vite)** | The app: a thin HTTP layer over the same engine as the CLI, and a single page that streams run progress. Shipped as one Docker image ([ADR 0001](docs/adr/0001-web-app-single-container.md)). |
+| **JSON config files** | Payouts, stat names, team names and book markets change over time. Keeping them in editable files means most fixes need no code changes. |
 
 ## Decisions and their trade-offs
 
@@ -211,6 +260,10 @@ These are deliberate choices, not oversights:
 
 ## Configuration files
 
+To change any of these without touching the originals, put an edited copy in `config/`. It's used
+instead of the built-in file, by the app (mounted read-only) and the CLI, from the next run. Files
+there are ignored by git.
+
 | File | What it holds | When to edit |
 |---|---|---|
 | `payouts.json` | Power/Flex multipliers by lineup size and number of hits | When PrizePicks changes payouts. Check against the app periodically |
@@ -230,10 +283,18 @@ These are deliberate choices, not oversights:
 ## Development
 
 ```bash
-.venv/bin/python -m pytest
+make test     # Python (pytest) and web (Vitest) unit tests
+make e2e      # Playwright against a separate container on port 8001 with canned odds
+make up       # rebuild and restart the app on port 8000
 ```
 
-`DESIGN.md` has the full design. Code is in `src/ppopt/`: `odds.py` (vig removal),
-`payouts.py` (EV maths), `slips.py` (lineup building), `promo_model.py` (promo estimates),
-`matching.py`/`pricing.py` (joining PrizePicks to the books), `sources/` (data fetching) and
-`cli.py`.
+The web tests need Node (LTS) and `npm ci` in `web/`; the e2e suite also needs
+`npx playwright install chromium` there once. For UI work, `npm run dev` in `web/` serves the page
+with hot reload and proxies `/api` to the app on port 8000.
+
+`DESIGN.md` has the engine's design, `docs/adr/` the architecture decisions, and `docs/sprints.md`
+the web app's build log. Engine code is in `src/ppopt/`: `odds.py` (vig removal), `payouts.py`
+(EV maths), `slips.py` (lineup building), `promo_model.py` (promo estimates),
+`matching.py`/`pricing.py` (joining PrizePicks to the books), `sources/` (data fetching),
+`progress.py` (run progress), `cli.py` (the CLI and the shared `report_for`) and `web.py` (the
+HTTP API). The page is in `web/src/`.

@@ -9,7 +9,7 @@ from collections import Counter
 from datetime import datetime, timezone
 from pathlib import Path
 
-from .matching import Config, game_id, matchup_label, parse_promo_leg
+from .matching import Config, config_file, game_id, matchup_label, parse_promo_leg
 from .odds import DEVIG_METHODS
 from .payouts import break_even, load_payouts
 from .pricing import PromoError, price_lines, price_promo
@@ -113,7 +113,7 @@ def _leg_dict(leg, cfg: Config) -> dict:
 def run(args: argparse.Namespace, root: Path, payload: dict, markets: list, now: datetime) -> dict:
     """Price everything and build the report. Raises UserError for fixable input problems."""
     cfg = Config.load(root)
-    table = load_payouts(args.payouts or root / "payouts.json")
+    table = load_payouts(args.payouts or config_file(root, "payouts.json"))
     warnings = []
 
     lines, feed_promos = prizepicks.parse_projections(payload, cfg, args.sports, now, args.hours)
@@ -231,7 +231,7 @@ def report_for(args, root: Path, payload: dict, http: Http, now: datetime, colle
     if not wanted:
         raise UserError(f"no games on the board start in the next {args.hours:g} hours "
                         f"in {','.join(args.sports)}; save a fresh board from PrizePicks")
-    books = json.loads((root / "books.json").read_text())
+    books = json.loads(config_file(root, "books.json").read_text())
     progress = getattr(http, "progress", None)
     if progress:
         games = Counter(sport for sport, _ in {(l.sport, l.teams) for l in [*lines, *promos]})

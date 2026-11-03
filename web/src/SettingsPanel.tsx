@@ -23,20 +23,26 @@ export function SettingsPanel({ options, settings, onChange, noCache, onNoCache 
     )
 
   return (
-    <section className="settings" aria-label="Run settings">
+    <section className="settings" aria-labelledby="settings-h">
+      <h2 id="settings-h" className="label">
+        Run settings
+      </h2>
       <div className="settings-row">
-        <div className="chips" role="group" aria-label="Leagues">
-          {options.sports.map((s) => (
-            <button
-              key={s}
-              type="button"
-              className="chip"
-              aria-pressed={settings.sports.includes(s)}
-              onClick={() => toggle(s)}
-            >
-              {s}
-            </button>
-          ))}
+        <div className="leagues">
+          <span id="leagues-label">Leagues</span>
+          <div className="chips" role="group" aria-labelledby="leagues-label">
+            {options.sports.map((s) => (
+              <button
+                key={s}
+                type="button"
+                className="chip"
+                aria-pressed={settings.sports.includes(s)}
+                onClick={() => toggle(s)}
+              >
+                {s}
+              </button>
+            ))}
+          </div>
         </div>
 
         <label className="field stake">
