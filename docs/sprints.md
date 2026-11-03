@@ -126,5 +126,10 @@ architecture is in `docs/adr/0001-web-app-single-container.md`.
   slide-in of report sections) was cut back to a single fade when a result arrives. The two skills agree on
   everything else.
 - The taste inspector runs against Playwright's Chromium: `CHROME_PATH=~/.cache/ms-playwright/chromium-*/chrome-linux64/chrome`.
+- Added at review: Best Slips legs never wrap mid-phrase. Desktop and tablet: one slip per row, each leg on one line in
+  aligned columns (odds, sport, matchup, player, line). Phone: two lines per leg, the line beneath, nothing cut off.
+  e2e checks all three widths.
+- `CLAUDE.md` names the external skills and when to use each; the README's References section lists their repos and
+  install steps.
 
-**Review:** _pending_
+**Review:** done 2026-11-02.

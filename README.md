@@ -280,6 +280,17 @@ there are ignored by git.
 - FanDuel coverage is narrower for NHL and MLB. Only markets seen and verified so far are mapped.
 - Estimates are only as good as the sportsbooks' prices and the assumptions above.
 
+## References
+
+Agent skills from these repos were used to plan, design and build this project with
+[Claude Code](https://claude.com/claude-code). `CLAUDE.md` tells future sessions which to use for what.
+
+| Skills | Repo | Used for | Install |
+|---|---|---|---|
+| `domain-modeling`, `grilling` (`/grill-me`, `/grill-with-docs`), `writing-for-agents` | [mattpocock/skills](https://github.com/mattpocock/skills) (Matt Pocock) | The glossary and ADR, stress-testing the web app plan, and `CLAUDE.md` | `/plugin install mattpocock-skills@claude-plugins-official` |
+| `design-taste-frontend` | [Leonxlnx/taste-skill](https://github.com/Leonxlnx/taste-skill) | The app's visual style (achromatic ledger), its review and the measured checks | `/plugin marketplace add Leonxlnx/taste-skill`, then `/plugin install taste-skill@taste-skill` |
+| `emil-design-eng` and the rest of the set | [emilkowalski/skills](https://github.com/emilkowalski/skills) (Emil Kowalski) | Motion and interaction: press feedback, easing, what not to animate | `npx skills@latest add emilkowalski/skills -g` |
+
 ## Development
 
 ```bash
@@ -292,7 +303,7 @@ The web tests need Node (LTS) and `npm ci` in `web/`; the e2e suite also needs
 `npx playwright install chromium` there once. For UI work, `npm run dev` in `web/` serves the page
 with hot reload and proxies `/api` to the app on port 8000.
 
-`DESIGN.md` has the engine's design, `docs/adr/` the architecture decisions, and `docs/sprints.md`
+`CLAUDE.md` has the conventions and skills for working on this with Claude Code. `DESIGN.md` has the engine's design, `docs/adr/` the architecture decisions, and `docs/sprints.md`
 the web app's build log. Engine code is in `src/ppopt/`: `odds.py` (vig removal), `payouts.py`
 (EV maths), `slips.py` (lineup building), `promo_model.py` (promo estimates),
 `matching.py`/`pricing.py` (joining PrizePicks to the books), `sources/` (data fetching),

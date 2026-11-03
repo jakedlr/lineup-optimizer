@@ -289,6 +289,14 @@ kbd, code {
 .slip-leg .num { text-align: left; }
 .slip-leg .who { font-weight: 500; }
 .tag { font-size: var(--fs-small); font-weight: 500; color: var(--muted); }
+/* Phone: two lines per leg. Odds, sport, matchup and player on the first; the line on the second, starting
+   under the sport. A very long name ends in an ellipsis (full name on hover) rather than wrapping. */
+@media (max-width: 40rem) {
+  .slip ul { overflow-x: visible; grid-template-columns: max-content max-content max-content minmax(0, 1fr); column-gap: 12px; row-gap: 12px; }
+  .slip-leg { row-gap: 2px; }
+  .slip-leg .who { overflow: hidden; text-overflow: ellipsis; }
+  .slip-leg .pick { grid-column: 2 / -1; grid-row: 2; }
+}
 .badge {
   display: inline-block; margin-left: 8px; font-size: var(--fs-small); font-weight: 500; line-height: 18px;
   padding: 0 7px; border-radius: 999px; color: var(--pill-ink); background: var(--pill-bg); white-space: nowrap;
