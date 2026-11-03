@@ -9,3 +9,5 @@
 **Promo leg**: A leg on a discounted PrizePicks line, either found in the feed or entered manually. A slip holds at most one.
 
 **Slip**: A PrizePicks entry of 2–6 legs, played as either Power (all legs must hit) or Flex (partial payouts), valued by its expected value at the chosen stake.
+
+**Board**: A snapshot of the lines PrizePicks is offering, saved from the user's browser at a moment in time. Lines move, so a board goes stale; legs are only ever drawn from the current board.

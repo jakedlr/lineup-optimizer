@@ -1,0 +1,14 @@
+services:
+  app:
+    build: .
+    image: ppopt:latest
+    ports:
+      - "8000:8000"
+    volumes:
+      - ppopt-data:/data
+      # Optional: drop edited payouts.json / books.json / etc. here to override the built-in ones.
+      - ./config:/app/config:ro
+    restart: unless-stopped
+
+volumes:
+  ppopt-data:

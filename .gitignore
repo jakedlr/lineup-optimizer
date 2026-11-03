@@ -6,3 +6,8 @@ samples/*
 !samples/.gitkeep
 .pytest_cache/
 *.egg-info/
+node_modules/
+web/dist/
+data/
+test-results/
+playwright-report/

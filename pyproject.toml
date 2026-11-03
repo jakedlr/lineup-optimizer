@@ -3,10 +3,15 @@ name = "ppopt"
 version = "0.1.0"
 description = "PrizePicks EV optimizer"
 requires-python = ">=3.11"
-dependencies = ["scrapling[fetchers]>=0.3"]
+dependencies = [
+    "scrapling[fetchers]>=0.3",
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.32",
+    "python-multipart>=0.0.9",
+]
 
 [project.optional-dependencies]
-dev = ["pytest"]
+dev = ["pytest", "httpx>=0.27"]
 
 [build-system]
 requires = ["setuptools>=68"]
