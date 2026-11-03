@@ -92,6 +92,35 @@ describe('Board', () => {
   })
 })
 
+describe('Board instructions', () => {
+  const FEED = 'https://api.prizepicks.com/projections?per_page=1000&single_stat=true&game_mode=pickem'
+
+  it('links to the PrizePicks feed to save, opening in a new tab', async () => {
+    stub({ 'GET /api/board': noBoard })
+    render(<App />)
+    await screen.findByText(/no board yet/i)
+    const link = screen.getByRole('link', { name: /api\.prizepicks\.com\/projections/i })
+    expect(link).toHaveAttribute('href', FEED)
+    expect(link).toHaveAttribute('target', '_blank')
+    expect(screen.getByRole('link', { name: /app\.prizepicks\.com/i })).toHaveAttribute('href', 'https://app.prizepicks.com')
+  })
+
+  it('shows the steps when there is no board or it is stale, and tucks them away otherwise', async () => {
+    const fresh = minutesAgo(2)
+    stub({ 'GET /api/board': () => Response.json({ saved_at: fresh, projections: 10 }) })
+    const { unmount } = render(<App />)
+    await screen.findByText(/saved 2 min ago/i)
+    expect(screen.getByText(/how to get a board/i).closest('details')).not.toHaveAttribute('open')
+    unmount()
+
+    const stale = minutesAgo(45)
+    stub({ 'GET /api/board': () => Response.json({ saved_at: stale, projections: 10 }) })
+    render(<App />)
+    await screen.findByText(/saved 45 min ago/i)
+    expect(screen.getByText(/how to get a board/i).closest('details')).toHaveAttribute('open')
+  })
+})
+
 describe('Run', () => {
   const withBoard = { 'GET /api/board': () => Response.json({ saved_at: minutesAgo(1), projections: 11 }) }
 

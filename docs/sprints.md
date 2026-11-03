@@ -41,6 +41,7 @@ architecture is in `docs/adr/0001-web-app-single-container.md`.
 - [x] `PUT /api/board` saves the upload to the data volume (rejects anything that isn't a projections feed); `GET /api/board` returns its age and line count
 - [x] `POST /api/run` runs the engine with CLI defaults and returns the Report; engine errors come back as 422 with the message, a stale board (>30 min) adds a warning
 - [x] UI: drop or choose a board, see "saved N min ago" with a stale flag, Run, see Best Slips / Top Legs / Unpriced and any warnings
+- [x] "How to get a board" steps with links to app.prizepicks.com and the projections feed; open when there is no board or it is stale
 - [x] e2e: upload a board, reload (persisted), run, read the report
 
 **Notes**
@@ -52,4 +53,4 @@ architecture is in `docs/adr/0001-web-app-single-container.md`.
   shifts the fixture board's start times to two hours from now.
 - A board with no games left in the window now fails fast with "save a fresh board" instead of fetching both books first.
 
-**Review:** _pending_
+**Review:** done 2026-11-02. Checked against live books with a fresh board; added in-page board instructions.
