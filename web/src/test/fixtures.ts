@@ -1,4 +1,4 @@
-import type { Leg, Report } from '../api'
+import type { Leg, Options, Report } from '../api'
 
 export function leg(over: Partial<Leg> = {}): Leg {
   return {
@@ -39,7 +39,10 @@ export const report: Report = {
   settings: { sports: ['NFL', 'NBA', 'NHL', 'MLB'], hours: 24, stake: 10, devig: 'multiplicative', mode: 'cash' },
   ref_slip: { type: 'power', size: 2, break_even: 0.5735 },
   legs: [maye, embiid],
-  slips: [{ type: 'power', size: 2, ev: 1.23, ev_pct: 0.123, legs: [maye, embiid] }],
+  slips: [
+    { type: 'power', size: 2, ev: 1.23, ev_pct: 0.123, legs: [maye, embiid] },
+    { type: 'flex', size: 2, ev: -0.4, ev_pct: -0.04, legs: [maye, embiid] },
+  ],
   unmatched: { 'no book line': 7, 'unmapped stat': 2 },
   unmatched_lines: [
     { sport: 'NFL', player: 'Rome Odunze', stat: 'Receiving Yards', line: 48.5, reason: 'no book line' },
@@ -58,4 +61,11 @@ export function routes(table: Record<string, Route>) {
     return handler(init)
   }
   return fn
+}
+
+export const options: Options = {
+  sports: ['NFL', 'NBA', 'NHL', 'MLB'],
+  devig: ['multiplicative', 'additive', 'power', 'shin'],
+  ref_slips: ['power2', 'power3', 'power4', 'power5', 'power6', 'flex2', 'flex3', 'flex4', 'flex5', 'flex6'],
+  defaults: { sports: ['NFL', 'NBA', 'NHL', 'MLB'], hours: 24, stake: 10, devig: 'multiplicative', ref_slip: null },
 }

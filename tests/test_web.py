@@ -134,3 +134,59 @@ def test_odds_file_replaces_live_books(tmp_path, monkeypatch):
     collect = markets_from_file(f)
     got, warnings = collect(None, None, {}, ["NFL", "NBA"], NOW, 24, set())
     assert got == markets() and warnings == []
+
+
+# --- run settings ------------------------------------------------------------
+
+import pytest
+
+
+def test_options_come_from_the_engine(tmp_path):
+    opts = engine_app(tmp_path).get("/api/options").json()
+    assert opts["sports"] == ["NFL", "NBA", "NHL", "MLB"]
+    assert opts["devig"] == ["multiplicative", "additive", "power", "shin"]
+    assert opts["ref_slips"] == [f"{t}{n}" for t in ("power", "flex") for n in range(2, 7)]
+    assert opts["defaults"] == {"sports": ["NFL", "NBA", "NHL", "MLB"], "hours": 24, "stake": 10.0,
+                                "devig": "multiplicative", "ref_slip": None}
+
+
+def test_run_applies_settings(tmp_path):
+    seen = {}
+
+    def collect(http, cfg, books, sports, now, hours, wanted):
+        seen.update(sports=sports, hours=hours, use_cache=http.use_cache)
+        return markets(), []
+
+    client = engine_app(tmp_path, collect=collect)
+    upload(client)
+    body = {"sports": ["NBA"], "stake": 20, "hours": 12, "devig": "shin", "ref_slip": "flex6", "no_cache": True}
+    report = client.post("/api/run", json=body).json()
+
+    assert seen == {"sports": ["NBA"], "hours": 12, "use_cache": False}
+    assert report["settings"] == {"sports": ["NBA"], "hours": 12, "stake": 20.0, "devig": "shin", "mode": "cash"}
+    assert report["ref_slip"]["type"] == "flex" and report["ref_slip"]["size"] == 6
+    assert {l["sport"] for l in report["legs"]} == {"NBA"}
+
+
+def test_run_settings_are_all_optional(tmp_path):
+    client = engine_app(tmp_path)
+    upload(client)
+    report = client.post("/api/run", json={"stake": 5}).json()
+    assert report["settings"]["stake"] == 5.0
+    assert report["settings"]["sports"] == ["NFL", "NBA", "NHL", "MLB"]
+
+
+@pytest.mark.parametrize("body", [
+    {"sports": []},
+    {"sports": ["XFL"]},
+    {"stake": 0},
+    {"hours": -1},
+    {"devig": "magic"},
+    {"ref_slip": "power9"},
+    {"surprise": 1},
+])
+def test_run_rejects_bad_settings(tmp_path, body):
+    client = engine_app(tmp_path)
+    upload(client)
+    r = client.post("/api/run", json=body)
+    assert r.status_code == 422, body

@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react'
-import { getBoard, putBoard, runReport, type BoardInfo, type Report } from './api'
+import { getBoard, getOptions, putBoard, runReport, type BoardInfo, type Options, type Report } from './api'
 import { BoardPanel } from './BoardPanel'
 import { ReportView } from './ReportView'
+import { DEFAULT_TOP, load, positive, save, toRun, type Settings } from './settings'
+import { SettingsPanel } from './SettingsPanel'
 
 type Engine = 'checking' | 'online' | 'offline'
 
@@ -37,12 +39,29 @@ function App() {
   const [running, setRunning] = useState(false)
   const [report, setReport] = useState<Report | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [options, setOptions] = useState<Options | null>(null)
+  const [settings, setSettings] = useState<Settings | null>(null)
+  const [noCache, setNoCache] = useState(false)
 
   useEffect(() => {
     getBoard()
       .then(setBoard)
       .catch(() => setBoard(null))
+    getOptions()
+      .then((o) => {
+        setOptions(o)
+        setSettings(load(o))
+      })
+      .catch((e) => setError(`Couldn't load run settings: ${message(e)}`))
   }, [])
+
+  const change = (next: Settings) => {
+    setSettings(next)
+    save(next)
+  }
+
+  const request = settings ? toRun(settings, noCache) : null
+  const problem = typeof request === 'string' ? request : null
 
   const upload = async (file: File) => {
     setUploading(true)
@@ -58,10 +77,11 @@ function App() {
   }
 
   const run = async () => {
+    if (!request || typeof request === 'string') return
     setRunning(true)
     setError(null)
     try {
-      setReport(await runReport())
+      setReport(await runReport(request))
     } catch (e) {
       setError(message(e))
     } finally {
@@ -80,11 +100,24 @@ function App() {
 
       <BoardPanel board={board} uploading={uploading} onFile={upload} />
 
+      {options && settings && (
+        <SettingsPanel options={options} settings={settings} onChange={change} noCache={noCache} onNoCache={setNoCache} />
+      )}
+
       <div className="actions">
-        <button type="button" className="primary" disabled={!board || running || uploading} onClick={run}>
+        <button
+          type="button"
+          className="primary"
+          disabled={!board || !request || !!problem || running || uploading}
+          onClick={run}
+        >
           {running ? 'Running…' : 'Run'}
         </button>
-        {running && <span className="muted small">Fetching sportsbook odds. This can take a minute.</span>}
+        {running ? (
+          <span className="muted small">Fetching sportsbook odds. This can take a minute.</span>
+        ) : (
+          problem && <span className="warn">{problem}</span>
+        )}
       </div>
 
       {error && (
@@ -93,7 +126,15 @@ function App() {
         </p>
       )}
 
-      {report && <ReportView report={report} />}
+      {report && settings && (
+        <ReportView
+          report={report}
+          top={Math.floor(positive(settings.top) ?? DEFAULT_TOP)}
+          slipType={settings.slipType}
+          slipSize={settings.slipSize}
+          onFilter={(f) => change({ ...settings, ...f })}
+        />
+      )}
     </main>
   )
 }

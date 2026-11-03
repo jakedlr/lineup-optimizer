@@ -1,21 +1,22 @@
-import { render, screen, within } from '@testing-library/react'
+import { cleanup, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import App from './App'
-import { report, routes } from './test/fixtures'
+import { options, report, routes } from './test/fixtures'
 
 const health = () => Response.json({ status: 'ok' })
 const noBoard = () => Response.json({ detail: 'no board uploaded yet' }, { status: 404 })
 const minutesAgo = (m: number) => new Date(Date.now() - m * 60_000).toISOString()
 
 function stub(table: Parameters<typeof routes>[0]) {
-  const fn = vi.fn(routes({ 'GET /api/health': health, ...table }))
+  const fn = vi.fn(routes({ 'GET /api/health': health, 'GET /api/options': () => Response.json(options), ...table }))
   vi.stubGlobal('fetch', fn)
   return fn
 }
 
 afterEach(() => {
   vi.unstubAllGlobals()
+  localStorage.clear()
 })
 
 describe('App shell', () => {
@@ -130,7 +131,7 @@ describe('Run', () => {
     await userEvent.click(await screen.findByRole('button', { name: /^run$/i }))
 
     const slips = await screen.findByRole('region', { name: /best slips/i })
-    expect(within(slips).getByText(/power 2/i)).toBeInTheDocument()
+    expect(within(slips).getByRole('heading', { name: 'Power 2' })).toBeInTheDocument()
     expect(within(slips).getByText('+$1.23')).toBeInTheDocument()
 
     const legs = screen.getByRole('region', { name: /top legs/i })
@@ -153,5 +154,153 @@ describe('Run', () => {
     render(<App />)
     await userEvent.click(await screen.findByRole('button', { name: /^run$/i }))
     expect(await screen.findByRole('alert')).toHaveTextContent(/no sportsbook odds available/i)
+  })
+})
+
+describe('Run settings', () => {
+  const withBoard = { 'GET /api/board': () => Response.json({ saved_at: minutesAgo(1), projections: 11 }) }
+
+  function runBodies(fetchMock: ReturnType<typeof stub>) {
+    return fetchMock.mock.calls
+      .filter(([url]) => url === '/api/run')
+      .map(([, init]) => JSON.parse(String(init!.body)))
+  }
+
+  async function ready() {
+    const fetchMock = stub({ ...withBoard, 'POST /api/run': () => Response.json(report) })
+    render(<App />)
+    await screen.findByRole('button', { name: 'NBA', pressed: true })
+    return fetchMock
+  }
+
+  it('sends the defaults from the engine', async () => {
+    const fetchMock = await ready()
+    await userEvent.click(screen.getByRole('button', { name: /^run$/i }))
+    await screen.findByRole('region', { name: /best slips/i })
+    expect(runBodies(fetchMock)).toEqual([
+      { sports: ['NFL', 'NBA', 'NHL', 'MLB'], stake: 10, hours: 24, devig: 'multiplicative', ref_slip: null, no_cache: false },
+    ])
+  })
+
+  it('toggles leagues and needs at least one', async () => {
+    const fetchMock = await ready()
+    await userEvent.click(screen.getByRole('button', { name: 'NBA' }))
+    expect(screen.getByRole('button', { name: 'NBA' })).toHaveAttribute('aria-pressed', 'false')
+    await userEvent.click(screen.getByRole('button', { name: /^run$/i }))
+    await screen.findByRole('region', { name: /best slips/i })
+    expect(runBodies(fetchMock)[0].sports).toEqual(['NFL', 'NHL', 'MLB'])
+
+    for (const s of ['NFL', 'NHL', 'MLB']) await userEvent.click(screen.getByRole('button', { name: s }))
+    expect(screen.getByRole('button', { name: /^run$/i })).toBeDisabled()
+    expect(screen.getByText(/pick at least one league/i)).toBeInTheDocument()
+  })
+
+  it('sends stake and the advanced settings', async () => {
+    const fetchMock = await ready()
+    const stake = screen.getByLabelText(/stake/i)
+    await userEvent.clear(stake)
+    await userEvent.type(stake, '25')
+
+    await userEvent.click(screen.getByText(/advanced/i))
+    const hours = screen.getByLabelText(/hours ahead/i)
+    await userEvent.clear(hours)
+    await userEvent.type(hours, '6')
+    await userEvent.selectOptions(screen.getByLabelText(/devig/i), 'shin')
+    await userEvent.selectOptions(screen.getByLabelText(/edge against/i), 'flex6')
+    await userEvent.click(screen.getByLabelText(/fresh odds/i))
+
+    await userEvent.click(screen.getByRole('button', { name: /^run$/i }))
+    await screen.findByRole('region', { name: /best slips/i })
+    expect(runBodies(fetchMock)[0]).toEqual({
+      sports: ['NFL', 'NBA', 'NHL', 'MLB'], stake: 25, hours: 6, devig: 'shin', ref_slip: 'flex6', no_cache: true,
+    })
+  })
+
+  it('blocks a run with an invalid stake', async () => {
+    await ready()
+    await userEvent.clear(screen.getByLabelText(/stake/i))
+    expect(screen.getByRole('button', { name: /^run$/i })).toBeDisabled()
+  })
+
+  it('remembers settings across visits, except fresh odds', async () => {
+    await ready()
+    await userEvent.click(screen.getByRole('button', { name: 'MLB' }))
+    const stake = screen.getByLabelText(/stake/i)
+    await userEvent.clear(stake)
+    await userEvent.type(stake, '5')
+    await userEvent.click(screen.getByText(/advanced/i))
+    await userEvent.selectOptions(screen.getByLabelText(/devig/i), 'power')
+    await userEvent.click(screen.getByLabelText(/fresh odds/i))
+    cleanup()
+
+    await ready()
+    expect(screen.getByRole('button', { name: 'MLB' })).toHaveAttribute('aria-pressed', 'false')
+    expect(screen.getByLabelText(/stake/i)).toHaveValue(5)
+    expect(screen.getByLabelText(/devig/i)).toHaveValue('power')
+    expect(screen.getByLabelText(/fresh odds/i)).not.toBeChecked()
+  })
+
+  it('ignores remembered settings the engine no longer offers', async () => {
+    localStorage.setItem('ppopt.settings.v1', JSON.stringify({ sports: ['XFL', 'NBA'], devig: 'magic', stake: -3 }))
+    await ready()
+    expect(screen.getByRole('button', { name: 'NFL' })).toHaveAttribute('aria-pressed', 'false')
+    expect(screen.getByRole('button', { name: 'NBA' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByLabelText(/stake/i)).toHaveValue(10)
+  })
+})
+
+describe('Report controls (no re-run)', () => {
+  const withBoard = { 'GET /api/board': () => Response.json({ saved_at: minutesAgo(1), projections: 11 }) }
+
+  async function withReport() {
+    const fetchMock = stub({ ...withBoard, 'POST /api/run': () => Response.json(report) })
+    render(<App />)
+    await userEvent.click(await screen.findByRole('button', { name: /^run$/i }))
+    await screen.findByRole('region', { name: /best slips/i })
+    return fetchMock
+  }
+
+  const runs = (f: ReturnType<typeof stub>) => f.mock.calls.filter(([url]) => url === '/api/run').length
+
+  it('filters slips by type and size', async () => {
+    const fetchMock = await withReport()
+    const slips = screen.getByRole('region', { name: /best slips/i })
+    expect(within(slips).getAllByRole('article')).toHaveLength(2)
+
+    await userEvent.click(within(slips).getByRole('button', { name: 'Flex' }))
+    expect(within(slips).getByRole('heading', { name: 'Flex 2' })).toBeInTheDocument()
+    expect(within(slips).queryByRole('heading', { name: 'Power 2' })).not.toBeInTheDocument()
+
+    await userEvent.click(within(slips).getByRole('button', { name: '3' }))
+    expect(within(slips).queryAllByRole('article')).toHaveLength(0)
+    expect(within(slips).getByText(/no slips match/i)).toBeInTheDocument()
+    expect(runs(fetchMock)).toBe(1)
+  })
+
+  it('changes how many legs show', async () => {
+    const fetchMock = await withReport()
+    await userEvent.click(screen.getByText(/advanced/i))
+    const top = screen.getByLabelText(/legs to show/i)
+    await userEvent.clear(top)
+    await userEvent.type(top, '1')
+    const legs = screen.getByRole('region', { name: /top legs/i })
+    expect(within(legs).getAllByRole('row')).toHaveLength(2) // header + 1
+    expect(runs(fetchMock)).toBe(1)
+  })
+
+  it('downloads the report as JSON', async () => {
+    await withReport()
+    const blobs: Blob[] = []
+    URL.createObjectURL = vi.fn((b: Blob) => (blobs.push(b), 'blob:report'))
+    URL.revokeObjectURL = vi.fn()
+    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
+
+    await userEvent.click(screen.getByRole('button', { name: /download json/i }))
+
+    expect(click).toHaveBeenCalled()
+    const a = click.mock.contexts[0] as HTMLAnchorElement
+    expect(a.download).toMatch(/^ppopt-report-\d{4}-\d{2}-\d{2}T\d{2}-\d{2}\.json$/)
+    expect(JSON.parse(await blobs[0].text())).toEqual(report)
+    click.mockRestore()
   })
 })

@@ -51,6 +51,22 @@ export interface BoardInfo {
   projections: number
 }
 
+export interface Options {
+  sports: string[]
+  devig: string[]
+  ref_slips: string[]
+  defaults: { sports: string[]; hours: number; stake: number; devig: string; ref_slip: string | null }
+}
+
+export interface RunSettings {
+  sports: string[]
+  stake: number
+  hours: number
+  devig: string
+  ref_slip: string | null
+  no_cache: boolean
+}
+
 export class ApiError extends Error {}
 
 async function json<T>(res: Response): Promise<T> {
@@ -77,6 +93,16 @@ export async function putBoard(file: File): Promise<BoardInfo> {
   return json(await fetch('/api/board', { method: 'PUT', body }))
 }
 
-export async function runReport(): Promise<Report> {
-  return json(await fetch('/api/run', { method: 'POST' }))
+export async function getOptions(): Promise<Options> {
+  return json(await fetch('/api/options'))
+}
+
+export async function runReport(settings: RunSettings): Promise<Report> {
+  return json(
+    await fetch('/api/run', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(settings),
+    }),
+  )
 }

@@ -54,3 +54,19 @@ architecture is in `docs/adr/0001-web-app-single-container.md`.
 - A board with no games left in the window now fails fast with "save a fresh board" instead of fetching both books first.
 
 **Review:** done 2026-11-02. Checked against live books with a fresh board; added in-page board instructions.
+
+## Sprint 2: Run settings
+
+**Goal:** everything the CLI can tune (apart from promotions) is a control on the page.
+
+**Done criteria**
+- [x] `GET /api/options` serves leagues, devig methods, reference slips and defaults from the engine and `payouts.json`
+- [x] `POST /api/run` takes `{sports, stake, hours, devig, ref_slip, no_cache}`; every field optional, unknown fields and bad values are 422
+- [x] League chips and stake on the page; Advanced panel with hours ahead, devig, edge reference slip, legs to show, fresh odds
+- [x] Run is blocked with a reason when no league is picked or stake/hours aren't positive
+- [x] Report filters by slip type and size, and legs to show, change the view without re-running
+- [x] Settings and filters remembered in the browser (`localStorage`), validated against the engine's options on load; fresh odds is per-run and never remembered, and promotions won't be either
+- [x] Download JSON saves the report as `ppopt-report-<local time>.json`
+- [x] e2e: change leagues, stake and reference slip, run, filter, download, reload and see settings kept
+
+**Review:** _pending_

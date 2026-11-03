@@ -1,7 +1,50 @@
 import type { Leg, Report } from './api'
 import { bookAbbr, pct, pick, signedDollars, signedPct } from './format'
+import type { Settings } from './settings'
 
-const TOP_LEGS = 25
+type SlipFilter = Pick<Settings, 'slipType' | 'slipSize'>
+
+interface Props extends SlipFilter {
+  report: Report
+  top: number
+  onFilter: (f: Partial<SlipFilter>) => void
+}
+
+function Segmented<T extends string | number>({
+  label,
+  value,
+  options,
+  onPick,
+}: {
+  label: string
+  value: T
+  options: { value: T; label: string }[]
+  onPick: (v: T) => void
+}) {
+  return (
+    <div className="segmented" role="group" aria-label={label}>
+      {options.map((o) => (
+        <button key={o.value} type="button" aria-pressed={o.value === value} onClick={() => onPick(o.value)}>
+          {o.label}
+        </button>
+      ))}
+    </div>
+  )
+}
+
+function stamp(d = new Date()) {
+  const p = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}-${p(d.getMinutes())}`
+}
+
+function download(report: Report) {
+  const url = URL.createObjectURL(new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' }))
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `ppopt-report-${stamp()}.json`
+  a.click()
+  setTimeout(() => URL.revokeObjectURL(url), 0)
+}
 
 function LegLine({ leg }: { leg: Leg }) {
   return (
@@ -17,16 +60,46 @@ function LegLine({ leg }: { leg: Leg }) {
   )
 }
 
-function BestSlips({ report }: { report: Report }) {
+function BestSlips({ report, slipType, slipSize, onFilter }: Omit<Props, 'top'>) {
+  const sizes = [...new Set(report.slips.map((s) => s.size))].sort()
+  const shown = report.slips.filter(
+    (s) => (slipType === 'all' || s.type === slipType) && (slipSize === 'all' || s.size === slipSize),
+  )
   return (
     <section aria-labelledby="slips-h" className="block">
-      <h2 id="slips-h">Best Slips</h2>
+      <div className="block-head">
+        <h2 id="slips-h">Best Slips</h2>
+        {report.slips.length > 0 && (
+          <div className="filters">
+            <Segmented
+              label="Slip type"
+              value={slipType}
+              options={[
+                { value: 'all', label: 'All' },
+                { value: 'power', label: 'Power' },
+                { value: 'flex', label: 'Flex' },
+              ]}
+              onPick={(v) => onFilter({ slipType: v })}
+            />
+            <Segmented<'all' | number>
+              label="Slip size"
+              value={slipSize}
+              options={[{ value: 'all', label: 'All' }, ...[2, 3, 4, 5, 6].map((n) => ({ value: n, label: String(n) }))]}
+              onPick={(v) => onFilter({ slipSize: v })}
+            />
+          </div>
+        )}
+      </div>
       <p className="muted small">One leg per game, ${report.settings.stake} stake.</p>
       {report.slips.length === 0 ? (
         <p className="muted">None: not enough distinct games.</p>
+      ) : shown.length === 0 ? (
+        <p className="muted">
+          No slips match this filter.{sizes.length > 0 && ` This run has sizes ${sizes.join(', ')}.`}
+        </p>
       ) : (
         <div className="slips">
-          {report.slips.map((s) => (
+          {shown.map((s) => (
             <article key={`${s.type}${s.size}`} className="slip">
               <header>
                 <h3>
@@ -48,8 +121,8 @@ function BestSlips({ report }: { report: Report }) {
   )
 }
 
-function TopLegs({ report }: { report: Report }) {
-  const legs = report.legs.slice(0, TOP_LEGS)
+function TopLegs({ report, top }: { report: Report; top: number }) {
+  const legs = report.legs.slice(0, top)
   const ref = report.ref_slip
   return (
     <section aria-labelledby="legs-h" className="block">
@@ -145,13 +218,18 @@ function Unpriced({ report }: { report: Report }) {
   )
 }
 
-export function ReportView({ report }: { report: Report }) {
+export function ReportView({ report, top, slipType, slipSize, onFilter }: Props) {
   const s = report.settings
   return (
     <div className="report">
-      <p className="muted small">
-        ${s.stake} stake · {s.mode} · devig {s.devig} · {s.sports.join(', ')} · next {s.hours} h
-      </p>
+      <div className="report-head">
+        <p className="muted small">
+          ${s.stake} stake · {s.mode} · devig {s.devig} · {s.sports.join(', ')} · next {s.hours} h
+        </p>
+        <button type="button" className="secondary small" onClick={() => download(report)}>
+          Download JSON
+        </button>
+      </div>
       {report.warnings.length > 0 && (
         <ul className="warnings">
           {report.warnings.map((w) => (
@@ -159,8 +237,8 @@ export function ReportView({ report }: { report: Report }) {
           ))}
         </ul>
       )}
-      <BestSlips report={report} />
-      <TopLegs report={report} />
+      <BestSlips report={report} slipType={slipType} slipSize={slipSize} onFilter={onFilter} />
+      <TopLegs report={report} top={top} />
       <Unpriced report={report} />
     </div>
   )
