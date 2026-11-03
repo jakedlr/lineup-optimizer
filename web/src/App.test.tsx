@@ -359,7 +359,7 @@ describe('Promotions', () => {
     await userEvent.click(within(promotion()).getByRole('button', { name: /bonus/i }))
     expect(screen.getByLabelText(/promo lines from the board/i)).toBeDisabled()
     const body = await runBody(fetchMock)
-    expect(body).toMatchObject({ bonus: true, boost: null, promo_legs: [] })
+    expect(body).toMatchObject({ bonus: true, boost: null, promo_legs: [], feed_promos: false })
   })
 
   it('sends a boost, and needs it above 1', async () => {
@@ -373,7 +373,7 @@ describe('Promotions', () => {
 
     await userEvent.clear(boost)
     await userEvent.type(boost, '1.4')
-    expect(await runBody(fetchMock)).toMatchObject({ bonus: false, boost: 1.4, promo_legs: [] })
+    expect(await runBody(fetchMock)).toMatchObject({ bonus: false, boost: 1.4, promo_legs: [], feed_promos: false })
   })
 
   it('can leave out feed promos', async () => {
@@ -553,5 +553,65 @@ describe('Theme', () => {
       'true',
     )
     expect(document.documentElement.dataset.theme).toBe('light')
+  })
+})
+
+describe('Review fixes', () => {
+  const withBoard = { 'GET /api/board': () => Response.json({ saved_at: minutesAgo(1), projections: 11 }) }
+  const LINES = 'GET /api/board/lines?sports=NFL%2CNBA%2CNHL%2CMLB&hours=24'
+  const boardLines = [{ sport: 'NBA', matchup: 'CLE vs PHI', player: 'Joel Embiid', stat_label: 'Pts+Rebs+Asts', line: 35.5 }]
+
+  async function addEmbiidPromo() {
+    await userEvent.click(within(screen.getByRole('group', { name: /promotion/i })).getByRole('button', { name: /promo legs/i }))
+    await userEvent.type(await screen.findByLabelText(/find a line/i), 'embiid')
+    await userEvent.click(screen.getByRole('option', { name: /joel embiid/i }))
+    await userEvent.click(screen.getByRole('button', { name: /add promo leg/i }))
+    await screen.findByRole('list', { name: /promo legs/i })
+  }
+
+  it('locks the board while a run is going, so an old run cannot report over a new board', async () => {
+    stub({ ...withBoard, 'POST /api/run': () => new Promise<Response>(() => {}) })
+    render(<App />)
+    await userEvent.click(await screen.findByRole('button', { name: /^run$/i }))
+    expect(screen.getByRole('button', { name: /replace board/i })).toBeDisabled()
+    expect(screen.getByLabelText(/choose board file/i)).toBeDisabled()
+  })
+
+  it('blocks a run whose promo leg is in a league that is not selected', async () => {
+    stub({ ...withBoard, [LINES]: () => Response.json(boardLines), 'GET /api/board/lines?sports=NFL%2CNHL%2CMLB&hours=24': () => Response.json([]) })
+    render(<App />)
+    await screen.findByRole('button', { name: 'NBA', pressed: true })
+    await addEmbiidPromo()
+    await userEvent.click(screen.getByRole('button', { name: 'NBA' }))
+    expect(screen.getByRole('button', { name: /^run$/i })).toBeDisabled()
+    expect(screen.getByText(/joel embiid is an nba promo leg/i)).toBeInTheDocument()
+  })
+
+  it('clears promo legs when a new board is uploaded', async () => {
+    stub({
+      ...withBoard,
+      [LINES]: () => Response.json(boardLines),
+      'PUT /api/board': () => Response.json({ saved_at: new Date().toISOString(), projections: 9 }),
+    })
+    render(<App />)
+    await screen.findByRole('button', { name: 'NBA', pressed: true })
+    await addEmbiidPromo()
+    await userEvent.upload(screen.getByLabelText(/choose board file/i), new File(['{"data":[]}'], 'b.json'))
+    await screen.findByText(/saved just now/i)
+    expect(screen.queryByRole('list', { name: /promo legs/i })).not.toBeInTheDocument()
+  })
+
+  it('treats a fractional or zero "legs to show" as the default', async () => {
+    stub({ ...withBoard, 'POST /api/run': () => Response.json(report) })
+    render(<App />)
+    await userEvent.click(await screen.findByRole('button', { name: /^run$/i }))
+    await screen.findByRole('region', { name: /top legs/i })
+    await userEvent.click(screen.getByText(/advanced/i))
+    const top = screen.getByLabelText(/legs to show/i)
+    for (const bad of ['0.5', '0']) {
+      await userEvent.clear(top)
+      await userEvent.type(top, bad)
+      expect(within(screen.getByRole('region', { name: /top legs/i })).getAllByRole('row')).toHaveLength(3)
+    }
   })
 })

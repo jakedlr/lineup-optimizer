@@ -26,7 +26,7 @@ from .matching import Config, config_file, game_id, matchup_label
 from .models import BookMarket
 from .odds import DEVIG_METHODS
 from .payouts import load_payouts
-from .progress import Progress
+from .progress import Progress, RunCancelled
 from .sources import prizepicks
 from .sources.http import Http
 
@@ -100,6 +100,36 @@ class RunSettings(BaseModel):
         return args
 
 
+def stream_run(work):
+    """Run `work(progress)` on a worker thread and yield NDJSON: progress events, then one "report" or "error".
+
+    Closing the generator (Starlette does when the client goes away) cancels the run: the worker stops at its
+    next sportsbook request instead of scraping for a page nobody is watching.
+    """
+    events: queue.Queue = queue.Queue()
+    progress = Progress(lambda e: events.put({"type": "progress", **e}))
+
+    def worker():
+        try:
+            events.put({"type": "report", "report": work(progress)})
+        except RunCancelled:
+            pass
+        except cli.UserError as e:
+            events.put({"type": "error", "detail": str(e)})
+        except Exception as e:  # noqa: BLE001 - the stream has started, so this is the only way to say so
+            events.put({"type": "error", "detail": f"the engine failed: {e}"})
+
+    threading.Thread(target=worker, daemon=True).start()
+    try:
+        while True:
+            event = events.get()
+            yield json.dumps(event) + "\n"
+            if event["type"] != "progress":
+                return
+    finally:
+        progress.cancel()
+
+
 def create_app(static_dir=None, data_dir=None, root=None, collect=None, now=None) -> FastAPI:
     static_dir = Path(static_dir or os.environ.get("PPOPT_WEB_DIST") or DEFAULT_STATIC)
     data_dir = Path(data_dir or os.environ.get("PPOPT_DATA") or REPO / "data")
@@ -110,16 +140,19 @@ def create_app(static_dir=None, data_dir=None, root=None, collect=None, now=None
 
     board_path, meta_path = data_dir / BOARD, data_dir / BOARD_META
     app = FastAPI(title="PrizePicks EV Optimizer")
-    cache: dict = {}
+    cache: dict = {}  # {"board": (mtime_ns, payload)}, swapped whole so a reader never sees half of it
+    cache_lock = threading.Lock()
 
     def load_board() -> dict:
         """The saved board, parsed once per upload (real boards run to tens of MB)."""
         if not board_path.is_file():
             raise HTTPException(409, "upload a board first")
-        mtime = board_path.stat().st_mtime_ns
-        if cache.get("mtime") != mtime:
-            cache.update(mtime=mtime, payload=json.loads(board_path.read_text()))
-        return cache["payload"]
+        with cache_lock:
+            mtime = board_path.stat().st_mtime_ns
+            cached = cache.get("board")
+            if cached is None or cached[0] != mtime:
+                cached = cache["board"] = (mtime, json.loads(board_path.read_text()))
+            return cached[1]
 
     def board_info() -> dict | None:
         if not board_path.is_file() or not meta_path.is_file():
@@ -170,8 +203,9 @@ def create_app(static_dir=None, data_dir=None, root=None, collect=None, now=None
         ]
 
     @app.put("/api/board")
-    async def put_board(file: UploadFile) -> dict:
-        raw = await file.read()
+    def put_board(file: UploadFile) -> dict:
+        # A plain def: FastAPI runs it on a worker thread, so parsing a big board doesn't stall the server.
+        raw = file.file.read()
         try:
             payload = json.loads(raw)
         except ValueError:
@@ -183,7 +217,9 @@ def create_app(static_dir=None, data_dir=None, root=None, collect=None, now=None
         tmp = board_path.with_suffix(".tmp")
         tmp.write_bytes(raw)
         meta_path.write_text(json.dumps({"projections": len(payload["data"]), "filename": file.filename}))
-        tmp.replace(board_path)
+        with cache_lock:
+            tmp.replace(board_path)
+            cache["board"] = (board_path.stat().st_mtime_ns, payload)
         return board_info()
 
     @app.post("/api/run", response_model=None)
@@ -207,27 +243,7 @@ def create_app(static_dir=None, data_dir=None, root=None, collect=None, now=None
             except cli.UserError as e:
                 raise HTTPException(422, str(e)) from e
 
-        # Streamed: one JSON object per line, progress events then a final "report" or "error".
-        events: queue.Queue = queue.Queue()
-
-        def work():
-            try:
-                events.put({"type": "report", "report": report(Progress(lambda e: events.put({"type": "progress", **e})))})
-            except cli.UserError as e:
-                events.put({"type": "error", "detail": str(e)})
-            except Exception as e:  # noqa: BLE001 - the stream has started, so this is the only way to say so
-                events.put({"type": "error", "detail": f"the engine failed: {e}"})
-
-        threading.Thread(target=work, daemon=True).start()
-
-        def lines():
-            while True:
-                event = events.get()
-                yield json.dumps(event) + "\n"
-                if event["type"] != "progress":
-                    return
-
-        return StreamingResponse(lines(), media_type="application/x-ndjson")
+        return StreamingResponse(stream_run(report), media_type="application/x-ndjson")
 
     @app.get("/api/{rest:path}", include_in_schema=False)
     def api_not_found(rest: str):

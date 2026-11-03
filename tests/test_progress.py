@@ -149,3 +149,15 @@ def test_fanduel_quiet_when_props_are_posted():
     markets = fanduel.collect(Fixtures(FD_ROUTES), Config.load(ROOT), books()["fanduel"], ["NFL"], NOW, 24,
                               wanted_games={GAME}, warnings=warnings)
     assert markets and warnings == []
+
+
+def test_a_cancelled_run_stops_at_its_next_request():
+    import pytest
+
+    from ppopt.progress import RunCancelled
+
+    p = Progress(lambda e: None)
+    p.tick()
+    p.cancel()
+    with pytest.raises(RunCancelled):
+        p.tick()

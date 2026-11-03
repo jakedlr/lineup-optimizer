@@ -5,7 +5,7 @@ import { ReportView } from './ReportView'
 import { PromoPanel } from './PromoPanel'
 import { advance, type Shown } from './progress'
 import { RunProgressBar } from './RunProgressBar'
-import { DEFAULT_TOP, load, NO_PROMOTION, positive, save, toRun, type Promotion, type Settings } from './settings'
+import { count, DEFAULT_TOP, load, NO_PROMOTION, positive, save, toRun, type Promotion, type Settings } from './settings'
 import { Segmented } from './Segmented'
 import { SettingsPanel } from './SettingsPanel'
 import { applyTheme, loadTheme, type Theme } from './theme'
@@ -94,6 +94,7 @@ function App() {
     try {
       setBoard(await putBoard(file))
       setReport(null) // a report from the old board no longer matches
+      setPromotion((p) => ({ ...p, legs: [] })) // promo legs were picked from the old board
     } catch (e) {
       setError(message(e))
     } finally {
@@ -139,7 +140,7 @@ function App() {
         />
       </header>
 
-      <BoardPanel board={board} uploading={uploading} onFile={upload} />
+      <BoardPanel board={board} uploading={uploading} locked={uploading || running} onFile={upload} />
 
       {options && settings && (
         <>
@@ -187,7 +188,7 @@ function App() {
       {report && settings && (
         <ReportView
           report={report}
-          top={Math.floor(positive(settings.top) ?? DEFAULT_TOP)}
+          top={count(settings.top) ?? DEFAULT_TOP}
           slipType={settings.slipType}
           slipSize={settings.slipSize}
           onFilter={(f) => change({ ...settings, ...f })}

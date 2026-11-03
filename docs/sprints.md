@@ -133,3 +133,19 @@ architecture is in `docs/adr/0001-web-app-single-container.md`.
   install steps.
 
 **Review:** done 2026-11-02.
+
+## Code review (web app changes since 9a16d2e)
+
+Ten findings, all fixed test-first:
+- A run going when the board was replaced could report the old board's results on the new one: the board is locked
+  while a run is going.
+- Promo legs outlived their league or board and failed the whole run: Run is blocked with a reason when a promo
+  leg's league isn't selected, a new board clears promo legs, and engine messages say "promo leg", not `--promoLeg`.
+- A run kept scraping after its browser went away: closing the stream cancels the run at its next request.
+- Board upload blocked the event loop while parsing: it runs on a worker thread and primes the board cache.
+- Bonus and boost runs sent `feed_promos: true` and got a spurious warning: only sent when they apply.
+- The no-games error told live-fetch CLI users to save a board: it now fits both front doors.
+- Games with only dropped feed promos were still fetched from FanDuel: they're left out.
+- The board was parsed twice per run: `report_for` hands its parse to `run`.
+- The board cache could hand out a stale payload between concurrent requests: it's swapped whole under a lock.
+- "Legs to show" took 0.5 and showed an empty table: whole numbers of 1 or more only.

@@ -33,6 +33,12 @@ export function defaults(o: Options): Settings {
   }
 }
 
+/** A whole number of 1 or more, or null. */
+export const count = (s: string) => {
+  const n = Number(s)
+  return s.trim() !== '' && Number.isInteger(n) && n >= 1 ? n : null
+}
+
 export const positive = (s: string) => {
   const n = Number(s)
   return s.trim() !== '' && Number.isFinite(n) && n > 0 ? n : null
@@ -56,7 +62,7 @@ export function load(o: Options): Settings {
     hours: pos(saved.hours) ?? base.hours,
     devig: o.devig.includes(saved.devig as string) ? (saved.devig as string) : base.devig,
     refSlip: o.ref_slips.includes(saved.refSlip as string) ? (saved.refSlip as string) : base.refSlip,
-    top: pos(saved.top) ?? base.top,
+    top: str(saved.top) !== null && count(str(saved.top)!) !== null ? str(saved.top)! : base.top,
     slipType: ['all', 'power', 'flex'].includes(saved.slipType as string) ? (saved.slipType as Settings['slipType']) : 'all',
     slipSize: [2, 3, 4, 5, 6].includes(saved.slipSize as number) ? (saved.slipSize as number) : 'all',
   }
@@ -96,6 +102,11 @@ export function toRun(s: Settings, noCache: boolean, promo: Promotion = NO_PROMO
     if (boost === null || boost <= 1) return 'Boost must be more than 1 (e.g. 1.4).'
   }
   if (promo.kind === 'legs' && promo.legs.length === 0) return 'Add a promo leg, or set Promotion to None.'
+  if (promo.kind === 'legs') {
+    const off = promo.legs.find((l) => !s.sports.includes(l.sport))
+    if (off) return `${off.player} is an ${off.sport} promo leg, but ${off.sport} isn't selected.`
+  }
+  const feedPromosApply = promo.kind !== 'bonus' && promo.kind !== 'boost'
 
   return {
     sports: s.sports,
@@ -107,6 +118,6 @@ export function toRun(s: Settings, noCache: boolean, promo: Promotion = NO_PROMO
     bonus: promo.kind === 'bonus',
     boost,
     promo_legs: promo.kind === 'legs' ? promo.legs : [],
-    feed_promos: promo.feedPromos,
+    feed_promos: promo.feedPromos && feedPromosApply, // the engine drops them under a bonus or boost anyway
   }
 }

@@ -297,3 +297,40 @@ def test_problems_found_before_running_are_still_plain_http_errors(tmp_path):
     assert client.post("/api/run", json={}, headers=NDJSON).status_code == 409
     upload(client)
     assert client.post("/api/run", json={"stake": 0}, headers=NDJSON).status_code == 422
+
+
+# --- review fixes --------------------------------------------------------------
+
+def test_closing_the_stream_cancels_the_run():
+    import threading
+
+    from ppopt.progress import RunCancelled
+    from ppopt.web import stream_run
+
+    finished = threading.Event()
+
+    def work(progress):
+        try:
+            while True:
+                progress.tick()  # a request every loop, like a book fetching props
+                threading.Event().wait(0.01)
+        except RunCancelled:
+            finished.set()
+            raise
+
+    lines = stream_run(work)
+    first = json.loads(next(lines))
+    assert first["type"] == "progress"
+    lines.close()  # what Starlette does when the client goes away
+    assert finished.wait(2), "the worker kept running after the stream closed"
+
+
+def test_upload_primes_the_board_cache(tmp_path, monkeypatch):
+    client = engine_app(tmp_path)
+    upload(client)
+    real = json.loads
+    parsed = []
+    monkeypatch.setattr("ppopt.web.json.loads", lambda s, *a, **k: parsed.append(len(s)) or real(s, *a, **k))
+    client.get("/api/board/lines")
+    board_size = (tmp_path / "data" / "board.json").stat().st_size
+    assert board_size not in parsed, "the board was parsed again after upload"

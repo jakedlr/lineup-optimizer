@@ -110,13 +110,14 @@ def _leg_dict(leg, cfg: Config) -> dict:
     }
 
 
-def run(args: argparse.Namespace, root: Path, payload: dict, markets: list, now: datetime) -> dict:
-    """Price everything and build the report. Raises UserError for fixable input problems."""
+def run(args: argparse.Namespace, root: Path, payload: dict, markets: list, now: datetime, parsed=None) -> dict:
+    """Price everything and build the report. Raises UserError for fixable input problems.
+    `parsed` is the board's (lines, feed promos) when the caller has already parsed it."""
     cfg = Config.load(root)
     table = load_payouts(args.payouts or config_file(root, "payouts.json"))
     warnings = []
 
-    lines, feed_promos = prizepicks.parse_projections(payload, cfg, args.sports, now, args.hours)
+    lines, feed_promos = parsed or prizepicks.parse_projections(payload, cfg, args.sports, now, args.hours)
     if feed_promos and (args.bonus or args.boost):
         warnings.append(f"ignored {len(feed_promos)} feed promo line(s): only one promotion is allowed per lineup")
         feed_promos = []
@@ -126,14 +127,14 @@ def run(args: argparse.Namespace, root: Path, payload: dict, markets: list, now:
     try:
         manual = [parse_promo_leg(values, cfg) for values in args.promo_legs]
     except ValueError as e:
-        raise UserError(f"--promoLeg: {e}") from e
+        raise UserError(f"promo leg: {e}") from e
 
     legs, unmatched = price_lines(lines, markets, cfg, args.devig)
     for promo in manual:
         try:
             legs.append(price_promo(promo, markets, cfg, args.devig))
         except PromoError as e:
-            raise UserError(f"--promoLeg {promo.player}: {e}") from e
+            raise UserError(f"promo leg {promo.player}: {e}") from e
     for promo in feed_promos:
         try:
             legs.append(price_promo(promo, markets, cfg, args.devig))
@@ -223,18 +224,20 @@ def report_for(args, root: Path, payload: dict, http: Http, now: datetime, colle
     collect = collect or collect_markets
     cfg = Config.load(root)
     lines, promos = prizepicks.parse_projections(payload, cfg, args.sports, now, args.hours)
-    wanted = {l.teams for l in lines} | {p.teams for p in promos}
+    # Feed promos are dropped under these, so their games aren't worth fetching for.
+    used_promos = [] if (args.no_promos or args.bonus or args.boost) else promos
+    wanted = {l.teams for l in lines} | {p.teams for p in used_promos}
     try:
         wanted |= {parse_promo_leg(v, cfg).teams for v in args.promo_legs}
     except ValueError as e:
-        raise UserError(f"--promoLeg: {e}") from e
+        raise UserError(f"promo leg: {e}") from e
     if not wanted:
-        raise UserError(f"no games on the board start in the next {args.hours:g} hours "
-                        f"in {','.join(args.sports)}; save a fresh board from PrizePicks")
+        raise UserError(f"no PrizePicks games start in the next {args.hours:g} hours in {','.join(args.sports)}; "
+                        "try more hours or other leagues, or save a fresh board if this one is old")
     books = json.loads(config_file(root, "books.json").read_text())
     progress = getattr(http, "progress", None)
     if progress:
-        games = Counter(sport for sport, _ in {(l.sport, l.teams) for l in [*lines, *promos]})
+        games = Counter(sport for sport, _ in {(l.sport, l.teams) for l in [*lines, *used_promos]})
         estimate_requests(progress, books, args.sports, games)
         progress.step("Fetching sportsbook odds")
     markets, book_warnings = collect(http, cfg, books, args.sports, now, args.hours, wanted)
@@ -242,7 +245,7 @@ def report_for(args, root: Path, payload: dict, http: Http, now: datetime, colle
         raise UserError("no sportsbook odds available: " + "; ".join(book_warnings or ["no markets in window"]))
     if progress:
         progress.step("Pricing lines and building slips")
-    report = run(args, root, payload, markets, now)
+    report = run(args, root, payload, markets, now, parsed=(lines, promos))
     report["warnings"] = book_warnings + report["warnings"]
     return report
 

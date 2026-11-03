@@ -5,6 +5,7 @@ import { ago, minutesSince, STALE_MINUTES } from './format'
 interface Props {
   board: BoardInfo | null | undefined // undefined while loading
   uploading: boolean
+  locked: boolean // while uploading or running: a new board mid-run would be reported on with the old one's results
   onFile: (file: File) => void
 }
 
@@ -55,7 +56,7 @@ function HowToGetABoard({ open }: { open: boolean }) {
   )
 }
 
-export function BoardPanel({ board, uploading, onFile }: Props) {
+export function BoardPanel({ board, uploading, locked, onFile }: Props) {
   const now = useNow()
   const input = useRef<HTMLInputElement>(null)
   const [dragging, setDragging] = useState(false)
@@ -63,6 +64,7 @@ export function BoardPanel({ board, uploading, onFile }: Props) {
   const drop = (e: DragEvent) => {
     e.preventDefault()
     setDragging(false)
+    if (locked) return
     const file = e.dataTransfer.files[0]
     if (file) onFile(file)
   }
@@ -76,7 +78,7 @@ export function BoardPanel({ board, uploading, onFile }: Props) {
       data-dragging={dragging || undefined}
       onDragOver={(e) => {
         e.preventDefault()
-        setDragging(true)
+        if (!locked) setDragging(true)
       }}
       onDragLeave={() => setDragging(false)}
       onDrop={drop}
@@ -101,7 +103,7 @@ export function BoardPanel({ board, uploading, onFile }: Props) {
         )}
       </div>
 
-      <button type="button" className="secondary" disabled={uploading} onClick={() => input.current?.click()}>
+      <button type="button" className="secondary" disabled={locked} onClick={() => input.current?.click()}>
         {uploading ? 'Uploading…' : board ? 'Replace board' : 'Choose file'}
       </button>
       <input
@@ -110,6 +112,7 @@ export function BoardPanel({ board, uploading, onFile }: Props) {
         accept="application/json,.json"
         aria-label="Choose board file"
         className="visually-hidden"
+        disabled={locked}
         onChange={(e) => {
           const file = e.target.files?.[0]
           if (file) onFile(file)

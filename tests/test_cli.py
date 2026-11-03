@@ -253,7 +253,7 @@ def test_report_for_a_board_with_no_games_in_the_window_says_so_without_fetching
 
     args = cli.parse_args([])
     later = datetime(2026, 11, 2, 19, 0, tzinfo=timezone.utc)  # every fixture game has started
-    with pytest.raises(cli.UserError, match="no games on the board start in the next 24 hours"):
+    with pytest.raises(cli.UserError, match="no PrizePicks games start in the next 24 hours"):
         cli.report_for(args, ROOT, pp_payload(), http=None, now=later, collect=collect)
 
 
@@ -307,3 +307,40 @@ def test_collect_markets_passes_on_book_warnings(monkeypatch):
     monkeypatch.setattr(cli.fanduel, "collect", lambda *a, **k: [])
     _, warnings = cli.collect_markets(None, None, {"draftkings": {}, "fanduel": {}}, ["NHL"], NOW, 24, set())
     assert warnings == ["DraftKings has no NHL player props posted yet for 2 games in the window"]
+
+
+# --- review fixes --------------------------------------------------------------
+
+def test_no_games_in_window_message_fits_cli_and_app():
+    later = datetime(2026, 11, 2, 19, 0, tzinfo=timezone.utc)
+    with pytest.raises(cli.UserError) as e:
+        cli.report_for(cli.parse_args(["--sports", "NHL"]), ROOT, pp_payload(), http=None, now=later,
+                       collect=lambda *a: (_ for _ in ()).throw(AssertionError("no fetch")))
+    msg = str(e.value)
+    assert "no PrizePicks games start in the next 24 hours in NHL" in msg
+    assert "more hours" in msg and "fresh board" in msg
+
+
+@pytest.mark.parametrize("argv", [["--no-promos"], ["--bonus"], ["--boost", "1.4"]])
+def test_games_with_only_dropped_feed_promos_are_not_fetched(argv):
+    payload = pp_payload()
+    # Keep only the taco promo projection: its game then has nothing but a feed promo.
+    payload["data"] = [p for p in payload["data"] if p["attributes"].get("is_promo")]
+    assert payload["data"]
+    with pytest.raises(cli.UserError, match="no PrizePicks games"):
+        cli.report_for(cli.parse_args(argv), ROOT, payload, http=None, now=NOW,
+                       collect=lambda *a: (_ for _ in ()).throw(AssertionError("fetched a promo-only game")))
+
+
+def test_report_for_parses_the_board_once(monkeypatch):
+    calls = []
+    real = cli.prizepicks.parse_projections
+    monkeypatch.setattr(cli.prizepicks, "parse_projections", lambda *a, **k: calls.append(1) or real(*a, **k))
+    cli.report_for(cli.parse_args([]), ROOT, pp_payload(), http=None, now=NOW, collect=lambda *a: (markets(), []))
+    assert len(calls) == 1
+
+
+def test_promo_leg_errors_name_the_leg_not_the_cli_flag():
+    with pytest.raises(cli.UserError) as e:
+        run(["--promoLeg", "NFL", "CHI vs NE", "Nobody", "Over 200.5 Pass Yards"])
+    assert str(e.value).startswith("promo leg Nobody:")

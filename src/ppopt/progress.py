@@ -11,6 +11,10 @@ from typing import Callable
 BOOK_NAMES = {"draftkings": "DraftKings", "fanduel": "FanDuel"}
 
 
+class RunCancelled(Exception):
+    """Nobody is waiting for this run any more (the browser went away); stop fetching."""
+
+
 class Progress:
     def __init__(self, emit: Callable[[dict], None]):
         self.emit = emit
@@ -18,6 +22,7 @@ class Progress:
         self.done_by: Counter[str] = Counter()
         self.current: str | None = None
         self.label = ""
+        self.cancelled = False
 
     @property
     def done(self) -> int:
@@ -39,7 +44,13 @@ class Progress:
         self.current = book
         self.label = f"{BOOK_NAMES.get(book, book)} {sport}"
 
+    def cancel(self):
+        """Ask the run to stop. It does so at its next request (each costs 1-2 s, so promptly)."""
+        self.cancelled = True
+
     def tick(self):
+        if self.cancelled:
+            raise RunCancelled()
         self.done_by[self.current or ""] += 1
         self._emit()
 
