@@ -200,7 +200,20 @@ def collect_markets(http: Http, cfg: Config, books: dict, sports, now, hours, wa
             markets += collect(http, cfg, books[name], sports, now, hours, **kwargs)
         except (FetchError, KeyError, ValueError) as e:
             warnings.append(f"{name} unavailable: {e}")
+            if getattr(http, "progress", None):
+                http.progress.close(name)
     return markets, warnings
+
+
+def estimate_requests(progress, books: dict, sports: list[str], games: Counter):
+    """Plan each book's requests from the board alone; the books refine it once they've read each league.
+    Set quietly: the caller's next step() announces the whole estimate at once."""
+    for sport in sports:
+        dk, fd = books["draftkings"]["sports"].get(sport), books["fanduel"]["sports"].get(sport)
+        if dk:
+            progress.planned[("draftkings", sport)] = 1 + (len(dk["subcategories"]) if games[sport] else 0)
+        if fd:
+            progress.planned[("fanduel", sport)] = 1 + games[sport] * len(fd["tabs"])
 
 
 def report_for(args, root: Path, payload: dict, http: Http, now: datetime, collect=None) -> dict:
@@ -217,9 +230,16 @@ def report_for(args, root: Path, payload: dict, http: Http, now: datetime, colle
         raise UserError(f"no games on the board start in the next {args.hours:g} hours "
                         f"in {','.join(args.sports)}; save a fresh board from PrizePicks")
     books = json.loads((root / "books.json").read_text())
+    progress = getattr(http, "progress", None)
+    if progress:
+        games = Counter(sport for sport, _ in {(l.sport, l.teams) for l in [*lines, *promos]})
+        estimate_requests(progress, books, args.sports, games)
+        progress.step("Fetching sportsbook odds")
     markets, book_warnings = collect(http, cfg, books, args.sports, now, args.hours, wanted)
     if not markets:
         raise UserError("no sportsbook odds available: " + "; ".join(book_warnings or ["no markets in window"]))
+    if progress:
+        progress.step("Pricing lines and building slips")
     report = run(args, root, payload, markets, now)
     report["warnings"] = book_warnings + report["warnings"]
     return report

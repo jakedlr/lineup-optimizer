@@ -55,6 +55,7 @@ class Http:
         delay: tuple[float, float] = (1.0, 2.0),
         fetch=scrapling_fetch,
         sleep=time.sleep,
+        progress=None,
     ):
         self.cache_dir = Path(cache_dir)
         self.ttl = ttl
@@ -62,6 +63,7 @@ class Http:
         self.delay = delay
         self.fetch = fetch
         self.sleep = sleep
+        self.progress = progress  # ppopt.progress.Progress, ticked once per request
         self._live_requests = 0
 
     def _cache_path(self, url: str) -> Path:
@@ -70,7 +72,9 @@ class Http:
     def get_json(self, url: str, browser: bool = False):
         path = self._cache_path(url)
         if self.use_cache and path.exists() and time.time() - path.stat().st_mtime < self.ttl:
-            return json.loads(path.read_text())
+            data = json.loads(path.read_text())
+            self._tick()
+            return data
 
         if self._live_requests:
             self.sleep(random.uniform(*self.delay))
@@ -86,4 +90,9 @@ class Http:
 
         self.cache_dir.mkdir(parents=True, exist_ok=True)
         path.write_bytes(body if isinstance(body, bytes) else body.encode())
+        self._tick()
         return data
+
+    def _tick(self):
+        if self.progress is not None:
+            self.progress.tick()

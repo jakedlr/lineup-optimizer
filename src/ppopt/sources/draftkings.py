@@ -83,11 +83,15 @@ def collect(http: Http, cfg: Config, conf: dict, sports: list[str], now: datetim
         if not sport_conf:
             continue
         base = BASE.format(state=conf["state"], league=sport_conf["league"])
+        progress = getattr(http, "progress", None)
+        if progress:
+            progress.book("draftkings", sport)
         league = http.get_json(base)
         events = events_in_window(league, cfg, sport, now, hours)
-        if not events:
-            continue
-        for stat, (cat, sub) in subcategory_ids(league, sport_conf["subcategories"]).items():
+        subcats = subcategory_ids(league, sport_conf["subcategories"]) if events else {}
+        if progress:
+            progress.plan("draftkings", sport, 1 + len(subcats))
+        for stat, (cat, sub) in subcats.items():
             payload = http.get_json(f"{base}/categories/{cat}/subcategories/{sub}")
             markets += parse_markets(payload, sport, stat, events)
     return markets

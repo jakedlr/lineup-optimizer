@@ -11,7 +11,7 @@ architecture is in `docs/adr/0001-web-app-single-container.md`.
 | 1 | Drop a board, run with defaults, see a report | Board upload persists to the volume and shows its age; Run returns a Report rendered as Best Slips / Top Legs / Unpriced; e2e smoke passes |
 | 2 | Run settings | League chips, stake, Advanced panel (hours, devig, ref slip, top N, no-cache); type/size filters on the Report without re-running; settings remembered (promotions excluded); JSON download |
 | 3 | Promotions | None / Bonus / Boost × control; feed promos toggle; promo-leg picker built from the board |
-| 4 | Progress and polish | Streamed run steps; motion and interaction pass (Emil Kowalski skills); taste-skill review; dark mode; mobile reflow; config override mount; README leads with the app |
+| 4 | Progress and polish | ~~Streamed run steps~~ (done in Sprint 3); motion and interaction pass (Emil Kowalski skills); taste-skill review; dark mode; mobile reflow; config override mount; README leads with the app |
 
 ## Sprint 0: Tooling and walking skeleton
 
@@ -84,5 +84,16 @@ architecture is in `docs/adr/0001-web-app-single-container.md`.
 - [x] Promo-leg picker: search the board's lines, choose one, pick Over/Under and a half-point promo line, add; remove from the list
 - [x] Promotions are never remembered
 - [x] e2e: a promo leg picked from the board shows up priced (`manual`) in Top Legs; Bonus entry runs Power slips only
+- [x] Run progress (pulled forward from Sprint 4 at review): a progress bar with a percentage and the current step
 
-**Review:** _pending_
+**Progress notes**
+- Progress is counted in sportsbook requests, which is where a run spends its time (1–2 s polite delay each);
+  pricing the board's lines afterwards is instant.
+- The engine estimates each book's requests per league from the board and `books.json` before fetching; each
+  book replaces its estimate with the exact count once it has read that league. Tests pin that a collector's plan
+  equals the requests it makes. A failed book's unfetched requests are dropped from the total.
+- `POST /api/run` streams NDJSON (progress events, then `report` or `error`) when asked with
+  `Accept: application/x-ndjson`; otherwise it still returns plain JSON. The bar never moves backwards.
+- Live check, 2026-11-02: first estimate 46, actual 41, 66 s with fresh odds.
+
+**Review:** done 2026-11-02, with run progress added.

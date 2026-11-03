@@ -10,13 +10,15 @@ Paths come from the environment so the same code runs from a checkout and from t
 
 import json
 import os
+import queue
+import threading
 from datetime import datetime, timezone
 from pathlib import Path
 
 from typing import Annotated, Literal
 
-from fastapi import Body, FastAPI, HTTPException, Query, UploadFile
-from fastapi.responses import FileResponse
+from fastapi import Body, FastAPI, HTTPException, Query, Request, UploadFile
+from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from . import cli
@@ -24,6 +26,7 @@ from .matching import Config, game_id, matchup_label
 from .models import BookMarket
 from .odds import DEVIG_METHODS
 from .payouts import load_payouts
+from .progress import Progress
 from .sources import prizepicks
 from .sources.http import Http
 
@@ -183,22 +186,48 @@ def create_app(static_dir=None, data_dir=None, root=None, collect=None, now=None
         tmp.replace(board_path)
         return board_info()
 
-    @app.post("/api/run")
-    def run(settings: Annotated[RunSettings | None, Body()] = None) -> dict:
+    @app.post("/api/run", response_model=None)
+    def run(request: Request, settings: Annotated[RunSettings | None, Body()] = None):
         if not board_path.is_file():
             raise HTTPException(409, "upload a board before running")
         payload = load_board()
         args = (settings or RunSettings()).apply(cli.parse_args([]))
-        http = Http(data_dir / "cache", use_cache=not args.no_cache)
-        try:
-            report = cli.report_for(args, root, payload, http, now(), collect=collect)
-        except cli.UserError as e:
-            raise HTTPException(422, str(e)) from e
 
-        age = (now().timestamp() - board_path.stat().st_mtime) / 60
-        if age > cli.STALE_MINUTES:
-            report["warnings"].insert(0, f"board is {age:.0f} minutes old; PrizePicks lines may have moved")
-        return report
+        def report(progress: Progress | None = None) -> dict:
+            http = Http(data_dir / "cache", use_cache=not args.no_cache, progress=progress)
+            result = cli.report_for(args, root, payload, http, now(), collect=collect)
+            age = (now().timestamp() - board_path.stat().st_mtime) / 60
+            if age > cli.STALE_MINUTES:
+                result["warnings"].insert(0, f"board is {age:.0f} minutes old; PrizePicks lines may have moved")
+            return result
+
+        if "application/x-ndjson" not in request.headers.get("accept", ""):
+            try:
+                return report()
+            except cli.UserError as e:
+                raise HTTPException(422, str(e)) from e
+
+        # Streamed: one JSON object per line, progress events then a final "report" or "error".
+        events: queue.Queue = queue.Queue()
+
+        def work():
+            try:
+                events.put({"type": "report", "report": report(Progress(lambda e: events.put({"type": "progress", **e})))})
+            except cli.UserError as e:
+                events.put({"type": "error", "detail": str(e)})
+            except Exception as e:  # noqa: BLE001 - the stream has started, so this is the only way to say so
+                events.put({"type": "error", "detail": f"the engine failed: {e}"})
+
+        threading.Thread(target=work, daemon=True).start()
+
+        def lines():
+            while True:
+                event = events.get()
+                yield json.dumps(event) + "\n"
+                if event["type"] != "progress":
+                    return
+
+        return StreamingResponse(lines(), media_type="application/x-ndjson")
 
     @app.get("/api/{rest:path}", include_in_schema=False)
     def api_not_found(rest: str):

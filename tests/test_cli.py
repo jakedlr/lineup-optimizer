@@ -255,3 +255,44 @@ def test_report_for_a_board_with_no_games_in_the_window_says_so_without_fetching
     later = datetime(2026, 11, 2, 19, 0, tzinfo=timezone.utc)  # every fixture game has started
     with pytest.raises(cli.UserError, match="no games on the board start in the next 24 hours"):
         cli.report_for(args, ROOT, pp_payload(), http=None, now=later, collect=collect)
+
+
+# --- progress ----------------------------------------------------------------
+
+from types import SimpleNamespace
+
+from ppopt.progress import Progress
+
+
+def test_report_for_estimates_requests_from_the_board_before_fetching():
+    seen = []
+    http = SimpleNamespace(progress=Progress(seen.append))
+    snapshot = {}
+    collect = lambda h, *a: (snapshot.update(seen[-1]), (markets(), []))[1]
+    cli.report_for(cli.parse_args([]), ROOT, pp_payload(), http=http, now=NOW, collect=collect)
+
+    books = json.loads((ROOT / "books.json").read_text())
+    games = {"NFL": 1, "NBA": 1, "NHL": 0, "MLB": 0}  # games on the fixture board
+    dk = sum(1 + (len(books["draftkings"]["sports"][s]["subcategories"]) if n else 0) for s, n in games.items())
+    fd = sum(1 + n * len(books["fanduel"]["sports"][s]["tabs"]) for s, n in games.items())
+    assert snapshot == {"done": 0, "total": dk + fd, "step": "Fetching sportsbook odds"}
+    assert seen[0] == snapshot  # the estimate goes out as one event, not one per league
+    assert seen[-1]["step"] == "Pricing lines and building slips"
+
+
+def test_a_failing_book_is_closed_out_of_the_progress(monkeypatch):
+    from ppopt.sources.http import FetchError
+
+    p = Progress(lambda e: None)
+    http = SimpleNamespace(progress=p)
+
+    def broken(http, *a, **k):
+        http.progress.book("draftkings", "NFL")
+        http.progress.tick()
+        raise FetchError("HTTP 403")
+
+    monkeypatch.setattr(cli.draftkings, "collect", broken)
+    monkeypatch.setattr(cli.fanduel, "collect", lambda *a, **k: [])
+    p.plan("draftkings", "NFL", 15)
+    cli.collect_markets(http, None, {"draftkings": {}, "fanduel": {}}, ["NFL"], NOW, 24, set())
+    assert p.planned == {("draftkings", "*"): 1}

@@ -259,3 +259,41 @@ def test_board_lines_list_priceable_lines_in_the_window(tmp_path):
     nba = client.get("/api/board/lines", params={"sports": "NBA", "hours": 24}).json()
     assert nba and {l["sport"] for l in nba} == {"NBA"}
     assert client.get("/api/board/lines", params={"hours": 0.0001}).json() == []
+
+
+# --- streamed progress -------------------------------------------------------
+
+NDJSON = {"Accept": "application/x-ndjson"}
+
+
+def stream(client, body=None):
+    r = client.post("/api/run", json=body or {}, headers=NDJSON)
+    assert r.headers["content-type"].startswith("application/x-ndjson")
+    return r, [json.loads(line) for line in r.text.splitlines() if line]
+
+
+def test_run_streams_progress_then_the_report(tmp_path):
+    client = engine_app(tmp_path)
+    upload(client)
+    r, events = stream(client)
+    assert r.status_code == 200
+    progress = [e for e in events if e["type"] == "progress"]
+    assert progress and all({"done", "total", "step"} <= set(e) for e in progress)
+    assert progress[0]["done"] == 0 and progress[0]["total"] > 0
+    assert progress[-1]["step"] == "Pricing lines and building slips"
+    assert events[-1]["type"] == "report"
+    assert events[-1]["report"]["legs"]
+
+
+def test_streamed_engine_errors_end_the_stream(tmp_path):
+    client = engine_app(tmp_path, collect=lambda *a: ([], ["draftkings unavailable: blocked"]))
+    upload(client)
+    _, events = stream(client)
+    assert events[-1] == {"type": "error", "detail": "no sportsbook odds available: draftkings unavailable: blocked"}
+
+
+def test_problems_found_before_running_are_still_plain_http_errors(tmp_path):
+    client = engine_app(tmp_path)
+    assert client.post("/api/run", json={}, headers=NDJSON).status_code == 409
+    upload(client)
+    assert client.post("/api/run", json={"stake": 0}, headers=NDJSON).status_code == 422

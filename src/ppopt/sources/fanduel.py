@@ -85,10 +85,17 @@ def collect(
         sport_conf = conf["sports"].get(sport)
         if not sport_conf:
             continue
+        progress = getattr(http, "progress", None)
+        if progress:
+            progress.book("fanduel", sport)
         league = http.get_json(LEAGUE.format(state=conf["state"], page=sport_conf["page"], key=API_KEY))
-        for event_id, teams in parse_events(league, cfg, sport, now, hours).items():
-            if wanted_games is not None and teams not in wanted_games:
-                continue
+        events = {
+            event_id: teams for event_id, teams in parse_events(league, cfg, sport, now, hours).items()
+            if wanted_games is None or teams in wanted_games
+        }
+        if progress:
+            progress.plan("fanduel", sport, 1 + len(events) * len(sport_conf["tabs"]))
+        for event_id, teams in events.items():
             for tab in sport_conf["tabs"]:
                 url = EVENT.format(state=conf["state"], key=API_KEY, event=event_id, tab=tab)
                 markets += parse_event_markets(http.get_json(url), sport, teams, sport_conf["markets"])

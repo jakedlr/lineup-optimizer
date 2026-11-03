@@ -432,3 +432,83 @@ describe('Promotions', () => {
     expect(within(promotion()).getByRole('button', { name: 'None' })).toHaveAttribute('aria-pressed', 'true')
   })
 })
+
+describe('Run progress', () => {
+  const withBoard = { 'GET /api/board': () => Response.json({ saved_at: minutesAgo(1), projections: 11 }) }
+
+  /** A run response we feed by hand, one chunk at a time. */
+  function controlledRun() {
+    let controller!: ReadableStreamDefaultController<Uint8Array>
+    const body = new ReadableStream<Uint8Array>({ start: (c) => void (controller = c) })
+    const enc = new TextEncoder()
+    return {
+      response: () => new Response(body, { headers: { 'Content-Type': 'application/x-ndjson' } }),
+      send: (text: string) => controller.enqueue(enc.encode(text)),
+      event: (e: object) => controller.enqueue(enc.encode(JSON.stringify(e) + '\n')),
+      close: () => controller.close(),
+    }
+  }
+
+  async function start() {
+    const run = controlledRun()
+    const fetchMock = stub({ ...withBoard, 'POST /api/run': run.response })
+    render(<App />)
+    await userEvent.click(await screen.findByRole('button', { name: /^run$/i }))
+    return { run, fetchMock }
+  }
+
+  it('asks the engine to stream progress', async () => {
+    const { run, fetchMock } = await start()
+    const init = fetchMock.mock.calls.find(([url]) => url === '/api/run')![1]!
+    expect(new Headers(init.headers).get('Accept')).toBe('application/x-ndjson')
+    run.close()
+  })
+
+  it('shows a progress bar with a percentage and the current step', async () => {
+    const { run } = await start()
+    const bar = await screen.findByRole('progressbar', { name: /run progress/i })
+    expect(bar).toHaveAttribute('aria-valuenow', '0')
+
+    run.event({ type: 'progress', done: 4, total: 10, step: 'DraftKings NBA' })
+    await screen.findByText('40%')
+    expect(bar).toHaveAttribute('aria-valuenow', '40')
+    expect(screen.getByText(/draftkings nba/i)).toBeInTheDocument()
+    expect(screen.getByText(/4 of 10 requests/i)).toBeInTheDocument()
+
+    run.event({ type: 'progress', done: 5, total: 20, step: 'FanDuel NBA' }) // plan grew: never step backwards
+    await screen.findByText(/fanduel nba/i)
+    expect(bar).toHaveAttribute('aria-valuenow', '40')
+
+    run.event({ type: 'report', report })
+    run.close()
+    expect(await screen.findByRole('region', { name: /best slips/i })).toBeInTheDocument()
+    expect(screen.queryByRole('progressbar')).not.toBeInTheDocument()
+  })
+
+  it('copes with events split across chunks', async () => {
+    const { run } = await start()
+    const line = JSON.stringify({ type: 'progress', done: 1, total: 4, step: 'FanDuel NFL' }) + '\n'
+    run.send(line.slice(0, 20))
+    run.send(line.slice(20) + JSON.stringify({ type: 'report', report }).slice(0, 50))
+    await screen.findByText('25%')
+    run.send(JSON.stringify({ type: 'report', report }).slice(50) + '\n')
+    run.close()
+    expect(await screen.findByRole('region', { name: /best slips/i })).toBeInTheDocument()
+  })
+
+  it('shows an error sent mid-run', async () => {
+    const { run } = await start()
+    run.event({ type: 'progress', done: 1, total: 4, step: 'DraftKings NFL' })
+    run.event({ type: 'error', detail: 'no sportsbook odds available: draftkings unavailable: HTTP 403' })
+    run.close()
+    expect(await screen.findByRole('alert')).toHaveTextContent(/draftkings unavailable/i)
+    expect(screen.queryByRole('progressbar')).not.toBeInTheDocument()
+  })
+
+  it('says so if the stream ends without a report', async () => {
+    const { run } = await start()
+    run.event({ type: 'progress', done: 1, total: 4, step: 'DraftKings NFL' })
+    run.close()
+    expect(await screen.findByRole('alert')).toHaveTextContent(/ended before/i)
+  })
+})

@@ -3,6 +3,8 @@ import { getBoard, getOptions, putBoard, runReport, type BoardInfo, type Options
 import { BoardPanel } from './BoardPanel'
 import { ReportView } from './ReportView'
 import { PromoPanel } from './PromoPanel'
+import { advance, type Shown } from './progress'
+import { RunProgressBar } from './RunProgressBar'
 import { DEFAULT_TOP, load, NO_PROMOTION, positive, save, toRun, type Promotion, type Settings } from './settings'
 import { SettingsPanel } from './SettingsPanel'
 
@@ -44,6 +46,7 @@ function App() {
   const [settings, setSettings] = useState<Settings | null>(null)
   const [noCache, setNoCache] = useState(false)
   const [promotion, setPromotion] = useState<Promotion>(NO_PROMOTION)
+  const [progress, setProgress] = useState<Shown | null>(null)
 
   useEffect(() => {
     getBoard()
@@ -82,8 +85,9 @@ function App() {
     if (!request || typeof request === 'string') return
     setRunning(true)
     setError(null)
+    setProgress(null)
     try {
-      setReport(await runReport(request))
+      setReport(await runReport(request, (p) => setProgress((prev) => advance(prev, p))))
     } catch (e) {
       setError(message(e))
     } finally {
@@ -124,12 +128,10 @@ function App() {
         >
           {running ? 'Running…' : 'Run'}
         </button>
-        {running ? (
-          <span className="muted small">Fetching sportsbook odds. This can take a minute.</span>
-        ) : (
-          problem && <span className="warn">{problem}</span>
-        )}
+        {!running && problem && <span className="warn">{problem}</span>}
       </div>
+
+      {running && <RunProgressBar progress={progress} />}
 
       {error && (
         <p className="error" role="alert">

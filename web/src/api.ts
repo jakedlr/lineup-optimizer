@@ -118,12 +118,43 @@ export async function getOptions(): Promise<Options> {
   return json(await fetch('/api/options'))
 }
 
-export async function runReport(settings: RunSettings): Promise<Report> {
-  return json(
-    await fetch('/api/run', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(settings),
-    }),
-  )
+export interface RunProgress {
+  done: number
+  total: number
+  step: string
+}
+
+type RunEvent =
+  | ({ type: 'progress' } & RunProgress)
+  | { type: 'report'; report: Report }
+  | { type: 'error'; detail: string }
+
+/**
+ * Run the engine. The server streams NDJSON: progress events, then one "report" or "error".
+ * A plain JSON answer (an older server, or an error found before the run started) is handled too.
+ */
+export async function runReport(settings: RunSettings, onProgress: (p: RunProgress) => void = () => {}): Promise<Report> {
+  const res = await fetch('/api/run', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/x-ndjson' },
+    body: JSON.stringify(settings),
+  })
+  if (!res.ok || !res.headers.get('Content-Type')?.includes('ndjson') || !res.body) return json(res)
+
+  const reader = res.body.pipeThrough(new TextDecoderStream()).getReader()
+  let buffer = ''
+  for (;;) {
+    const { value, done } = await reader.read()
+    if (value) buffer += value
+    const lines = buffer.split('\n')
+    buffer = done ? '' : lines.pop()!
+    for (const line of lines) {
+      if (!line.trim()) continue
+      const event = JSON.parse(line) as RunEvent
+      if (event.type === 'progress') onProgress({ done: event.done, total: event.total, step: event.step })
+      else if (event.type === 'report') return event.report
+      else throw new ApiError(event.detail)
+    }
+    if (done) throw new ApiError('The run ended before the engine sent a report. Check the container logs.')
+  }
 }
