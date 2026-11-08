@@ -15,6 +15,7 @@ export interface Settings {
   top: string
   slipType: 'all' | 'power' | 'flex'
   slipSize: 'all' | number
+  notify: boolean // system notifications for runs that end in a hidden tab
 }
 
 const KEY = 'ppopt.settings.v1'
@@ -32,6 +33,7 @@ export function defaults(o: Options): Settings {
     top: String(DEFAULT_TOP),
     slipType: 'all',
     slipSize: 'all',
+    notify: false,
   }
 }
 
@@ -68,6 +70,7 @@ export function load(o: Options): Settings {
     top: str(saved.top) !== null && count(str(saved.top)!) !== null ? str(saved.top)! : base.top,
     slipType: ['all', 'power', 'flex'].includes(saved.slipType as string) ? (saved.slipType as Settings['slipType']) : 'all',
     slipSize: [2, 3, 4, 5, 6].includes(saved.slipSize as number) ? (saved.slipSize as number) : 'all',
+    notify: saved.notify === true,
   }
 }
 

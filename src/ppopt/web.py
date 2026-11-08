@@ -11,6 +11,7 @@ Paths come from the environment so the same code runs from a checkout and from t
 import json
 import os
 import queue
+import tempfile
 import threading
 from datetime import datetime, timezone
 from pathlib import Path
@@ -42,6 +43,8 @@ def markets_from_file(path: Path):
     markets = [BookMarket(**{**r, "teams": frozenset(r["teams"])}) for r in rows]
 
     def collect(http, cfg, books, sports, now, hours, wanted):
+        if http is not None:
+            http.count_live()  # canned odds stand in for the books, so a run on them is always fresh
         return [m for m in markets if m.sport in sports], []
 
     return collect
@@ -157,8 +160,9 @@ def create_app(static_dir=None, data_dir=None, root=None, collect=None, now=None
     def board_info() -> dict | None:
         if not board_path.is_file() or not meta_path.is_file():
             return None
-        meta = json.loads(meta_path.read_text())
-        saved = datetime.fromtimestamp(board_path.stat().st_mtime, timezone.utc)
+        with cache_lock:  # an upload rewrites the meta and swaps the board under this lock
+            meta = json.loads(meta_path.read_text())
+            saved = datetime.fromtimestamp(board_path.stat().st_mtime, timezone.utc)
         return {"saved_at": saved.isoformat(), "projections": meta["projections"]}
 
     @app.get("/api/health")
@@ -214,10 +218,12 @@ def create_app(static_dir=None, data_dir=None, root=None, collect=None, now=None
             raise HTTPException(422, "that file isn't a PrizePicks projections feed (expected a JSON object with a \"data\" list)")
 
         data_dir.mkdir(parents=True, exist_ok=True)
-        tmp = board_path.with_suffix(".tmp")
-        tmp.write_bytes(raw)
-        meta_path.write_text(json.dumps({"projections": len(payload["data"]), "filename": file.filename}))
+        # Each upload gets its own temp file, so two saving at once can't move each other's half-written board.
+        with tempfile.NamedTemporaryFile(dir=data_dir, prefix="board.", suffix=".tmp", delete=False) as f:
+            f.write(raw)
+        tmp = Path(f.name)
         with cache_lock:
+            meta_path.write_text(json.dumps({"projections": len(payload["data"]), "filename": file.filename}))
             tmp.replace(board_path)
             cache["board"] = (board_path.stat().st_mtime_ns, payload)
         return board_info()

@@ -6,7 +6,7 @@ test('container serves the shell and the engine answers', async ({ page, request
 
   await page.goto('/')
   await expect(page.getByRole('heading', { name: 'PrizePicks EV Optimizer' })).toBeVisible()
-  await expect(page.getByRole('status')).toHaveText('Engine online')
+  await expect(page.getByRole('status').filter({ hasText: /^Engine/ })).toHaveText('Engine online')
 })
 
 test('client routes fall back to the shell', async ({ page }) => {

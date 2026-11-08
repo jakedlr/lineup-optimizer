@@ -349,3 +349,49 @@ def test_promo_leg_errors_name_the_leg_not_the_cli_flag():
     with pytest.raises(cli.UserError) as e:
         run(["--promoLeg", "NFL", "CHI vs NE", "Nobody", "Over 200.5 Pass Yards"])
     assert str(e.value).startswith("promo leg Nobody:")
+
+
+# --- live requests -------------------------------------------------------------
+
+def _fetching_collect(http, *a):
+    http.get_json("https://book.test/odds")
+    return markets(), []
+
+
+def test_report_counts_live_sportsbook_requests_and_a_cached_rerun_counts_none(tmp_path):
+    from ppopt.sources.http import Http
+
+    fetch = lambda url, browser=False: (200, b"{}")
+    args = cli.parse_args([])
+    first = cli.report_for(args, ROOT, pp_payload(), Http(tmp_path, fetch=fetch), NOW, collect=_fetching_collect)
+    second = cli.report_for(args, ROOT, pp_payload(), Http(tmp_path, fetch=fetch), NOW, collect=_fetching_collect)
+    assert first["live_requests"] == 1
+    assert second["live_requests"] == 0
+
+
+def test_no_cache_report_counts_every_request_live(tmp_path):
+    from ppopt.sources.http import Http
+
+    fetch = lambda url, browser=False: (200, b"{}")
+    args = cli.parse_args(["--no-cache"])
+    cli.report_for(args, ROOT, pp_payload(), Http(tmp_path, fetch=fetch), NOW, collect=_fetching_collect)
+    http = Http(tmp_path, use_cache=not args.no_cache, fetch=fetch)
+    assert cli.report_for(args, ROOT, pp_payload(), http, NOW, collect=_fetching_collect)["live_requests"] == 1
+
+
+def test_live_requests_leave_out_the_prizepicks_fetch(tmp_path):
+    from ppopt.sources.http import Http
+
+    http = Http(tmp_path, fetch=lambda url, browser=False: (200, b"{}"), sleep=lambda s: None)
+    http.get_json("https://prizepicks.test/projections")  # the board, fetched before pricing
+    report = cli.report_for(cli.parse_args([]), ROOT, pp_payload(), http, NOW, collect=_fetching_collect)
+    assert report["live_requests"] == 1
+
+
+def test_main_json_output_carries_live_requests(tmp_path, capsys, monkeypatch):
+    pp_file = tmp_path / "pp.json"
+    pp_file.write_text(json.dumps(pp_payload()))
+    monkeypatch.setattr(cli, "collect_markets", lambda *a, **k: (markets(), []))
+    monkeypatch.setattr(cli, "utcnow", lambda: NOW)
+    assert cli.main(["--pp-file", str(pp_file), "--json"], root=ROOT) == 0
+    assert json.loads(capsys.readouterr().out)["live_requests"] == 0

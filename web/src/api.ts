@@ -44,6 +44,8 @@ export interface Report {
   unmatched: Record<string, number>
   unmatched_lines: UnpricedLine[]
   warnings: string[]
+  /** Sportsbook requests the run made live, not answered from the odds cache. 0 means a cached run. */
+  live_requests: number
 }
 
 export interface BoardInfo {

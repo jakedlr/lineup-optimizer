@@ -169,3 +169,38 @@ methods stay selectable. Terms are in `GLOSSARY.md` (*Devig method*, *Worst-case
 - On a two-way market the methods always rank the same way: multiplicative gives the favourite its lowest
   probability, power gives the underdog its lowest, and Shin equals additive. So worst case usually matches
   multiplicative and only differs for legs played on their less likely side or where books disagree.
+
+## Sprint 5: Run notifications
+
+When a fresh run finishes, or any run fails, the app says so: in the page, and on the tab and the desktop when
+you're looking elsewhere. Terms are in `GLOSSARY.md` (*Run*, *Odds cache*, *Run notification*). No new
+dependencies: the pop-up and the alerts use the browser's own APIs.
+
+**Done criteria**
+- [x] The report carries `live_requests`, the number of sportsbook requests the run made live (not from the odds
+      cache); canned odds (`PPOPT_ODDS_FILE`) count as live
+- [x] A fresh run that finishes shows a pop-up: "Run finished" with the slip count and the best slip's EV; a failed
+      run shows "Run failed" with the reason. A cached run shows nothing
+- [x] The pop-up is a polite live region, has a close button, auto-dismisses after about 6s when seen, fades in
+      (opacity only, none under reduced motion) and follows the ledger style
+- [x] If the tab is hidden when the run ends, the pop-up waits for you to come back, the tab title gets a `✓` (or
+      `✕`) prefix and the favicon a dot; both clear when the tab is visible again. No flashing
+- [x] Settings → Advanced has "Notify me when runs finish" (remembered). Turning it on asks for notification permission; when
+      granted, a hidden tab also gets a system notification (one at a time, clicking it focuses the tab and shows
+      the report)
+- [x] Where system notifications can't work (not a secure context, no `Notification`, mobile), the toggle is
+      disabled with a reason; the pop-up and tab mark still work
+
+**Notes**
+- Research (GitHub/npm) found sonner, react-hot-toast and react-toastify maintained but unneeded for one pop-up
+  kind, and push.js, react-web-notification and favico.js stale; everything is hand-rolled on the Notification and
+  Page Visibility APIs (`web/src/notify.ts`, `useRunNotifier.ts`, `RunToast.tsx`, `tabMark.ts`, `systemNotify.ts`).
+- System notifications need a secure context (`localhost` counts; a LAN IP over http doesn't) and fail in mobile
+  browser tabs, so phones get the pop-up and tab mark only. The tab mark is static: Chrome throttles hidden-tab
+  timers to once a minute after five minutes, so a flashing title would stall.
+- The pop-up names slips as the report heads them ("Flex 5"), via a shared `slipName`.
+- Found on the way: two board uploads at once could fail with a 500 (they shared one temp file, and the meta was
+  read mid-write). The new e2e spec's parallel uploads exposed it; each upload now gets its own temp file and the
+  meta is written and read under the board lock.
+
+**Review:** done 2026-11-07.

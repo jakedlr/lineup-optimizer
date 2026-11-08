@@ -24,3 +24,7 @@ export const pick = (leg: Pick<Leg, 'side' | 'line' | 'stat_label'>) =>
 
 const BOOK_ABBR: Record<string, string> = { draftkings: 'DK', fanduel: 'FD' }
 export const bookAbbr = (book: string) => BOOK_ABBR[book] ?? book
+
+/** A slip's name as the report heads it: "Power 2", "Flex 5". */
+export const slipName = (slip: { type: 'power' | 'flex'; size: number }) =>
+  `${slip.type === 'power' ? 'Power' : 'Flex'} ${slip.size}`

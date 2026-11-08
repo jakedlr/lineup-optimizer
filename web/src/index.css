@@ -224,6 +224,8 @@ kbd, code {
   grid-template-columns: repeat(auto-fill, minmax(min(100%, 14rem), 1fr)); align-items: end;
 }
 .advanced .check { min-height: var(--control-height); }
+.check:has(input:disabled) { color: var(--muted); cursor: not-allowed; }
+.check-field p { margin: 0; }
 
 /* --- promotion --------------------------------------------------------------------------- */
 .promo { display: grid; gap: var(--gap); padding: 16px var(--pad); }
@@ -344,6 +346,41 @@ td.num { font-variant-numeric: tabular-nums; }
   .unpriced-table .u-reason { flex-basis: 100%; }
 }
 
+/* --- run notification -------------------------------------------------------------------
+   One pop-up at a time, floating at the bottom right, clear of the Run button (which sits at the left of
+   the column). On a phone it spans the top with the page's gutters: the Run button is mid-page or low
+   when it is pressed, never under the header. It floats, so it takes the one faint shadow, and no border. */
+.toasts {
+  position: fixed; z-index: 10; right: 24px; bottom: 24px; width: min(360px, calc(100vw - 48px));
+  pointer-events: none;
+}
+.toast {
+  pointer-events: auto; display: flex; align-items: flex-start; gap: 12px; padding: 14px 8px 14px 16px;
+  background: var(--surface); color: var(--text); border-radius: var(--radius-card);
+  box-shadow: 0 2px 8px rgb(0 0 0 / 0.06), 0 0 0 1px var(--border); /* taste-skill-ignore: it floats over the page */
+}
+.toast-text { display: grid; gap: 2px; min-width: 0; flex: 1; }
+.toast-title { font-size: var(--fs-body); font-weight: 500; }
+.toast-title::before {
+  content: ''; display: inline-block; width: 6px; height: 6px; border-radius: 50%;
+  margin-right: 8px; vertical-align: 1px; background: var(--positive);
+}
+.toast[data-kind='failed'] .toast-title::before { background: var(--negative); }
+.toast-body { font-size: var(--fs-small); color: var(--muted); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.toast-close {
+  flex: none; min-height: 28px; width: 28px; padding: 0; margin-top: -5px;
+  display: grid; place-items: center; background: transparent; color: var(--muted); border-radius: 4px;
+}
+@media (hover: hover) and (pointer: fine) {
+  .toast-close:hover { background: var(--raised); color: var(--text); }
+}
+@media (max-width: 40rem) {
+  .toasts {
+    right: 16px; left: 16px; width: auto; bottom: auto;
+    top: calc(16px + env(safe-area-inset-top, 0px));
+  }
+}
+
 /* --- motion --------------------------------------------------------------------------------
    A working screen performs no entrances. Motion is feedback: presses (above), and a result arriving,
    which fades in once (no travel, no stagger). Reduced motion drops the press scale. */
@@ -351,8 +388,14 @@ td.num { font-variant-numeric: tabular-nums; }
   transition: opacity 180ms ease;
   @starting-style { opacity: 0; }
 }
+/* A run notification arrives the same way: a fade, no travel. It leaves at once. */
+.toast {
+  transition: opacity 180ms var(--ease-out);
+  @starting-style { opacity: 0; }
+}
 @media (prefers-reduced-motion: reduce) {
   button:active:not(:disabled) { transform: none; }
   details > summary::before { transition: none; }
   .bar-fill { transition: none; }
+  .toast { transition: none; }
 }

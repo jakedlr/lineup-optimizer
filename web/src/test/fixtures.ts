@@ -48,6 +48,7 @@ export const report: Report = {
     { sport: 'NFL', player: 'Rome Odunze', stat: 'Receiving Yards', line: 48.5, reason: 'no book line' },
   ],
   warnings: ['fanduel unavailable: HTTP 403'],
+  live_requests: 14,
 }
 
 type Route = (init?: RequestInit) => Response | Promise<Response>

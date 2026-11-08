@@ -71,6 +71,15 @@ class Http:
         self.progress = progress  # ppopt.progress.Progress, ticked once per request
         self._live_requests = 0
 
+    @property
+    def live_requests(self) -> int:
+        """Requests made live so far (fetched, not answered from the odds cache)."""
+        return self._live_requests
+
+    def count_live(self):
+        """Record a live request made without get_json: canned odds stand in for fetching the books."""
+        self._live_requests += 1
+
     def _cache_path(self, url: str) -> Path:
         return self.cache_dir / (hashlib.sha256(url.encode()).hexdigest()[:32] + ".json")
 

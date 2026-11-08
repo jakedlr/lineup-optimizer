@@ -235,6 +235,7 @@ def report_for(args, root: Path, payload: dict, http: Http, now: datetime, colle
         raise UserError(f"no PrizePicks games start in the next {args.hours:g} hours in {','.join(args.sports)}; "
                         "try more hours or other leagues, or save a fresh board if this one is old")
     books = json.loads(config_file(root, "books.json").read_text())
+    live_before = getattr(http, "live_requests", 0)  # the CLI may have fetched PrizePicks on this Http
     progress = getattr(http, "progress", None)
     if progress:
         games = Counter(sport for sport, _ in {(l.sport, l.teams) for l in [*lines, *used_promos]})
@@ -247,6 +248,7 @@ def report_for(args, root: Path, payload: dict, http: Http, now: datetime, colle
         progress.step("Pricing lines and building slips")
     report = run(args, root, payload, markets, now, parsed=(lines, promos))
     report["warnings"] = book_warnings + report["warnings"]
+    report["live_requests"] = getattr(http, "live_requests", 0) - live_before
     return report
 
 

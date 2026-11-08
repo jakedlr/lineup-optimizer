@@ -1,5 +1,5 @@
 import type { Leg, Report } from './api'
-import { bookAbbr, pct, pick, signedDollars, signedPct } from './format'
+import { bookAbbr, pct, pick, signedDollars, signedPct, slipName } from './format'
 import { Segmented } from './Segmented'
 import type { Settings } from './settings'
 
@@ -84,9 +84,7 @@ function BestSlips({ report, slipType, slipSize, onFilter }: Omit<Props, 'top'>)
           {shown.map((s) => (
             <article key={`${s.type}${s.size}`} className="slip">
               <header>
-                <h3>
-                  {s.type === 'power' ? 'Power' : 'Flex'} {s.size}
-                </h3>
+                <h3>{slipName(s)}</h3>
                 <span className={s.ev >= 0 ? 'pos num' : 'neg num'}>{signedDollars(s.ev)}</span>
                 <span className="muted num small">{signedPct(s.ev_pct)}</span>
               </header>

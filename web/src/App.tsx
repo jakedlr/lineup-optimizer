@@ -5,10 +5,13 @@ import { ReportView } from './ReportView'
 import { PromoPanel } from './PromoPanel'
 import { advance, type Shown } from './progress'
 import { RunProgressBar } from './RunProgressBar'
+import { RunToast } from './RunToast'
 import { count, DEFAULT_TOP, load, NO_PROMOTION, positive, save, toRun, type Promotion, type Settings } from './settings'
 import { Segmented } from './Segmented'
 import { SettingsPanel } from './SettingsPanel'
+import { sendSystemNotice } from './systemNotify'
 import { applyTheme, loadTheme, type Theme } from './theme'
+import { useRunNotifier } from './useRunNotifier'
 
 type Engine = 'checking' | 'online' | 'offline'
 
@@ -65,6 +68,7 @@ function App() {
   const [promotion, setPromotion] = useState<Promotion>(NO_PROMOTION)
   const [progress, setProgress] = useState<Shown | null>(null)
   const [theme, setTheme] = useState<Theme>(loadTheme)
+  const notifier = useRunNotifier({ onHidden: settings?.notify ? sendSystemNotice : undefined })
 
   useEffect(() => applyTheme(theme), [theme])
 
@@ -108,9 +112,12 @@ function App() {
     setError(null)
     setProgress(null)
     try {
-      setReport(await runReport(request, (p) => setProgress((prev) => advance(prev, p))))
+      const next = await runReport(request, (p) => setProgress((prev) => advance(prev, p)))
+      setReport(next)
+      notifier.notify({ ok: true, report: next })
     } catch (e) {
       setError(message(e))
+      notifier.notify({ ok: false, error: message(e) })
     } finally {
       setRunning(false)
     }
@@ -194,6 +201,8 @@ function App() {
           onFilter={(f) => change({ ...settings, ...f })}
         />
       )}
+
+      <RunToast notice={notifier.notice} onClose={notifier.dismiss} />
     </main>
   )
 }

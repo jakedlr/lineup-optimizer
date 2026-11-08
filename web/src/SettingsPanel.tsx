@@ -1,5 +1,7 @@
+import { useEffect, useRef, useState } from 'react'
 import type { Options } from './api'
 import type { Settings } from './settings'
+import { BLOCKED_NOTE, requestSystemNotify, systemNotifyState, UNSUPPORTED_NOTE } from './systemNotify'
 
 interface Props {
   options: Options
@@ -13,6 +15,23 @@ const refLabel = (r: string) => `${r.startsWith('power') ? 'Power' : 'Flex'} ${r
 
 export function SettingsPanel({ options, settings, onChange, noCache, onNoCache }: Props) {
   const set = <K extends keyof Settings>(key: K, value: Settings[K]) => onChange({ ...settings, [key]: value })
+
+  const [notifyState, setNotifyState] = useState(systemNotifyState)
+  const latest = useRef(settings) // the permission prompt answers later; don't undo edits made meanwhile
+  useEffect(() => {
+    latest.current = settings
+  }, [settings])
+  const notifyNote = notifyState === 'unsupported' ? UNSUPPORTED_NOTE : notifyState === 'denied' ? BLOCKED_NOTE : null
+
+  const toggleNotify = (on: boolean) => {
+    set('notify', on)
+    if (!on || systemNotifyState() === 'granted') return
+    // Asked inside the change handler: Firefox and Safari only prompt from a user gesture.
+    requestSystemNotify().then((answer) => {
+      setNotifyState(answer)
+      if (answer !== 'granted') onChange({ ...latest.current, notify: false })
+    })
+  }
 
   const toggle = (sport: string) =>
     set(
@@ -113,6 +132,23 @@ export function SettingsPanel({ options, settings, onChange, noCache, onNoCache 
               Fresh odds <span className="muted small">(skip the 5-minute cache for this run)</span>
             </span>
           </label>
+          <div className="check-field">
+            <label className="check">
+              <input
+                type="checkbox"
+                checked={settings.notify && !notifyNote}
+                disabled={!!notifyNote}
+                aria-describedby={notifyNote ? 'notify-note' : undefined}
+                onChange={(e) => toggleNotify(e.target.checked)}
+              />
+              <span>Notify me when runs finish</span>
+            </label>
+            {notifyNote && (
+              <p id="notify-note" className="muted small">
+                {notifyNote}
+              </p>
+            )}
+          </div>
         </div>
       </details>
     </section>

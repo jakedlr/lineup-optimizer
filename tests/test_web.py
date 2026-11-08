@@ -341,3 +341,62 @@ def test_upload_primes_the_board_cache(tmp_path, monkeypatch):
     client.get("/api/board/lines")
     board_size = (tmp_path / "data" / "board.json").stat().st_size
     assert board_size not in parsed, "the board was parsed again after upload"
+
+
+# --- live requests -------------------------------------------------------------
+
+def _books_app(tmp_path, monkeypatch):
+    """An app whose collector fetches one sportsbook URL through the run's Http (fake network)."""
+    import functools
+
+    from ppopt import web
+    from ppopt.sources.http import Http
+
+    monkeypatch.setattr(web, "Http", functools.partial(Http, fetch=lambda url, browser=False: (200, b"{}"),
+                                                       sleep=lambda s: None))
+
+    def collect(http, *a):
+        http.get_json("https://book.test/odds")
+        return markets(), []
+
+    client = engine_app(tmp_path, collect=collect)
+    upload(client)
+    return client
+
+
+def test_run_reports_live_requests_and_a_cached_rerun_reports_none(tmp_path, monkeypatch):
+    client = _books_app(tmp_path, monkeypatch)
+    assert client.post("/api/run").json()["live_requests"] == 1
+    assert client.post("/api/run").json()["live_requests"] == 0
+    assert client.post("/api/run", json={"no_cache": True}).json()["live_requests"] == 1
+
+
+def test_streamed_report_carries_live_requests(tmp_path, monkeypatch):
+    client = _books_app(tmp_path, monkeypatch)
+    _, events = stream(client)
+    assert events[-1]["type"] == "report"
+    assert events[-1]["report"]["live_requests"] == 1
+
+
+def test_canned_odds_count_as_live(tmp_path, monkeypatch):
+    rows = [{"book": m.book, "sport": m.sport, "teams": sorted(m.teams), "player": m.player, "stat": m.stat,
+             "line": m.line, "over_odds": m.over_odds, "under_odds": m.under_odds} for m in markets()]
+    f = tmp_path / "markets.json"
+    f.write_text(json.dumps(rows))
+    monkeypatch.setenv("PPOPT_ODDS_FILE", str(f))
+    client = TestClient(create_app(static_dir=tmp_path, data_dir=tmp_path / "data", root=ROOT, now=lambda: NOW))
+    upload(client)
+    assert client.post("/api/run").json()["live_requests"] >= 1
+    assert client.post("/api/run").json()["live_requests"] >= 1  # canned odds are never a cached run
+
+
+def test_concurrent_board_uploads_all_succeed(tmp_path):
+    """Two browsers saving a board at once must not trip over each other's half-written file."""
+    from concurrent.futures import ThreadPoolExecutor
+
+    client = engine_app(tmp_path)
+    with ThreadPoolExecutor(8) as pool:
+        codes = list(pool.map(lambda _: upload(client).status_code, range(40)))
+    assert codes == [200] * 40
+    assert json.loads((tmp_path / "data" / "board.json").read_text())["data"]
+    assert not list((tmp_path / "data").glob("*.tmp"))

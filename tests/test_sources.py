@@ -71,6 +71,40 @@ def test_http_delays_between_live_requests(tmp_path):
     assert len(slept) == 1 and 1 <= slept[0] <= 2
 
 
+def test_http_counts_live_requests_not_cache_hits(tmp_path):
+    fetch = FakeFetch({"a": (200, b"{}"), "b": (200, b"{}")})
+    http = Http(tmp_path, fetch=fetch, sleep=lambda s: None)
+    assert http.live_requests == 0
+    http.get_json("a")
+    http.get_json("a")  # cache hit
+    assert http.live_requests == 1
+    again = Http(tmp_path, fetch=fetch, sleep=lambda s: None)
+    again.get_json("a")
+    assert again.live_requests == 0
+    again.get_json("b")
+    assert again.live_requests == 1
+
+
+def test_http_no_cache_counts_every_request_live(tmp_path):
+    fetch = FakeFetch({"a": (200, b"{}")})
+    Http(tmp_path, fetch=fetch, sleep=lambda s: None).get_json("a")
+    http = Http(tmp_path, use_cache=False, fetch=fetch, sleep=lambda s: None)
+    http.get_json("a")
+    http.get_json("a")
+    assert http.live_requests == 2
+
+
+def test_http_live_requests_is_read_only(tmp_path):
+    with pytest.raises(AttributeError):
+        Http(tmp_path).live_requests = 5
+
+
+def test_http_count_live_records_a_request_made_outside_get_json(tmp_path):
+    http = Http(tmp_path)
+    http.count_live()
+    assert http.live_requests == 1
+
+
 @pytest.mark.parametrize("resp", [(403, b'{"url": "captcha"}'), (200, b"<html>")])
 def test_http_errors(tmp_path, resp):
     http = Http(tmp_path, fetch=FakeFetch({"u": resp}), sleep=lambda s: None)
