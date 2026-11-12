@@ -262,8 +262,9 @@ books fetch side by side, each keeping today's rate. Terms are in `GLOSSARY.md` 
 **Done criteria**
 - [x] Each book in `books.json` has `"pacing": {"in_flight": 3, "min_gap": 0.3}`, overridable through `config/`
 - [x] A book never has more requests in flight than `in_flight`, nor starts two less than `min_gap` apart
-- [x] On a 403/429 a book is rate-limited: it falls back to one request at a time, 1–2 s apart, retries that request
-      once (honouring `Retry-After`), then fails with a warning that names the rate limit
+- [x] On a 429 a book is rate-limited: it falls back to one request at a time, 1–2 s apart, retries that request
+      once (honouring `Retry-After`), then fails with a warning that names the rate limit. (Changed at review: a
+      403 is a refusal, not a rate limit; it gets the same slow-down and one retry, then fails as "refused".)
 - [x] A full slate (NFL + NBA + NHL) runs fresh in under 30 s with no rate-limited warning
 
 **Notes**
@@ -275,9 +276,9 @@ books fetch side by side, each keeping today's rate. Terms are in `GLOSSARY.md` 
   page. `Http` paces each book with its own `Pacer`: at most `in_flight` requests at once, starts at least the gap
   apart. A book with no `pacing`, and any request made by no book (the CLI's PrizePicks fetch), keeps one request
   at a time 1-2 s apart.
-- The gap now runs from one request's start to the next, not from the end of the last one, so even the slow pace
-  is a touch quicker than before (a 0.3 s request followed by a 1.5 s gap waits 1.2 s).
-- Rate-limited: a 403/429 to a book's request slows that book to one at a time, 1-2 s apart, and retries once after
+- The fast pace measures its gap from one request's start to the next; the slow pace (unpaced books, PrizePicks, a
+  book that pushed back) pauses 1-2 s after each request ends, as before.
+- Rate-limited: a 429 (at first, a 403 too; see the review) to a book's request slows that book to one at a time, 1-2 s apart, and retries once after
   `Retry-After` (seconds or an HTTP date). Asking for more than 10 s fails the book at once; a second refusal fails
   it too. Either way the warning reads "<book> unavailable: rate-limited: ...". A book that recovered warns that it
   finished one request at a time. Requests made by no book (PrizePicks) are never retried.
@@ -286,4 +287,20 @@ books fetch side by side, each keeping today's rate. Terms are in `GLOSSARY.md` 
   batch, and a request made by no book isn't retried.
 
 **Review:** done 2026-11-12.
+`/code-review` (medium) found ten issues, all fixed, test-first except where noted:
+- A book that pushes back holds **all** its requests for the wait (`Retry-After`, or one 1-2 s pause), the retry
+  included; before, only the refused request waited and the rest kept going. A request finishing can only push the
+  next start later, so it can't cut a hold short (found while fixing this).
+- The slow pace pauses after each request ends again (the start-to-start gap had let a slow request swallow its pause).
+- Waits end early when the run stops or is cancelled (`Http`'s default sleep is its stop event; `Progress.cancel`
+  stops the run's `Http`), and a request that waited checks the run is still going before it's sent.
+- Only a 429 is rate-limited. A 403 retried and refused again reads "refused: HTTP 403 from … (blocked, or off a US
+  connection)", and a recovered 403 adds no "lower its pacing" warning. A retry failing otherwise (a 500, say)
+  reports its own status.
+- Bad `pacing` (`in_flight` not a whole number of 1 or more, `min_gap` not 0 or more, either missing) makes that book
+  unavailable with a warning saying so, instead of hanging (`in_flight: 0`) or crashing the run.
+- Cleanups: one place makes a book's pacer, and a book keeps it for the run (a guard test, written after: a slowed
+  book stays slowed when handed a view again); `raise_first_error` in `progress.py` serves both `collect_markets`
+  and `get_many`; `Http.timing`'s docstring lists `rate_limited`.
+- Live again after the fixes, 01:40 UTC: 14.2 s, DraftKings 32 in 10.0 s, FanDuel 45 in 13.5 s, no warnings.
 

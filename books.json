@@ -1,5 +1,5 @@
 {
-  "_note": "Sportsbook adapter config. Map each book's market identifiers to canonical stats (see stats.json). 'state' is the regional API host used for odds. 'pacing' is how fast a run may ask the book: at most 'in_flight' requests at once, starting at least 'min_gap' seconds apart. A book that pushes back (HTTP 403/429) drops to one request at a time for the rest of the run; if the run warns that it did, lower these.",
+  "_note": "Sportsbook adapter config. Map each book's market identifiers to canonical stats (see stats.json). 'state' is the regional API host used for odds. 'pacing' is how fast a run may ask the book: at most 'in_flight' requests at once, starting at least 'min_gap' seconds apart. A book that pushes back (HTTP 429, or a 403 refusal) drops to one request at a time for the rest of the run; if the run warns that it was rate-limited, lower these.",
   "draftkings": {
     "state": "nj",
     "pacing": {"in_flight": 3, "min_gap": 0.3},
