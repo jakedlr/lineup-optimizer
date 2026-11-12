@@ -46,8 +46,12 @@ export interface Report {
   warnings: string[]
   /** Sportsbook requests the run made live, not answered from the odds cache. 0 means a cached run. */
   live_requests: number
-  /** How long the run took, and each sportsbook's live requests and time. */
-  timing: { seconds: number; books: Record<string, { requests: number; seconds: number }> }
+  /** How long the run took, and how each sportsbook was reached; `summary` is the engine's one-line wording. */
+  timing: {
+    seconds: number
+    books: Record<string, { requests: number; cached: number; failed: boolean; seconds: number }>
+    summary: string
+  }
 }
 
 export interface BoardInfo {

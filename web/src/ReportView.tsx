@@ -1,5 +1,5 @@
 import type { Leg, Report } from './api'
-import { bookAbbr, pct, pick, runTiming, signedDollars, signedPct, slipName } from './format'
+import { bookAbbr, pct, pick, signedDollars, signedPct, slipName } from './format'
 import { Segmented } from './Segmented'
 import type { Settings } from './settings'
 
@@ -220,7 +220,7 @@ export function ReportView({ report, top, slipType, slipSize, onFilter }: Props)
       <BestSlips report={report} slipType={slipType} slipSize={slipSize} onFilter={onFilter} />
       <TopLegs report={report} top={top} />
       <Unpriced report={report} />
-      <p className="muted small">{runTiming(report.timing)}</p>
+      <p className="muted small">{report.timing.summary}</p>
     </div>
   )
 }

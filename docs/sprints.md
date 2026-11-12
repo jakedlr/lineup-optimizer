@@ -243,7 +243,19 @@ books fetch side by side, each keeping today's rate. Terms are in `GLOSSARY.md` 
   odds-cache writes made atomic (write aside, then rename).
 - Refactor candidate for review: `estimate_requests` repeats the books' pruning rules to estimate up front.
 
-**Review:** done 2026-11-12.
+**Review:** done 2026-11-12. `/code-review` (medium) found ten issues, all fixed test-first except where noted:
+- "No props posted yet" no longer fires when a book has no market for any stat a game needs: FanDuel warns only
+  if it fetched a tab and found nothing; DraftKings only if the league lacks the subcategories its stats come from.
+- A board whose stats are all unmapped reports them as Unpriced again, without asking the books for anything.
+- The timing line no longer calls a failed or idle book "from the odds cache": each book's timing records live,
+  cached and failed, and reads "unavailable", "from the odds cache" or "made no requests" as it should.
+- The report carries the timing line as `timing.summary`; the web shows that string, so the wording has one source.
+- Timing lists books in book order, whichever finishes first.
+- Progress events are sent under `Progress`'s lock, so two books ticking at once can't deliver them out of order.
+- A book that breaks stops the other at its next request (`Http.stop`), and its error is the one raised, not the
+  other book's `RunCancelled` (which the web stream would have swallowed, leaving the page waiting).
+- Not test-driven: the odds-cache temp file is named by process and thread, and removed if the write fails.
+- Refactor: `draftkings.needed_subcategories` and `fanduel.needed_tabs` serve both fetching and the up-front estimate.
 
 ## Sprint 7: Concurrent requests per book
 

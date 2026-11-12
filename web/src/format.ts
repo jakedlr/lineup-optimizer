@@ -1,4 +1,4 @@
-import type { Leg, Report } from './api'
+import type { Leg } from './api'
 
 export const STALE_MINUTES = 30
 
@@ -21,20 +21,6 @@ export const signedDollars = (x: number) => `${x >= 0 ? '+' : '−'}$${Math.abs(
 
 export const pick = (leg: Pick<Leg, 'side' | 'line' | 'stat_label'>) =>
   `${leg.side === 'over' ? 'Over' : 'Under'} ${leg.line} ${leg.stat_label}`
-
-const BOOK_NAMES: Record<string, string> = { draftkings: 'DraftKings', fanduel: 'FanDuel' }
-
-/** The run's timing, worded as the CLI's footer words it. */
-export function runTiming(timing: Report['timing']): string {
-  const books = Object.entries(timing.books).map(
-    ([book, t]) =>
-      `${BOOK_NAMES[book] ?? book} ` +
-      (t.requests
-        ? `${t.requests} live request${t.requests === 1 ? '' : 's'} in ${t.seconds.toFixed(1)}s`
-        : 'from the odds cache'),
-  )
-  return `Run took ${timing.seconds.toFixed(1)}s` + (books.length ? `: ${books.join(', ')}` : '')
-}
 
 const BOOK_ABBR: Record<string, string> = { draftkings: 'DK', fanduel: 'FD' }
 export const bookAbbr = (book: string) => BOOK_ABBR[book] ?? book

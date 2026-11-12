@@ -139,7 +139,7 @@ def test_http_times_each_book_and_counts_its_live_requests(tmp_path):
     with http.for_book("draftkings") as dk:
         dk.get_json("https://dk.example/a")
         dk.get_json("https://dk.example/b")
-    assert http.timing == {"draftkings": {"requests": 2, "seconds": 2.0}}  # 0.5 + 1 pause + 0.5
+    assert http.timing == {"draftkings": {"requests": 2, "cached": 0, "failed": False, "seconds": 2.0}}  # 0.5 + 1 + 0.5
 
 
 def test_http_a_book_answered_from_the_odds_cache_made_no_live_requests(tmp_path):
@@ -148,7 +148,15 @@ def test_http_a_book_answered_from_the_odds_cache_made_no_live_requests(tmp_path
     http = Http(tmp_path, fetch=slow_fetch(clock), sleep=clock.sleep, clock=clock)
     with http.for_book("draftkings") as dk:
         dk.get_json("https://dk.example/a")
-    assert http.timing == {"draftkings": {"requests": 0, "seconds": 0.0}}
+    assert http.timing == {"draftkings": {"requests": 0, "cached": 1, "failed": False, "seconds": 0.0}}
+
+
+def test_http_records_a_book_that_failed(tmp_path):
+    http = Http(tmp_path, fetch=lambda url, browser=False: (403, b"{}"), sleep=lambda s: None)
+    with pytest.raises(FetchError):
+        with http.for_book("draftkings") as dk:
+            dk.get_json("https://dk.example/a")
+    assert http.timing["draftkings"]["failed"] is True
 
 
 @pytest.mark.parametrize("resp", [(403, b'{"url": "captcha"}'), (200, b"<html>")])

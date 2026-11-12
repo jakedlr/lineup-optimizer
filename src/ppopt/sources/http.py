@@ -1,13 +1,17 @@
 """Polite, cached JSON fetching via Scrapling."""
 
 import hashlib
+from collections import Counter
 import json
+import os
 import random
 import threading
 import time
 from datetime import datetime, timezone
 from pathlib import Path
 from urllib.parse import urlsplit
+
+from ..progress import RunCancelled
 
 
 def no_props_warning(book: str, sport: str, games: int) -> str:
@@ -75,8 +79,11 @@ class Http:
         self.clock = clock
         self._live_requests = 0
         self._hosts_fetched: set[str] = set()
+        self._by_book: dict[str, Counter] = {}  # {book: Counter(live=..., cached=...)}, failed requests included
         self._lock = threading.Lock()  # books share this Http from their own threads
-        self.timing: dict[str, dict] = {}  # {book: {"requests": live requests, "seconds": time spent}}
+        self._stopped = threading.Event()
+        self._timing: dict[str, dict] = {}  # {book: timing}, as each book finishes
+        self._books: list[str] = []  # books in the order they were handed views
 
     @property
     def live_requests(self) -> int:
@@ -88,8 +95,22 @@ class Http:
         with self._lock:
             self._live_requests += 1
 
+    def stop(self):
+        """End the run's fetching: every request from here on raises RunCancelled (one book broke)."""
+        self._stopped.set()
+
+    @property
+    def timing(self) -> dict[str, dict]:
+        """{book: {"requests", "cached", "failed", "seconds"}} for each book that has finished, in book order."""
+        with self._lock:
+            return {book: self._timing[book] for book in self._books if book in self._timing}
+
     def for_book(self, book: str) -> "BookHttp":
-        """This Http as one book uses it: same odds cache, with the book's live requests and time recorded."""
+        """This Http as one book uses it: same odds cache, with the book's live requests and time recorded.
+        Hand out views in book order: timing lists books in the order they were handed views."""
+        with self._lock:
+            if book not in self._books:
+                self._books.append(book)
         return BookHttp(self, book)
 
     def _cache_path(self, url: str) -> Path:
@@ -100,9 +121,13 @@ class Http:
 
     def _get_json(self, url: str, browser: bool, book: str = "") -> tuple[object, bool]:
         """The response, and whether it was fetched live."""
+        if self._stopped.is_set():
+            raise RunCancelled()
         path = self._cache_path(url)
         if self.use_cache and path.exists() and time.time() - path.stat().st_mtime < self.ttl:
             data = json.loads(path.read_text())
+            with self._lock:
+                self._by_book.setdefault(book, Counter())["cached"] += 1
             self._tick(book)
             return data, False
 
@@ -111,6 +136,7 @@ class Http:
             paused = host in self._hosts_fetched  # pacing is per sportsbook: hosts don't wait on each other
             self._hosts_fetched.add(host)
             self._live_requests += 1
+            self._by_book.setdefault(book, Counter())["live"] += 1
         if paused:
             self.sleep(random.uniform(*self.delay))
 
@@ -124,9 +150,12 @@ class Http:
 
         self.cache_dir.mkdir(parents=True, exist_ok=True)
         # Write aside, then rename: another run reading this response never sees half of it.
-        tmp = path.with_name(f"{path.stem}.{threading.get_ident()}.tmp")
-        tmp.write_bytes(body if isinstance(body, bytes) else body.encode())
-        tmp.replace(path)
+        tmp = path.with_name(f"{path.stem}.{os.getpid()}.{threading.get_ident()}.tmp")  # unique across runs
+        try:
+            tmp.write_bytes(body if isinstance(body, bytes) else body.encode())
+            tmp.replace(path)
+        finally:
+            tmp.unlink(missing_ok=True)
         self._tick(book)
         return data, True
 
@@ -141,20 +170,21 @@ class BookHttp:
     def __init__(self, http: Http, book: str):
         self.http, self.book = http, book
         self.progress = http.progress
-        self.requests = 0
 
     def get_json(self, url: str, browser: bool = False):
-        data, live = self.http._get_json(url, browser, self.book)
-        self.requests += live
-        return data
+        return self.http._get_json(url, browser, self.book)[0]
 
     def __enter__(self):
         self.started = self.http.clock()
         return self
 
-    def __exit__(self, *exc):
+    def __exit__(self, exc_type, *exc):
         if self.progress is not None:
             self.progress.finish(self.book)
         with self.http._lock:
-            self.http.timing[self.book] = {"requests": self.requests, "seconds": self.http.clock() - self.started}
+            counts = self.http._by_book.get(self.book, Counter())
+            self.http._timing[self.book] = {
+                "requests": counts["live"], "cached": counts["cached"], "failed": exc_type is not None,
+                "seconds": self.http.clock() - self.started,
+            }
         return False

@@ -51,7 +51,11 @@ export const report: Report = {
   live_requests: 14,
   timing: {
     seconds: 31.24,
-    books: { draftkings: { requests: 14, seconds: 30.08 }, fanduel: { requests: 0, seconds: 0.02 } },
+    books: {
+      draftkings: { requests: 14, cached: 0, failed: false, seconds: 30.08 },
+      fanduel: { requests: 0, cached: 9, failed: false, seconds: 0.02 },
+    },
+    summary: 'Run took 31.2s: DraftKings 14 live requests in 30.1s, FanDuel from the odds cache (as the engine words it)',
   },
 }
 

@@ -26,6 +26,11 @@ def market_key(market_type: str) -> str:
     return re.sub(r"_(HIGH|MEDIUM|LOW)$", "", key)
 
 
+def needed_tabs(sport_conf: dict, stats: set[str]) -> dict[str, dict[str, str]]:
+    """{tab: {market key: stat}} for the tabs holding any of one game's needed stats."""
+    return {tab: markets for tab, markets in sport_conf["tabs"].items() if stats & set(markets.values())}
+
+
 def parse_events(league: dict, cfg: Config, sport: str, now: datetime, hours: float) -> dict[str, frozenset[str]]:
     """{event id: teams} for games in the window. Futures/specials have no ' @ '."""
     out = {}
@@ -99,8 +104,7 @@ def collect(
         fetches = [
             (event_id, teams, tab, markets_in_tab)
             for event_id, teams in events.items()
-            for tab, markets_in_tab in sport_conf["tabs"].items()
-            if needs[(sport, teams)] & set(markets_in_tab.values())
+            for tab, markets_in_tab in needed_tabs(sport_conf, needs[(sport, teams)]).items()
         ]
         if progress:
             progress.plan("fanduel", sport, 1 + len(fetches))
@@ -108,7 +112,7 @@ def collect(
         for event_id, teams, tab, markets_in_tab in fetches:
             url = EVENT.format(state=conf["state"], key=API_KEY, event=event_id, tab=tab)
             found += parse_event_markets(http.get_json(url), sport, teams, markets_in_tab)
-        if events and not found and warnings is not None:
+        if fetches and not found and warnings is not None:  # nothing to fetch isn't "not posted"
             warnings.append(no_props_warning("FanDuel", sport, len(events)))
         markets += found
     return markets

@@ -12,7 +12,7 @@ from pathlib import Path
 
 from .matching import Config, config_file, game_id, matchup_label, parse_promo_leg
 from .payouts import break_even, load_payouts
-from .progress import BOOK_NAMES
+from .progress import BOOK_NAMES, RunCancelled
 from .pricing import PRICING_METHODS, WORST, PromoError, price_lines, price_promo
 from .slips import best_slips
 from .sources import draftkings, fanduel, prizepicks
@@ -207,20 +207,27 @@ def collect_markets(http: Http, cfg: Config, books: dict, sports, now, hours, ne
     """Fetch what the board needs from every book at once; a failing book becomes a warning, not a crash.
     Markets and warnings come back in book order, whichever book finishes first."""
 
-    def fetch(name, collect) -> tuple[list, list[str]]:
+    def fetch(name, collect, view) -> tuple[list, list[str]]:
         warnings = []
         try:
-            with http.for_book(name) as book_http:
+            with view as book_http:
                 return collect(book_http, cfg, books[name], sports, now, hours, warnings=warnings, needs=needs), warnings
         except (FetchError, KeyError, ValueError) as e:
             if http.progress is not None:
                 http.progress.close(name)
             return [], [*warnings, f"{name} unavailable: {e}"]
+        except BaseException:
+            http.stop()  # a cancelled run or a bug: the other book stops at its next request
+            raise
 
     sources = [("draftkings", draftkings.collect), ("fanduel", fanduel.collect)]
     with ThreadPoolExecutor(max_workers=len(sources)) as pool:
-        futures = [pool.submit(fetch, name, collect) for name, collect in sources]
-        results = [f.result() for f in futures]  # re-raises a cancelled run (or a bug) from either book
+        # Views are handed out here, in book order, so timing lists the books in that order.
+        futures = [pool.submit(fetch, name, collect, http.for_book(name)) for name, collect in sources]
+    errors = [f.exception() for f in futures if f.exception() is not None]
+    if errors:  # a bug outranks the stop it caused in the other book; otherwise the run was cancelled
+        raise next((e for e in errors if not isinstance(e, RunCancelled)), errors[0])
+    results = [f.result() for f in futures]
     return [m for found, _ in results for m in found], [w for _, found in results for w in found]
 
 
@@ -229,13 +236,11 @@ def estimate_requests(progress, books: dict, sports: list[str], needs: dict):
     Set quietly: the caller's next step() announces the whole estimate at once."""
     for sport in sports:
         dk, fd = books["draftkings"]["sports"].get(sport), books["fanduel"]["sports"].get(sport)
-        games = [stats for (s, _), stats in needs.items() if s == sport]
         if dk:
-            wanted = set().union(*games)
-            progress.planned[("draftkings", sport)] = 1 + sum(stat in wanted for stat in dk["subcategories"].values())
+            progress.planned[("draftkings", sport)] = 1 + len(draftkings.needed_subcategories(dk, sport, needs))
         if fd:
             progress.planned[("fanduel", sport)] = 1 + sum(
-                bool(stats & set(tab.values())) for stats in games for tab in fd["tabs"].values()
+                len(fanduel.needed_tabs(fd, stats)) for (s, _), stats in needs.items() if s == sport
             )
 
 
@@ -258,18 +263,21 @@ def report_for(args, root: Path, payload: dict, http: Http, now: datetime, colle
     books = json.loads(config_file(root, "books.json").read_text())
     live_before = getattr(http, "live_requests", 0)  # the CLI may have fetched PrizePicks on this Http
     progress = getattr(http, "progress", None)
-    if progress:
-        estimate_requests(progress, books, args.sports, needs)
-        progress.step("Fetching sportsbook odds")
-    markets, book_warnings = collect(http, cfg, books, args.sports, now, args.hours, needs)
-    if not markets:
+    markets, book_warnings = [], []
+    if needs:  # a board of only unmapped stats has nothing to ask the books; its lines all go unpriced
+        if progress:
+            estimate_requests(progress, books, args.sports, needs)
+            progress.step("Fetching sportsbook odds")
+        markets, book_warnings = collect(http, cfg, books, args.sports, now, args.hours, needs)
+    if needs and not markets:
         raise UserError("no sportsbook odds available: " + "; ".join(book_warnings or ["no markets in window"]))
     if progress:
         progress.step("Pricing lines and building slips")
     report = run(args, root, payload, markets, now, parsed=(lines, promos))
     report["warnings"] = book_warnings + report["warnings"]
     report["live_requests"] = getattr(http, "live_requests", 0) - live_before
-    report["timing"] = {"seconds": clock() - started, "books": dict(getattr(http, "timing", {}))}
+    timing = {"seconds": clock() - started, "books": dict(getattr(http, "timing", {}))}
+    report["timing"] = {**timing, "summary": format_timing(timing)}
     return report
 
 
@@ -342,16 +350,27 @@ def format_report(report: dict, top: int, verbose: bool) -> str:
     for w in report["warnings"]:
         out.append(f"warning: {w}")
     if "timing" in report:
-        out.append(format_timing(report["timing"]))
+        out.append(report["timing"]["summary"])
     return "\n".join(out)
 
 
+def _requests(n: int) -> str:
+    return f"{n} live request{'s' if n != 1 else ''}"
+
+
 def format_timing(timing: dict) -> str:
-    books = [
-        f"{BOOK_NAMES.get(book, book)} " + (f"{t['requests']} live request{'s' if t['requests'] != 1 else ''} in {t['seconds']:.1f}s" if t["requests"]
-                                             else "from the odds cache")
-        for book, t in timing["books"].items()
-    ]
+    """One line: how long the run took, and how each book was reached."""
+    books = []
+    for book, t in timing["books"].items():
+        name = BOOK_NAMES.get(book, book)
+        if t["failed"]:
+            books.append(f"{name} unavailable" + (f" after {_requests(t['requests'])}" if t["requests"] else ""))
+        elif t["requests"]:
+            books.append(f"{name} {_requests(t['requests'])} in {t['seconds']:.1f}s")
+        elif t["cached"]:
+            books.append(f"{name} from the odds cache")
+        else:
+            books.append(f"{name} made no requests")
     return f"Run took {timing['seconds']:.1f}s" + (": " + ", ".join(books) if books else "")
 
 

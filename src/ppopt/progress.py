@@ -35,14 +35,14 @@ class Progress:
         return max(sum(self.planned.values()), self.done)
 
     def _emit(self):
+        # Sent under the lock, so books ticking at once can't deliver their events out of order.
         with self.lock:
-            event = {"done": self.done, "total": self.total, "step": self.label}
-        self.emit(event)
+            self.emit({"done": self.done, "total": self.total, "step": self.label})
 
     def plan(self, book: str, sport: str, requests: int):
         with self.lock:
             self.planned[(book, sport)] = requests
-        self._emit()
+            self._emit()
 
     def book(self, book: str, sport: str):
         """This book is now fetching this league."""
@@ -69,7 +69,7 @@ class Progress:
             raise RunCancelled()
         with self.lock:
             self.done_by[book] += 1
-        self._emit()
+            self._emit()
 
     def close(self, book: str):
         """The book failed: whatever it hadn't fetched yet will never be fetched."""
@@ -77,9 +77,9 @@ class Progress:
             for key in [k for k in self.planned if k[0] == book]:
                 del self.planned[key]
             self.planned[(book, "*")] = self.done_by[book]
-        self._emit()
+            self._emit()
 
     def step(self, label: str):
         with self.lock:
             self.label = label
-        self._emit()
+            self._emit()

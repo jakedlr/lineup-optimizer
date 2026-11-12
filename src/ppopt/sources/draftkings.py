@@ -27,6 +27,12 @@ def subcategory_ids(league: dict, names: dict[str, str]) -> dict[str, tuple[int,
     return out
 
 
+def needed_subcategories(sport_conf: dict, sport: str, needs: dict) -> dict[str, str]:
+    """{subcategory name: stat} for the stats the board needs anywhere in this league."""
+    wanted = set().union(*(stats for (s, _), stats in needs.items() if s == sport))
+    return {name: stat for name, stat in sport_conf["subcategories"].items() if stat in wanted}
+
+
 def _event_teams(event: dict, cfg: Config, sport: str) -> frozenset[str] | None:
     parts = event["name"].split(" @ ")
     if len(parts) != 2:
@@ -95,8 +101,7 @@ def collect(
             event_id: teams for event_id, teams in events_in_window(league, cfg, sport, now, hours).items()
             if (sport, teams) in needs
         }
-        wanted = set().union(*(stats for (s, _), stats in needs.items() if s == sport))
-        names = {name: stat for name, stat in sport_conf["subcategories"].items() if stat in wanted}
+        names = needed_subcategories(sport_conf, sport, needs)
         subcats = subcategory_ids(league, names) if events else {}
         if progress:
             progress.plan("draftkings", sport, 1 + len(subcats))
@@ -104,7 +109,8 @@ def collect(
         for stat, (cat, sub) in subcats.items():
             payload = http.get_json(f"{base}/categories/{cat}/subcategories/{sub}")
             found += parse_markets(payload, sport, stat, events)
-        if events and not found and warnings is not None:
+        # Not posted yet: the board's games are listed, but none of the subcategories their stats come from.
+        if events and names and not found and warnings is not None:
             warnings.append(no_props_warning("DraftKings", sport, len(events)))
         markets += found
     return markets

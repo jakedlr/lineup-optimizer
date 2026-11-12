@@ -230,3 +230,37 @@ def test_draftkings_skips_and_does_not_warn_about_games_the_board_does_not_need(
     draftkings.collect(http, Config.load(ROOT), books()["draftkings"], ["NFL"], NOW, 24, warnings=warnings,
                        needs={("NFL", frozenset({"KC", "BUF"})): {"rec_yards"}})
     assert len(http.calls) == 1 and warnings == []
+
+
+# --- a book that has no market for any stat a game needs isn't "not posted yet" ------
+
+def test_fanduel_quiet_when_no_tab_holds_a_stat_the_game_needs():
+    http, warnings = Fixtures(FD_ROUTES), []
+    fanduel.collect(http, Config.load(ROOT), books()["fanduel"], ["NFL"], NOW, 24, warnings=warnings,
+                    needs={("NFL", GAME): {"pass_rush_yards"}})  # FanDuel prices no pass+rush yards
+    assert len(http.calls) == 1 and warnings == []
+
+
+def test_draftkings_quiet_when_it_maps_no_stat_the_game_needs():
+    http, warnings = Fixtures(DK_ROUTES), []
+    draftkings.collect(http, Config.load(ROOT), books()["draftkings"], ["NFL"], NOW, 24, warnings=warnings,
+                       needs={("NFL", GAME): {"kicking_points"}})
+    assert len(http.calls) == 1 and warnings == []
+
+
+def test_progress_events_go_out_in_the_order_they_happened():
+    import threading
+
+    sent, other = [], []
+
+    def emit(event):
+        if not other:  # while the first event is still going out, another book ticks
+            other.append(threading.Thread(target=p.tick, args=("fanduel",)))
+            other[0].start()
+            other[0].join(0.2)
+        sent.append(event["done"])
+
+    p = Progress(emit)
+    p.tick("draftkings")
+    other[0].join(2)
+    assert sent == [1, 2]

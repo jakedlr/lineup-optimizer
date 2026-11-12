@@ -416,7 +416,7 @@ def test_report_carries_how_long_the_run_took():
         return markets(), []
 
     report = cli.report_for(cli.parse_args([]), ROOT, pp_payload(), http=None, now=NOW, collect=collect, clock=clock)
-    assert report["timing"] == {"seconds": 3.0, "books": {}}
+    assert report["timing"] == {"seconds": 3.0, "books": {}, "summary": "Run took 3.0s"}
 
 
 def test_each_book_is_timed_with_its_own_live_requests(monkeypatch, tmp_path):
@@ -441,15 +441,20 @@ def test_format_report_ends_with_the_run_timing():
         "settings": {"sports": ["NFL"], "hours": 24, "stake": 10.0, "devig": "worst", "mode": "cash"},
         "ref_slip": {"type": "power", "size": 2, "break_even": 0.573},
         "legs": [], "slips": [], "unmatched": {}, "unmatched_lines": [], "warnings": [],
-        "timing": {"seconds": 92.44, "books": {"draftkings": {"requests": 41, "seconds": 40.08},
-                                                "fanduel": {"requests": 0, "seconds": 0.02}}},
+        "timing": {"seconds": 1.0, "books": {}, "summary": "Run took 1.0s"},
     }
-    last = cli.format_report(report, top=25, verbose=False).splitlines()[-1]
-    assert last == "Run took 92.4s: DraftKings 41 live requests in 40.1s, FanDuel from the odds cache"
+    assert cli.format_report(report, top=25, verbose=False).splitlines()[-1] == "Run took 1.0s"
+
+
+def test_timing_names_each_books_live_requests_or_the_odds_cache():
+    timing = {"seconds": 92.44, "books": {
+        "draftkings": {"requests": 41, "cached": 0, "failed": False, "seconds": 40.08},
+        "fanduel": {"requests": 0, "cached": 12, "failed": False, "seconds": 0.02}}}
+    assert cli.format_timing(timing) == "Run took 92.4s: DraftKings 41 live requests in 40.1s, FanDuel from the odds cache"
 
 
 def test_timing_says_request_for_a_single_live_request():
-    timing = {"seconds": 2.0, "books": {"fanduel": {"requests": 1, "seconds": 1.0}}}
+    timing = {"seconds": 2.0, "books": {"fanduel": {"requests": 1, "cached": 0, "failed": False, "seconds": 1.0}}}
     assert cli.format_timing(timing) == "Run took 2.0s: FanDuel 1 live request in 1.0s"
 
 
@@ -512,3 +517,89 @@ def test_a_cancelled_run_stops_every_book(monkeypatch, tmp_path):
     monkeypatch.setattr(cli.fanduel, "collect", cancelled)
     with pytest.raises(RunCancelled):
         cli.collect_markets(Http(tmp_path), None, {"draftkings": {}, "fanduel": {}}, ["NFL"], NOW, 24, {})
+
+
+def test_a_board_of_only_unmapped_stats_reports_them_unpriced_without_fetching():
+    payload = pp_payload()
+    for p in payload["data"]:
+        p["attributes"]["stat_type"] = "Fantasy Score"  # no book prices it
+    report = cli.report_for(cli.parse_args([]), ROOT, payload, http=None, now=NOW,
+                            collect=lambda *a: (_ for _ in ()).throw(AssertionError("nothing to fetch")))
+    assert report["legs"] == [] and report["unmatched"]
+
+
+@pytest.mark.parametrize("book, words", [
+    ({"requests": 0, "cached": 0, "failed": True, "seconds": 0.4}, "DraftKings unavailable"),
+    ({"requests": 3, "cached": 0, "failed": True, "seconds": 5.1}, "DraftKings unavailable after 3 live requests"),
+    ({"requests": 0, "cached": 0, "failed": False, "seconds": 0.0}, "DraftKings made no requests"),
+])
+def test_timing_does_not_call_a_failed_or_idle_book_cached(book, words):
+    assert cli.format_timing({"seconds": 1.0, "books": {"draftkings": book}}) == f"Run took 1.0s: {words}"
+
+
+def test_timing_lists_books_in_book_order_whichever_finishes_first(monkeypatch, tmp_path):
+    import time
+
+    from ppopt.sources.http import Http
+
+    http = Http(tmp_path)
+
+    def dk(*a, **k):
+        deadline = time.monotonic() + 2
+        while "fanduel" not in http.timing:  # finish only after FanDuel has
+            assert time.monotonic() < deadline, "FanDuel never finished"
+            time.sleep(0.01)
+        return []
+
+    monkeypatch.setattr(cli.draftkings, "collect", dk)
+    monkeypatch.setattr(cli.fanduel, "collect", lambda *a, **k: [])
+    cli.collect_markets(http, None, {"draftkings": {}, "fanduel": {}}, ["NFL"], NOW, 24, {})
+    assert list(http.timing) == ["draftkings", "fanduel"]
+
+
+def test_a_book_that_breaks_stops_the_other_at_its_next_request(monkeypatch, tmp_path):
+    import time
+
+    from ppopt.sources.http import Http
+
+    def broken(*a, **k):
+        raise TypeError("a bug in the DraftKings parser")
+
+    def busy(http, *a, **k):
+        for i in range(1000):
+            http.get_json(f"https://fd.example/{i}")
+        return []
+
+    def fetch(url, browser=False):
+        time.sleep(0.001)
+        return 200, b"{}"
+
+    monkeypatch.setattr(cli.draftkings, "collect", broken)
+    monkeypatch.setattr(cli.fanduel, "collect", busy)
+    http = Http(tmp_path, fetch=fetch, sleep=lambda s: None)
+    with pytest.raises(TypeError):
+        cli.collect_markets(http, None, {"draftkings": {}, "fanduel": {}}, ["NFL"], NOW, 24, {})
+    assert http.live_requests < 1000
+
+
+def test_the_breaking_books_error_surfaces_not_the_stop_it_caused(monkeypatch, tmp_path):
+    from ppopt.sources.http import Http
+
+    def busy(http, *a, **k):
+        for i in range(1000):
+            http.get_json(f"https://dk.example/{i}")
+        return []
+
+    def broken(*a, **k):
+        raise TypeError("a bug in the FanDuel parser")
+
+    def fetch(url, browser=False):
+        import time
+        time.sleep(0.001)
+        return 200, b"{}"
+
+    monkeypatch.setattr(cli.draftkings, "collect", busy)
+    monkeypatch.setattr(cli.fanduel, "collect", broken)
+    with pytest.raises(TypeError):
+        cli.collect_markets(Http(tmp_path, fetch=fetch, sleep=lambda s: None), None,
+                            {"draftkings": {}, "fanduel": {}}, ["NFL"], NOW, 24, {})
