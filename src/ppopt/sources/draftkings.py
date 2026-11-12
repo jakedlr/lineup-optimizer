@@ -78,8 +78,9 @@ def parse_markets(payload: dict, sport: str, stat: str, events: dict[str, frozen
 
 def collect(
     http: Http, cfg: Config, conf: dict, sports: list[str], now: datetime, hours: float,
-    warnings: list[str] | None = None,
+    warnings: list[str] | None = None, *, needs: dict[tuple[str, frozenset[str]], set[str]],
 ) -> list[BookMarket]:
+    """Markets for the stats the board needs in each league: `needs` is {(sport, teams): stats}."""
     markets = []
     for sport in sports:
         sport_conf = conf["sports"].get(sport)
@@ -90,8 +91,13 @@ def collect(
         if progress:
             progress.book("draftkings", sport)
         league = http.get_json(base)
-        events = events_in_window(league, cfg, sport, now, hours)
-        subcats = subcategory_ids(league, sport_conf["subcategories"]) if events else {}
+        events = {
+            event_id: teams for event_id, teams in events_in_window(league, cfg, sport, now, hours).items()
+            if (sport, teams) in needs
+        }
+        wanted = set().union(*(stats for (s, _), stats in needs.items() if s == sport))
+        names = {name: stat for name, stat in sport_conf["subcategories"].items() if stat in wanted}
+        subcats = subcategory_ids(league, names) if events else {}
         if progress:
             progress.plan("draftkings", sport, 1 + len(subcats))
         found = []

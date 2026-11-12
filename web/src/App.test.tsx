@@ -153,6 +153,9 @@ describe('Run', () => {
     expect(within(within(unpriced).getByRole('list')).getByText(/no book line/i)).toBeInTheDocument()
 
     expect(screen.getByText(/fanduel unavailable/i)).toBeInTheDocument()
+    expect(
+      screen.getByText('Run took 31.2s: DraftKings 14 live requests in 30.1s, FanDuel from the odds cache'),
+    ).toBeInTheDocument()
     expect(fetchMock).toHaveBeenCalledWith('/api/run', expect.objectContaining({ method: 'POST' }))
   })
 

@@ -12,6 +12,8 @@ architecture is in `docs/adr/0001-web-app-single-container.md`.
 | 2 | Run settings | League chips, stake, Advanced panel (hours, devig, ref slip, top N, no-cache); type/size filters on the Report without re-running; settings remembered (promotions excluded); JSON download |
 | 3 | Promotions | None / Bonus / Boost × control; feed promos toggle; promo-leg picker built from the board |
 | 4 | Progress and polish | ~~Streamed run steps~~ (done in Sprint 3); motion and interaction pass (Emil Kowalski skills); taste-skill review; dark mode; mobile reflow; config override mount; README leads with the app |
+| 6 | Faster fetching, same politeness | Runs time themselves per book; a run fetches only what the board can use; books fetch in parallel, each paced on its own; a recorded live run beats the 208 s baseline |
+| 7 | Concurrent requests per book | Pacing per book in `books.json`; a rate-limited book backs off and says so; a full slate runs fresh in under 30 s |
 
 ## Sprint 0: Tooling and walking skeleton
 
@@ -204,3 +206,51 @@ dependencies: the pop-up and the alerts use the browser's own APIs.
   meta is written and read under the board lock.
 
 **Review:** done 2026-11-07.
+
+## Sprint 6: Faster fetching, same politeness
+
+A fresh run spent ~1.7 s per sportsbook request, ~1.5 s of it the deliberate pause, and the pause was shared by
+both books (largest recorded run: 122 requests, 208 s). This sprint cuts requests the board can't use and lets the
+books fetch side by side, each keeping today's rate. Terms are in `GLOSSARY.md` (*Run*, *Pacing*).
+
+**Done criteria**
+- [x] The report carries the run's timing: elapsed seconds overall, and live requests and seconds per book; the CLI
+      footer and the web report show it
+- [x] A run fetches only what the board can use: DraftKings subcategories for stats on the board in that league,
+      FanDuel tabs for stats on the board in that game (lines and promo legs alike); the "no props posted yet"
+      warning counts only those
+- [x] FanDuel MLB `batter-props` and NHL `points-assists` tabs, which map to no stat, are gone from `books.json`
+- [x] DraftKings and FanDuel fetch at the same time, each paced on its own (one request every 1–2 s per book);
+      cancelling stops both; a failing book still leaves the other's markets
+- [x] The progress step names every book still fetching (`DraftKings NHL · FanDuel NBA`); the percentage still
+      counts requests across both
+- [x] A recorded live run, with its timing, is noted below against the 208 s baseline
+
+**Notes**
+- Measured from the odds cache's file times before starting: ~1.7 s per request, ~1.5 s of it the pause, which
+  both books shared because they ran one after the other.
+- Live run, 2026-11-12 00:38 UTC, fresh (no cache), 7 NBA + 11 NHL games on a 31k-projection board: **89.8 s**,
+  DraftKings 20 live requests in 34.9 s, FanDuel 58 in 88.8 s. The old code would have made ~99 requests on this
+  board (DraftKings 20, FanDuel 79), ~170 s at 1.72 s each. A busy board needs every DraftKings stat, so the cut
+  there is nil; FanDuel's comes mostly from the dead NHL tab across 11 games. FanDuel now sets the run time, at
+  ~1.5 s a request, which is Sprint 7's target.
+- FanDuel's config is now `"tabs": {tab: {market key: stat}}`, each market listed under the one tab it's fetched
+  from (rush+rec yards appears on both NFL receiving and rushing; it's fetched from receiving). This also ends a
+  double-parse of that market. The tab contents were read from cached responses, not guessed.
+- Each book gets its own view of the run's `Http` (`for_book`), which records its live requests and time, and
+  attributes its progress ticks; `Progress` no longer has one "current" book.
+- Not test-driven, since thread races don't reproduce on demand: a lock around `Http`'s counters and `Progress`, and
+  odds-cache writes made atomic (write aside, then rename).
+- Refactor candidate for review: `estimate_requests` repeats the books' pruning rules to estimate up front.
+
+**Review:** done 2026-11-12.
+
+## Sprint 7: Concurrent requests per book
+
+**Done criteria**
+- [ ] Each book in `books.json` has `"pacing": {"in_flight": 3, "min_gap": 0.3}`, overridable through `config/`
+- [ ] A book never has more requests in flight than `in_flight`, nor starts two less than `min_gap` apart
+- [ ] On a 403/429 a book is rate-limited: it falls back to one request at a time, 1–2 s apart, retries that request
+      once (honouring `Retry-After`), then fails with a warning that names the rate limit
+- [ ] A full slate (NFL + NBA + NHL) runs fresh in under 30 s with no rate-limited warning
+

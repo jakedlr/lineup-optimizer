@@ -153,7 +153,7 @@ def test_options_come_from_the_engine(tmp_path):
 def test_run_applies_settings(tmp_path):
     seen = {}
 
-    def collect(http, cfg, books, sports, now, hours, wanted):
+    def collect(http, cfg, books, sports, now, hours, needs):
         seen.update(sports=sports, hours=hours, use_cache=http.use_cache)
         return markets(), []
 

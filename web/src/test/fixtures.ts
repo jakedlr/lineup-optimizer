@@ -49,6 +49,10 @@ export const report: Report = {
   ],
   warnings: ['fanduel unavailable: HTTP 403'],
   live_requests: 14,
+  timing: {
+    seconds: 31.24,
+    books: { draftkings: { requests: 14, seconds: 30.08 }, fanduel: { requests: 0, seconds: 0.02 } },
+  },
 }
 
 type Route = (init?: RequestInit) => Response | Promise<Response>

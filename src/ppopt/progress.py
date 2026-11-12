@@ -5,6 +5,7 @@ board before anything is fetched; a book replaces it with the exact count as soo
 event list. Plans are upper bounds in practice, so the percentage only moves forward.
 """
 
+import threading
 from collections import Counter
 from typing import Callable
 
@@ -20,9 +21,10 @@ class Progress:
         self.emit = emit
         self.planned: dict[tuple[str, str], int] = {}
         self.done_by: Counter[str] = Counter()
-        self.current: str | None = None
+        self.fetching: dict[str, str] = {}  # {book: league it's fetching}, in the order the books started
         self.label = ""
         self.cancelled = False
+        self.lock = threading.RLock()  # books fetch on their own threads
 
     @property
     def done(self) -> int:
@@ -33,34 +35,51 @@ class Progress:
         return max(sum(self.planned.values()), self.done)
 
     def _emit(self):
-        self.emit({"done": self.done, "total": self.total, "step": self.label})
+        with self.lock:
+            event = {"done": self.done, "total": self.total, "step": self.label}
+        self.emit(event)
 
     def plan(self, book: str, sport: str, requests: int):
-        self.planned[(book, sport)] = requests
+        with self.lock:
+            self.planned[(book, sport)] = requests
         self._emit()
 
     def book(self, book: str, sport: str):
-        """Requests from here on belong to this book, fetching this league."""
-        self.current = book
-        self.label = f"{BOOK_NAMES.get(book, book)} {sport}"
+        """This book is now fetching this league."""
+        with self.lock:
+            self.fetching[book] = sport
+            self._relabel()
+
+    def finish(self, book: str):
+        """This book has fetched everything it will."""
+        with self.lock:
+            self.fetching.pop(book, None)
+            self._relabel()
+
+    def _relabel(self):
+        self.label = " · ".join(f"{BOOK_NAMES.get(b, b)} {sport}" for b, sport in self.fetching.items())
 
     def cancel(self):
         """Ask the run to stop. It does so at its next request (each costs 1-2 s, so promptly)."""
         self.cancelled = True
 
-    def tick(self):
+    def tick(self, book: str = ""):
+        """One request made (live or from the odds cache), by `book`."""
         if self.cancelled:
             raise RunCancelled()
-        self.done_by[self.current or ""] += 1
+        with self.lock:
+            self.done_by[book] += 1
         self._emit()
 
     def close(self, book: str):
         """The book failed: whatever it hadn't fetched yet will never be fetched."""
-        for key in [k for k in self.planned if k[0] == book]:
-            del self.planned[key]
-        self.planned[(book, "*")] = self.done_by[book]
+        with self.lock:
+            for key in [k for k in self.planned if k[0] == book]:
+                del self.planned[key]
+            self.planned[(book, "*")] = self.done_by[book]
         self._emit()
 
     def step(self, label: str):
-        self.label = label
+        with self.lock:
+            self.label = label
         self._emit()

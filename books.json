@@ -25,20 +25,26 @@
   },
   "fanduel": {
     "state": "nj",
-    "_markets_note": "Keys are FanDuel marketType with the per-player letter removed and any _HIGH/_MEDIUM/_LOW suffix dropped, e.g. PLAYER_X_PASSING_YARDS_HIGH -> PLAYER_PASSING_YARDS.",
+    "_tabs_note": "Each league's event-page tabs, mapping the markets fetched from that tab to canonical stats. Market keys are FanDuel marketType with the per-player letter removed and any _HIGH/_MEDIUM/_LOW suffix dropped, e.g. PLAYER_X_PASSING_YARDS_HIGH -> PLAYER_PASSING_YARDS. List a market under one tab only: a run fetches a game's tab only when the board needs one of its stats.",
     "sports": {
-      "NFL": {"page": "nfl", "tabs": ["passing-props", "receiving-props", "rushing-props"], "markets": {
-        "PLAYER_PASSING_YARDS": "pass_yards", "PLAYER_PASSING_TOUCHDOWNS": "pass_tds", "PLAYER_RUSHING_YARDS": "rush_yards",
-        "PLAYER_RECEIVING_YARDS": "rec_yards", "PLAYER_RECEPTIONS": "receptions", "PLAYER_RUSHING_+_RECEIVING_YARDS": "rush_rec_yards"}},
-      "NBA": {"page": "nba", "tabs": ["player-points", "player-rebounds", "player-assists", "player-threes", "player-combos", "player-defense"], "markets": {
-        "PLAYER_TOTAL_POINTS": "points", "PLAYER_TOTAL_REBOUNDS": "rebounds", "PLAYER_TOTAL_ASSISTS": "assists",
-        "PLAYER_TOTAL_MADE_3_POINT_FIELD_GOALS": "threes", "PLAYER_TOTAL_STEALS": "steals", "PLAYER_TOTAL_BLOCKS": "blocks",
-        "PLAYER_TOTAL_POINTS_+_REB_+_AST": "pts_rebs_asts", "PLAYER_TOTAL_POINTS_+_REBOUNDS": "pts_rebs",
-        "PLAYER_TOTAL_POINTS_+_ASSISTS": "pts_asts", "PLAYER_TOTAL_REBOUNDS_+_ASSISTS": "rebs_asts"}},
-      "NHL": {"page": "nhl", "tabs": ["shots", "goalies", "points-assists"], "markets": {
-        "PLAYER_TOTAL_SHOTS": "shots_on_goal", "PLAYER_TOTAL_SAVES": "saves"}},
-      "MLB": {"page": "mlb", "tabs": ["pitcher-props", "batter-props"], "markets": {
-        "PITCHER_TOTAL_STRIKEOUTS": "pitcher_strikeouts"}}
+      "NFL": {"page": "nfl", "tabs": {
+        "passing-props": {"PLAYER_PASSING_YARDS": "pass_yards", "PLAYER_PASSING_TOUCHDOWNS": "pass_tds"},
+        "receiving-props": {"PLAYER_RECEIVING_YARDS": "rec_yards", "PLAYER_RECEPTIONS": "receptions",
+                            "PLAYER_RUSHING_+_RECEIVING_YARDS": "rush_rec_yards"},
+        "rushing-props": {"PLAYER_RUSHING_YARDS": "rush_yards"}}},
+      "NBA": {"page": "nba", "tabs": {
+        "player-points": {"PLAYER_TOTAL_POINTS": "points"},
+        "player-rebounds": {"PLAYER_TOTAL_REBOUNDS": "rebounds"},
+        "player-assists": {"PLAYER_TOTAL_ASSISTS": "assists"},
+        "player-threes": {"PLAYER_TOTAL_MADE_3_POINT_FIELD_GOALS": "threes"},
+        "player-combos": {"PLAYER_TOTAL_POINTS_+_REB_+_AST": "pts_rebs_asts", "PLAYER_TOTAL_POINTS_+_REBOUNDS": "pts_rebs",
+                          "PLAYER_TOTAL_POINTS_+_ASSISTS": "pts_asts", "PLAYER_TOTAL_REBOUNDS_+_ASSISTS": "rebs_asts"},
+        "player-defense": {"PLAYER_TOTAL_STEALS": "steals", "PLAYER_TOTAL_BLOCKS": "blocks"}}},
+      "NHL": {"page": "nhl", "tabs": {
+        "shots": {"PLAYER_TOTAL_SHOTS": "shots_on_goal"},
+        "goalies": {"PLAYER_TOTAL_SAVES": "saves"}}},
+      "MLB": {"page": "mlb", "tabs": {
+        "pitcher-props": {"PITCHER_TOTAL_STRIKEOUTS": "pitcher_strikeouts"}}}
     }
   }
 }

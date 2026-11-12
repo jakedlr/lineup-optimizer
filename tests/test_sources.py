@@ -71,6 +71,14 @@ def test_http_delays_between_live_requests(tmp_path):
     assert len(slept) == 1 and 1 <= slept[0] <= 2
 
 
+def test_http_paces_each_host_on_its_own(tmp_path):
+    slept = []
+    http = Http(tmp_path, fetch=lambda url, browser=False: (200, b"{}"), sleep=slept.append, delay=(1, 1))
+    for url in ["https://dk.example/a", "https://fd.example/a", "https://dk.example/b", "https://fd.example/b"]:
+        http.get_json(url)
+    assert slept == [1, 1]  # before each host's second request; a host's first request never waits on another's
+
+
 def test_http_counts_live_requests_not_cache_hits(tmp_path):
     fetch = FakeFetch({"a": (200, b"{}"), "b": (200, b"{}")})
     http = Http(tmp_path, fetch=fetch, sleep=lambda s: None)
@@ -103,6 +111,44 @@ def test_http_count_live_records_a_request_made_outside_get_json(tmp_path):
     http = Http(tmp_path)
     http.count_live()
     assert http.live_requests == 1
+
+
+class FakeClock:
+    """Time that moves only when a request takes time or the run pauses."""
+
+    def __init__(self):
+        self.now = 0.0
+
+    def __call__(self):
+        return self.now
+
+    def sleep(self, seconds):
+        self.now += seconds
+
+
+def slow_fetch(clock, seconds=0.5):
+    def fetch(url, browser=False):
+        clock.sleep(seconds)
+        return 200, b"{}"
+    return fetch
+
+
+def test_http_times_each_book_and_counts_its_live_requests(tmp_path):
+    clock = FakeClock()
+    http = Http(tmp_path, fetch=slow_fetch(clock), sleep=clock.sleep, clock=clock, delay=(1, 1))
+    with http.for_book("draftkings") as dk:
+        dk.get_json("https://dk.example/a")
+        dk.get_json("https://dk.example/b")
+    assert http.timing == {"draftkings": {"requests": 2, "seconds": 2.0}}  # 0.5 + 1 pause + 0.5
+
+
+def test_http_a_book_answered_from_the_odds_cache_made_no_live_requests(tmp_path):
+    clock = FakeClock()
+    Http(tmp_path, fetch=slow_fetch(clock), sleep=clock.sleep, clock=clock).get_json("https://dk.example/a")
+    http = Http(tmp_path, fetch=slow_fetch(clock), sleep=clock.sleep, clock=clock)
+    with http.for_book("draftkings") as dk:
+        dk.get_json("https://dk.example/a")
+    assert http.timing == {"draftkings": {"requests": 0, "seconds": 0.0}}
 
 
 @pytest.mark.parametrize("resp", [(403, b'{"url": "captcha"}'), (200, b"<html>")])
@@ -209,7 +255,7 @@ def test_fanduel_market_key():
 
 
 def test_fanduel_parse_event_markets(books):
-    mapping = books["fanduel"]["sports"]["NFL"]["markets"]
+    mapping = books["fanduel"]["sports"]["NFL"]["tabs"]["passing-props"]
     markets = fanduel.parse_event_markets(load("fd_event_passing.json"), "NFL", GAME, mapping)
     caleb = next(m for m in markets if m.player == "Caleb Williams" and m.stat == "pass_yards")
     assert (caleb.book, caleb.line, caleb.over_odds, caleb.under_odds) == ("fanduel", 243.5, -113, -113)

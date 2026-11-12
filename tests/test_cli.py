@@ -241,7 +241,7 @@ def test_report_for_collects_markets_for_the_board_and_merges_warnings():
 
     args = cli.parse_args([])
     report = cli.report_for(args, ROOT, pp_payload(), http=None, now=NOW, collect=collect)
-    assert CHI_NE in seen["wanted"]
+    assert seen["wanted"] == {("NFL", CHI_NE): {"pass_yards", "pass_rush_yards"}, ("NBA", PHI_CLE): {"pts_rebs_asts"}}
     assert "fanduel unavailable: test" in report["warnings"]
     assert report["legs"]
 
@@ -276,24 +276,23 @@ def test_report_for_estimates_requests_from_the_board_before_fetching():
     collect = lambda h, *a: (snapshot.update(seen[-1]), (markets(), []))[1]
     cli.report_for(cli.parse_args([]), ROOT, pp_payload(), http=http, now=NOW, collect=collect)
 
-    books = json.loads((ROOT / "books.json").read_text())
-    games = {"NFL": 1, "NBA": 1, "NHL": 0, "MLB": 0}  # games on the fixture board
-    dk = sum(1 + (len(books["draftkings"]["sports"][s]["subcategories"]) if n else 0) for s, n in games.items())
-    fd = sum(1 + n * len(books["fanduel"]["sports"][s]["tabs"]) for s, n in games.items())
+    # The board needs NFL pass yards + pass+rush yards (CHI-NE) and NBA pts+rebs+asts (CLE-PHI); one league page each.
+    dk = (1 + 2) + (1 + 1) + 1 + 1  # a subcategory per needed stat
+    fd = (1 + 1) + (1 + 1) + 1 + 1  # NFL passing-props (FD has no pass+rush), NBA player-combos
     assert snapshot == {"done": 0, "total": dk + fd, "step": "Fetching sportsbook odds"}
     assert seen[0] == snapshot  # the estimate goes out as one event, not one per league
     assert seen[-1]["step"] == "Pricing lines and building slips"
 
 
-def test_a_failing_book_is_closed_out_of_the_progress(monkeypatch):
-    from ppopt.sources.http import FetchError
+def test_a_failing_book_is_closed_out_of_the_progress(monkeypatch, tmp_path):
+    from ppopt.sources.http import FetchError, Http
 
     p = Progress(lambda e: None)
-    http = SimpleNamespace(progress=p)
+    http = Http(tmp_path, progress=p)
 
     def broken(http, *a, **k):
         http.progress.book("draftkings", "NFL")
-        http.progress.tick()
+        http.progress.tick("draftkings")
         raise FetchError("HTTP 403")
 
     monkeypatch.setattr(cli.draftkings, "collect", broken)
@@ -303,14 +302,16 @@ def test_a_failing_book_is_closed_out_of_the_progress(monkeypatch):
     assert p.planned == {("draftkings", "*"): 1}
 
 
-def test_collect_markets_passes_on_book_warnings(monkeypatch):
-    def dk(http, cfg, conf, sports, now, hours, warnings):
+def test_collect_markets_passes_on_book_warnings(monkeypatch, tmp_path):
+    from ppopt.sources.http import Http
+
+    def dk(http, cfg, conf, sports, now, hours, warnings, needs):
         warnings.append("DraftKings has no NHL player props posted yet for 2 games in the window")
         return []
 
     monkeypatch.setattr(cli.draftkings, "collect", dk)
     monkeypatch.setattr(cli.fanduel, "collect", lambda *a, **k: [])
-    _, warnings = cli.collect_markets(None, None, {"draftkings": {}, "fanduel": {}}, ["NHL"], NOW, 24, set())
+    _, warnings = cli.collect_markets(Http(tmp_path), None, {"draftkings": {}, "fanduel": {}}, ["NHL"], NOW, 24, set())
     assert warnings == ["DraftKings has no NHL player props posted yet for 2 games in the window"]
 
 
@@ -395,3 +396,119 @@ def test_main_json_output_carries_live_requests(tmp_path, capsys, monkeypatch):
     monkeypatch.setattr(cli, "utcnow", lambda: NOW)
     assert cli.main(["--pp-file", str(pp_file), "--json"], root=ROOT) == 0
     assert json.loads(capsys.readouterr().out)["live_requests"] == 0
+
+
+# --- timing --------------------------------------------------------------------
+
+class Clock:
+    def __init__(self):
+        self.now = 0.0
+
+    def __call__(self):
+        return self.now
+
+
+def test_report_carries_how_long_the_run_took():
+    clock = Clock()
+
+    def collect(*a):
+        clock.now += 3.0  # fetching the books
+        return markets(), []
+
+    report = cli.report_for(cli.parse_args([]), ROOT, pp_payload(), http=None, now=NOW, collect=collect, clock=clock)
+    assert report["timing"] == {"seconds": 3.0, "books": {}}
+
+
+def test_each_book_is_timed_with_its_own_live_requests(monkeypatch, tmp_path):
+    from ppopt.sources.http import Http
+
+    def fetching(*urls):
+        def collect(http, *a, **k):
+            for url in urls:
+                http.get_json(url)
+            return []
+        return collect
+
+    monkeypatch.setattr(cli.draftkings, "collect", fetching("https://dk.example/a", "https://dk.example/b"))
+    monkeypatch.setattr(cli.fanduel, "collect", fetching("https://fd.example/a"))
+    http = Http(tmp_path, fetch=lambda url, browser=False: (200, b"{}"), sleep=lambda s: None)
+    cli.collect_markets(http, None, {"draftkings": {}, "fanduel": {}}, ["NFL"], NOW, 24, set())
+    assert {book: t["requests"] for book, t in http.timing.items()} == {"draftkings": 2, "fanduel": 1}
+
+
+def test_format_report_ends_with_the_run_timing():
+    report = {
+        "settings": {"sports": ["NFL"], "hours": 24, "stake": 10.0, "devig": "worst", "mode": "cash"},
+        "ref_slip": {"type": "power", "size": 2, "break_even": 0.573},
+        "legs": [], "slips": [], "unmatched": {}, "unmatched_lines": [], "warnings": [],
+        "timing": {"seconds": 92.44, "books": {"draftkings": {"requests": 41, "seconds": 40.08},
+                                                "fanduel": {"requests": 0, "seconds": 0.02}}},
+    }
+    last = cli.format_report(report, top=25, verbose=False).splitlines()[-1]
+    assert last == "Run took 92.4s: DraftKings 41 live requests in 40.1s, FanDuel from the odds cache"
+
+
+def test_timing_says_request_for_a_single_live_request():
+    timing = {"seconds": 2.0, "books": {"fanduel": {"requests": 1, "seconds": 1.0}}}
+    assert cli.format_timing(timing) == "Run took 2.0s: FanDuel 1 live request in 1.0s"
+
+
+def test_a_manual_promo_legs_stat_is_fetched_too():
+    seen = {}
+
+    def collect(http, cfg, books, sports, now, hours, needs):
+        seen["needs"] = needs
+        return markets(), []
+
+    args = cli.parse_args(["--promoLeg", "NFL", "CHI vs NE", "Caleb Williams", "Over 1.5 Pass TDs"])
+    with pytest.raises(cli.UserError):  # no book prices pass TDs in markets(); the needs are what matter here
+        cli.report_for(args, ROOT, pp_payload(), http=None, now=NOW, collect=collect)
+    assert seen["needs"][("NFL", CHI_NE)] == {"pass_yards", "pass_rush_yards", "pass_tds"}
+
+
+def test_collect_markets_gives_both_books_the_board_needs(monkeypatch, tmp_path):
+    from ppopt.sources.http import Http
+
+    seen = {}
+    monkeypatch.setattr(cli.draftkings, "collect", lambda *a, needs, **k: seen.setdefault("draftkings", needs) and [])
+    monkeypatch.setattr(cli.fanduel, "collect", lambda *a, needs, **k: seen.setdefault("fanduel", needs) and [])
+    needs = {("NFL", CHI_NE): {"pass_yards"}}
+    cli.collect_markets(Http(tmp_path), None, {"draftkings": {}, "fanduel": {}}, ["NFL"], NOW, 24, needs)
+    assert seen == {"draftkings": needs, "fanduel": needs}
+
+
+# --- books fetch in parallel ----------------------------------------------------
+
+import threading
+
+
+def test_both_books_fetch_at_the_same_time(monkeypatch, tmp_path):
+    from ppopt.sources.http import Http
+
+    started = {"draftkings": threading.Event(), "fanduel": threading.Event()}
+
+    def book(name, other, market):
+        def collect(*a, **k):
+            started[name].set()
+            assert started[other].wait(2), f"{other} didn't start while {name} was fetching"
+            return [market]
+        return collect
+
+    dk, fd = markets()[0], markets()[1]
+    monkeypatch.setattr(cli.draftkings, "collect", book("draftkings", "fanduel", dk))
+    monkeypatch.setattr(cli.fanduel, "collect", book("fanduel", "draftkings", fd))
+    got, _ = cli.collect_markets(Http(tmp_path), None, {"draftkings": {}, "fanduel": {}}, ["NFL"], NOW, 24, {})
+    assert got == [dk, fd]
+
+
+def test_a_cancelled_run_stops_every_book(monkeypatch, tmp_path):
+    from ppopt.progress import RunCancelled
+    from ppopt.sources.http import Http
+
+    def cancelled(*a, **k):
+        raise RunCancelled()
+
+    monkeypatch.setattr(cli.draftkings, "collect", cancelled)
+    monkeypatch.setattr(cli.fanduel, "collect", cancelled)
+    with pytest.raises(RunCancelled):
+        cli.collect_markets(Http(tmp_path), None, {"draftkings": {}, "fanduel": {}}, ["NFL"], NOW, 24, {})

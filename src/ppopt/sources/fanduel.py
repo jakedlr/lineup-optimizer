@@ -77,10 +77,12 @@ def collect(
     sports: list[str],
     now: datetime,
     hours: float,
-    wanted_games: set[frozenset[str]] | None = None,
     warnings: list[str] | None = None,
+    *,
+    needs: dict[tuple[str, frozenset[str]], set[str]],
 ) -> list[BookMarket]:
-    """Markets for every event in the window, optionally only games PrizePicks lists."""
+    """Markets for the games the board needs, fetching only the tabs holding each game's stats.
+    `needs` is {(sport, teams): stats}."""
     markets = []
     for sport in sports:
         sport_conf = conf["sports"].get(sport)
@@ -92,15 +94,20 @@ def collect(
         league = http.get_json(LEAGUE.format(state=conf["state"], page=sport_conf["page"], key=API_KEY))
         events = {
             event_id: teams for event_id, teams in parse_events(league, cfg, sport, now, hours).items()
-            if wanted_games is None or teams in wanted_games
+            if (sport, teams) in needs
         }
+        fetches = [
+            (event_id, teams, tab, markets_in_tab)
+            for event_id, teams in events.items()
+            for tab, markets_in_tab in sport_conf["tabs"].items()
+            if needs[(sport, teams)] & set(markets_in_tab.values())
+        ]
         if progress:
-            progress.plan("fanduel", sport, 1 + len(events) * len(sport_conf["tabs"]))
+            progress.plan("fanduel", sport, 1 + len(fetches))
         found = []
-        for event_id, teams in events.items():
-            for tab in sport_conf["tabs"]:
-                url = EVENT.format(state=conf["state"], key=API_KEY, event=event_id, tab=tab)
-                found += parse_event_markets(http.get_json(url), sport, teams, sport_conf["markets"])
+        for event_id, teams, tab, markets_in_tab in fetches:
+            url = EVENT.format(state=conf["state"], key=API_KEY, event=event_id, tab=tab)
+            found += parse_event_markets(http.get_json(url), sport, teams, markets_in_tab)
         if events and not found and warnings is not None:
             warnings.append(no_props_warning("FanDuel", sport, len(events)))
         markets += found

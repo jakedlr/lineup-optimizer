@@ -3,9 +3,11 @@
 import hashlib
 import json
 import random
+import threading
 import time
 from datetime import datetime, timezone
 from pathlib import Path
+from urllib.parse import urlsplit
 
 
 def no_props_warning(book: str, sport: str, games: int) -> str:
@@ -61,6 +63,7 @@ class Http:
         fetch=scrapling_fetch,
         sleep=time.sleep,
         progress=None,
+        clock=time.monotonic,
     ):
         self.cache_dir = Path(cache_dir)
         self.ttl = ttl
@@ -69,7 +72,11 @@ class Http:
         self.fetch = fetch
         self.sleep = sleep
         self.progress = progress  # ppopt.progress.Progress, ticked once per request
+        self.clock = clock
         self._live_requests = 0
+        self._hosts_fetched: set[str] = set()
+        self._lock = threading.Lock()  # books share this Http from their own threads
+        self.timing: dict[str, dict] = {}  # {book: {"requests": live requests, "seconds": time spent}}
 
     @property
     def live_requests(self) -> int:
@@ -78,21 +85,34 @@ class Http:
 
     def count_live(self):
         """Record a live request made without get_json: canned odds stand in for fetching the books."""
-        self._live_requests += 1
+        with self._lock:
+            self._live_requests += 1
+
+    def for_book(self, book: str) -> "BookHttp":
+        """This Http as one book uses it: same odds cache, with the book's live requests and time recorded."""
+        return BookHttp(self, book)
 
     def _cache_path(self, url: str) -> Path:
         return self.cache_dir / (hashlib.sha256(url.encode()).hexdigest()[:32] + ".json")
 
     def get_json(self, url: str, browser: bool = False):
+        return self._get_json(url, browser)[0]
+
+    def _get_json(self, url: str, browser: bool, book: str = "") -> tuple[object, bool]:
+        """The response, and whether it was fetched live."""
         path = self._cache_path(url)
         if self.use_cache and path.exists() and time.time() - path.stat().st_mtime < self.ttl:
             data = json.loads(path.read_text())
-            self._tick()
-            return data
+            self._tick(book)
+            return data, False
 
-        if self._live_requests:
+        host = urlsplit(url).netloc
+        with self._lock:
+            paused = host in self._hosts_fetched  # pacing is per sportsbook: hosts don't wait on each other
+            self._hosts_fetched.add(host)
+            self._live_requests += 1
+        if paused:
             self.sleep(random.uniform(*self.delay))
-        self._live_requests += 1
 
         status, body = self.fetch(url, browser=browser)
         if status != 200:
@@ -103,10 +123,38 @@ class Http:
             raise FetchError(f"non-JSON response from {url}") from e
 
         self.cache_dir.mkdir(parents=True, exist_ok=True)
-        path.write_bytes(body if isinstance(body, bytes) else body.encode())
-        self._tick()
+        # Write aside, then rename: another run reading this response never sees half of it.
+        tmp = path.with_name(f"{path.stem}.{threading.get_ident()}.tmp")
+        tmp.write_bytes(body if isinstance(body, bytes) else body.encode())
+        tmp.replace(path)
+        self._tick(book)
+        return data, True
+
+    def _tick(self, book: str):
+        if self.progress is not None:
+            self.progress.tick(book)
+
+
+class BookHttp:
+    """One book's view of the run's Http, used as a context manager around that book's fetching."""
+
+    def __init__(self, http: Http, book: str):
+        self.http, self.book = http, book
+        self.progress = http.progress
+        self.requests = 0
+
+    def get_json(self, url: str, browser: bool = False):
+        data, live = self.http._get_json(url, browser, self.book)
+        self.requests += live
         return data
 
-    def _tick(self):
+    def __enter__(self):
+        self.started = self.http.clock()
+        return self
+
+    def __exit__(self, *exc):
         if self.progress is not None:
-            self.progress.tick()
+            self.progress.finish(self.book)
+        with self.http._lock:
+            self.http.timing[self.book] = {"requests": self.requests, "seconds": self.http.clock() - self.started}
+        return False

@@ -42,7 +42,7 @@ def markets_from_file(path: Path):
     rows = json.loads(Path(path).read_text())
     markets = [BookMarket(**{**r, "teams": frozenset(r["teams"])}) for r in rows]
 
-    def collect(http, cfg, books, sports, now, hours, wanted):
+    def collect(http, cfg, books, sports, now, hours, needs):
         if http is not None:
             http.count_live()  # canned odds stand in for the books, so a run on them is always fresh
         return [m for m in markets if m.sport in sports], []
