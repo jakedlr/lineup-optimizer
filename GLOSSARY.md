@@ -18,7 +18,7 @@
 
 **Run**: One pricing of the current board against the sportsbooks with the chosen settings, ending in a report or a failure. Every run recalculates; nothing about a run's result is reused. A run asks each sportsbook only for markets that could price a line or promo leg on the board.
 
-**Odds cache**: Sportsbook responses kept for five minutes and reused by later runs. A run whose every sportsbook request is answered from it is a *cached run*; a run that fetched anything live is a *fresh run*. Only a finished fresh run (or any failed run) raises a run notification.
+**Odds cache**: Sportsbook responses kept for one minute and reused by later runs. A run whose every sportsbook request is answered from it is a *cached run*; a run that fetched anything live is a *fresh run*. Only a finished fresh run (or any failed run) raises a run notification.
 
 **Pacing**: How fast a run may send requests to one sportsbook: how many at once and how far apart. Each sportsbook is paced on its own. A sportsbook that pushes back is *rate-limited* and falls back to one request at a time, slowly, for the rest of the run.
 

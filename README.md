@@ -160,7 +160,7 @@ that's blocked.
 | `--pp-file PATH` | – | PrizePicks board saved from your browser |
 | `--sports LIST` | `NFL,NBA,NHL,MLB` | Comma-separated leagues |
 | `--hours N` | `24` | Only games starting within the next N hours |
-| `--no-cache` | off | Ignore cached odds (cached for 5 minutes in `.cache/`) and fetch fresh |
+| `--no-cache` | off | Ignore cached odds (cached for 1 minute in `.cache/`) and fetch fresh |
 
 **Pricing**
 

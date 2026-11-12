@@ -55,6 +55,18 @@ def test_http_no_cache_refetches(tmp_path):
     assert fetch.calls == ["u", "u"]
 
 
+@pytest.mark.parametrize("age, refetched", [(55, False), (65, True)])
+def test_the_odds_cache_keeps_a_response_for_one_minute(tmp_path, age, refetched):
+    import os
+
+    fetch = FakeFetch({"u": (200, b'{"a": 1}')})
+    Http(tmp_path, fetch=fetch, sleep=lambda s: None).get_json("u")
+    for f in tmp_path.glob("*.json"):
+        os.utime(f, (time.time() - age, time.time() - age))
+    Http(tmp_path, fetch=fetch, sleep=lambda s: None).get_json("u")
+    assert len(fetch.calls) == (2 if refetched else 1)
+
+
 def test_http_expired_cache_refetches(tmp_path):
     fetch = FakeFetch({"u": (200, b'{"a": 1}')})
     Http(tmp_path, fetch=fetch, sleep=lambda s: None).get_json("u")

@@ -11,7 +11,7 @@ best slips by EV with at most one leg per game.
 | PrizePicks | `api.prizepicks.com/projections` via Scrapling stealth browser. Protected by **DataDome**: impersonated HTTP *and* the stealth browser both got 403 in testing, so live fetch is attempted and fails with instructions. | `--pp-file samples/projections.json` saved from a logged-in browser (warns if > 30 min old) |
 | FanDuel, DraftKings | Internal JSON feeds via Scrapling's impersonating `Fetcher` (no browser needed), one adapter per book. DK: one request per stat subcategory per league. FD: one request per event per props tab, only for games on the PrizePicks board. | A failing book is a warning; the other still prices |
 
-- Responses cached in `.cache/` for 5 minutes; `--no-cache` forces fresh fetches.
+- Responses cached in `.cache/` for 1 minute; `--no-cache` forces fresh fetches.
 - 1–2 s randomized delay between book requests.
 - Adding a book = adding one adapter module.
 

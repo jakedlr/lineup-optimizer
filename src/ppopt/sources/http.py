@@ -142,7 +142,7 @@ class Http:
     def __init__(
         self,
         cache_dir: str | Path,
-        ttl: float = 300,
+        ttl: float = 60,  # seconds an odds-cache answer is reused; lines move fast
         use_cache: bool = True,
         delay: tuple[float, float] = (1.0, 2.0),
         fetch=scrapling_fetch,

@@ -304,3 +304,15 @@ books fetch side by side, each keeping today's rate. Terms are in `GLOSSARY.md` 
   and `get_many`; `Http.timing`'s docstring lists `rate_limited`.
 - Live again after the fixes, 01:40 UTC: 14.2 s, DraftKings 32 in 10.0 s, FanDuel 45 in 13.5 s, no warnings.
 
+
+## Odds cache: one minute
+
+The odds cache now keeps a sportsbook response for one minute instead of five. With fresh runs at ~14 s (Sprint 7),
+reusing odds up to five minutes old was no longer worth it: lines move faster than that. Runs within a minute of
+each other still share answers. Terms are in `GLOSSARY.md` (*Odds cache*).
+
+**Done criteria**
+- [x] A cached response is reused for up to 60 s, then fetched again (`Http`'s default `ttl`)
+- [x] `GLOSSARY.md`, `DESIGN.md` and the README say one minute
+
+**Review:** done 2026-11-12.
