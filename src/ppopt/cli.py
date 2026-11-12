@@ -12,7 +12,7 @@ from pathlib import Path
 
 from .matching import Config, config_file, game_id, matchup_label, parse_promo_leg
 from .payouts import break_even, load_payouts
-from .progress import BOOK_NAMES, RunCancelled
+from .progress import BOOK_NAMES, raise_first_error
 from .pricing import PRICING_METHODS, WORST, PromoError, price_lines, price_promo
 from .slips import best_slips
 from .sources import draftkings, fanduel, prizepicks
@@ -225,14 +225,18 @@ def collect_markets(http: Http, cfg: Config, books: dict, sports, now, hours, ne
             raise
 
     sources = [("draftkings", draftkings.collect), ("fanduel", fanduel.collect)]
+    unusable: dict[str, tuple[list, list[str]]] = {}
     with ThreadPoolExecutor(max_workers=len(sources)) as pool:
-        # Views are handed out here, in book order, so timing lists the books in that order.
-        futures = [pool.submit(fetch, name, collect, http.for_book(name, books.get(name, {}).get("pacing")))
-                   for name, collect in sources]
-    errors = [f.exception() for f in futures if f.exception() is not None]
-    if errors:  # a bug outranks the stop it caused in the other book; otherwise the run was cancelled
-        raise next((e for e in errors if not isinstance(e, RunCancelled)), errors[0])
-    results = [f.result() for f in futures]
+        futures = {}
+        for name, collect in sources:
+            try:  # views are handed out here, in book order, so timing lists the books in that order
+                view = http.for_book(name, books.get(name, {}).get("pacing"))
+            except ValueError as e:
+                unusable[name] = ([], [f"{name} unavailable: {e}"])
+                continue
+            futures[name] = pool.submit(fetch, name, collect, view)
+    raise_first_error([f.exception() for f in futures.values()])
+    results = [unusable[name] if name in unusable else futures[name].result() for name, _ in sources]
     return [m for found, _ in results for m in found], [w for _, found in results for w in found]
 
 

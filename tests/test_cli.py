@@ -655,3 +655,19 @@ def test_a_book_that_was_rate_limited_but_recovered_says_so(monkeypatch, tmp_pat
     _, warnings = cli.collect_markets(http, None, books, ["NFL"], NOW, 24, {})
     assert warnings == ["DraftKings rate-limited the run, so it finished one request at a time; "
                         "lower its pacing in books.json"]
+
+
+@pytest.mark.parametrize("pacing", [
+    {"in_flight": 0, "min_gap": 0.3}, {"min_gap": 0.3}, {"in_flight": 3, "min_gap": -1}, {"in_flight": "lots", "min_gap": 0},
+    {"in_flight": 1.5, "min_gap": 0},
+])
+def test_bad_pacing_makes_the_book_unavailable_not_the_run(monkeypatch, tmp_path, pacing):
+    from ppopt.sources.http import Http
+
+    monkeypatch.setattr(cli.draftkings, "collect", lambda *a, **k: [markets()[0]])
+    monkeypatch.setattr(cli.fanduel, "collect", lambda *a, **k: [markets()[1]])
+    books = {"draftkings": {"pacing": pacing}, "fanduel": {}}
+    got, warnings = cli.collect_markets(Http(tmp_path), None, books, ["NFL"], NOW, 24, {})
+    assert got == [markets()[1]]
+    assert warnings == ["draftkings unavailable: its pacing in books.json needs a whole in_flight of 1 or more "
+                        "and a min_gap of 0 or more seconds"]

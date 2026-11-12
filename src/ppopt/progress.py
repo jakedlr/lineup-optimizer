@@ -16,6 +16,14 @@ class RunCancelled(Exception):
     """Nobody is waiting for this run any more (the browser went away); stop fetching."""
 
 
+def raise_first_error(errors) -> None:
+    """Raise the first real error among these (Nones ignored); RunCancelled only if nothing else went wrong.
+    A bug outranks the stop it caused elsewhere in the run."""
+    errors = [e for e in errors if e is not None]
+    if errors:
+        raise next((e for e in errors if not isinstance(e, RunCancelled)), errors[0])
+
+
 class Progress:
     def __init__(self, emit: Callable[[dict], None]):
         self.emit = emit
@@ -24,6 +32,7 @@ class Progress:
         self.fetching: dict[str, str] = {}  # {book: league it's fetching}, in the order the books started
         self.label = ""
         self.cancelled = False
+        self.on_cancel: list[Callable[[], None]] = []  # called once when the run is cancelled
         self.lock = threading.RLock()  # books fetch on their own threads
 
     @property
@@ -62,6 +71,8 @@ class Progress:
     def cancel(self):
         """Ask the run to stop. It does so at its next request (each costs 1-2 s, so promptly)."""
         self.cancelled = True
+        for stop in self.on_cancel:
+            stop()
 
     def tick(self, book: str = ""):
         """One request made (live or from the odds cache), by `book`."""
