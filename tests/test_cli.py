@@ -603,3 +603,55 @@ def test_the_breaking_books_error_surfaces_not_the_stop_it_caused(monkeypatch, t
     with pytest.raises(TypeError):
         cli.collect_markets(Http(tmp_path, fetch=fetch, sleep=lambda s: None), None,
                             {"draftkings": {}, "fanduel": {}}, ["NFL"], NOW, 24, {})
+
+
+# --- each book is paced as books.json says ------------------------------------------
+
+class InFlight:
+    """A fake network counting the most requests in flight at once; `limit` URLs get one 429 first."""
+
+    def __init__(self, limit=()):
+        self.lock, self.now, self.peak, self.limit, self.seen = threading.Lock(), 0, 0, set(limit), set()
+
+    def __call__(self, url, browser=False):
+        import time
+        with self.lock:
+            self.now += 1
+            self.peak = max(self.peak, self.now)
+            first = url not in self.seen
+            self.seen.add(url)
+        time.sleep(0.03)
+        with self.lock:
+            self.now -= 1
+        return (429 if url in self.limit and first else 200), b"{}", {}
+
+
+def batch(*urls):
+    def collect(http, *a, **k):
+        http.get_many(list(urls))
+        return []
+    return collect
+
+
+def test_each_book_is_paced_by_its_own_books_json_entry(monkeypatch, tmp_path):
+    from ppopt.sources.http import Http
+
+    dk_net = InFlight()
+    monkeypatch.setattr(cli.draftkings, "collect", batch(*[f"https://dk.example/{i}" for i in range(6)]))
+    monkeypatch.setattr(cli.fanduel, "collect", lambda *a, **k: [])
+    books = {"draftkings": {"pacing": {"in_flight": 2, "min_gap": 0}}, "fanduel": {}}
+    cli.collect_markets(Http(tmp_path, fetch=dk_net), None, books, ["NFL"], NOW, 24, {})
+    assert dk_net.peak == 2
+
+
+def test_a_book_that_was_rate_limited_but_recovered_says_so(monkeypatch, tmp_path):
+    from ppopt.sources.http import Http
+
+    net = InFlight(limit={"https://dk.example/0"})
+    monkeypatch.setattr(cli.draftkings, "collect", batch("https://dk.example/0", "https://dk.example/1"))
+    monkeypatch.setattr(cli.fanduel, "collect", lambda *a, **k: [])
+    books = {"draftkings": {"pacing": {"in_flight": 3, "min_gap": 0}}, "fanduel": {}}
+    http = Http(tmp_path, fetch=net, delay=(0, 0))
+    _, warnings = cli.collect_markets(http, None, books, ["NFL"], NOW, 24, {})
+    assert warnings == ["DraftKings rate-limited the run, so it finished one request at a time; "
+                        "lower its pacing in books.json"]

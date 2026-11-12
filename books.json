@@ -1,7 +1,8 @@
 {
-  "_note": "Sportsbook adapter config. Map each book's market identifiers to canonical stats (see stats.json). 'state' is the regional API host used for odds.",
+  "_note": "Sportsbook adapter config. Map each book's market identifiers to canonical stats (see stats.json). 'state' is the regional API host used for odds. 'pacing' is how fast a run may ask the book: at most 'in_flight' requests at once, starting at least 'min_gap' seconds apart. A book that pushes back (HTTP 403/429) drops to one request at a time for the rest of the run; if the run warns that it did, lower these.",
   "draftkings": {
     "state": "nj",
+    "pacing": {"in_flight": 3, "min_gap": 0.3},
     "sports": {
       "NFL": {"league": 88808, "subcategories": {
         "Pass Yards O/U": "pass_yards", "Pass TDs O/U": "pass_tds", "Pass Attempts O/U": "pass_attempts",
@@ -25,6 +26,7 @@
   },
   "fanduel": {
     "state": "nj",
+    "pacing": {"in_flight": 3, "min_gap": 0.3},
     "_tabs_note": "Each league's event-page tabs, mapping the markets fetched from that tab to canonical stats. Market keys are FanDuel marketType with the per-player letter removed and any _HIGH/_MEDIUM/_LOW suffix dropped, e.g. PLAYER_X_PASSING_YARDS_HIGH -> PLAYER_PASSING_YARDS. List a market under one tab only: a run fetches a game's tab only when the board needs one of its stats.",
     "sports": {
       "NFL": {"page": "nfl", "tabs": {

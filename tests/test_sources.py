@@ -65,15 +65,15 @@ def test_http_expired_cache_refetches(tmp_path):
 def test_http_delays_between_live_requests(tmp_path):
     slept = []
     fetch = FakeFetch({"a": (200, b"{}"), "b": (200, b"{}")})
-    http = Http(tmp_path, fetch=fetch, sleep=slept.append, delay=(1, 2))
+    http = Http(tmp_path, fetch=fetch, sleep=slept.append, delay=(1, 2), clock=FakeClock())
     http.get_json("a")
     http.get_json("b")
     assert len(slept) == 1 and 1 <= slept[0] <= 2
 
 
 def test_http_paces_each_host_on_its_own(tmp_path):
-    slept = []
-    http = Http(tmp_path, fetch=lambda url, browser=False: (200, b"{}"), sleep=slept.append, delay=(1, 1))
+    slept, clock = [], FakeClock()
+    http = Http(tmp_path, fetch=lambda url, browser=False: (200, b"{}"), sleep=slept.append, delay=(1, 1), clock=clock)
     for url in ["https://dk.example/a", "https://fd.example/a", "https://dk.example/b", "https://fd.example/b"]:
         http.get_json(url)
     assert slept == [1, 1]  # before each host's second request; a host's first request never waits on another's
@@ -139,7 +139,9 @@ def test_http_times_each_book_and_counts_its_live_requests(tmp_path):
     with http.for_book("draftkings") as dk:
         dk.get_json("https://dk.example/a")
         dk.get_json("https://dk.example/b")
-    assert http.timing == {"draftkings": {"requests": 2, "cached": 0, "failed": False, "seconds": 2.0}}  # 0.5 + 1 + 0.5
+    # Requests start 1 s apart: the first takes 0.5, so the second waits 0.5 more and takes 0.5.
+    assert http.timing == {"draftkings": {"requests": 2, "cached": 0, "failed": False, "rate_limited": False,
+                                           "seconds": 1.5}}
 
 
 def test_http_a_book_answered_from_the_odds_cache_made_no_live_requests(tmp_path):
@@ -148,7 +150,8 @@ def test_http_a_book_answered_from_the_odds_cache_made_no_live_requests(tmp_path
     http = Http(tmp_path, fetch=slow_fetch(clock), sleep=clock.sleep, clock=clock)
     with http.for_book("draftkings") as dk:
         dk.get_json("https://dk.example/a")
-    assert http.timing == {"draftkings": {"requests": 0, "cached": 1, "failed": False, "seconds": 0.0}}
+    assert http.timing == {"draftkings": {"requests": 0, "cached": 1, "failed": False, "rate_limited": False,
+                                           "seconds": 0.0}}
 
 
 def test_http_records_a_book_that_failed(tmp_path):
@@ -272,3 +275,126 @@ def test_fanduel_parse_event_markets(books):
     # Alt "X+" ladders are one-sided and never become markets.
     assert all(m.two_sided for m in markets)
     assert len({(m.player, m.stat) for m in markets}) == len(markets)
+
+
+# --- pacing: several requests in flight per book ------------------------------
+
+import threading
+import time
+
+
+class Network:
+    """A fake network that notes when each request starts and how many are in flight at once."""
+
+    def __init__(self, seconds=0.05, status=None):
+        self.seconds, self.status = seconds, status or (lambda url, n: (200, {}))
+        self.lock, self.in_flight, self.peak, self.starts = threading.Lock(), 0, 0, []
+
+    def __call__(self, url, browser=False):
+        with self.lock:
+            self.in_flight += 1
+            self.peak = max(self.peak, self.in_flight)
+            self.starts.append((time.monotonic(), url))
+            n = sum(u == url for _, u in self.starts)
+        time.sleep(self.seconds)
+        with self.lock:
+            self.in_flight -= 1
+        status, headers = self.status(url, n)
+        return status, json.dumps({"url": url}).encode(), headers
+
+
+URLS = [f"https://dk.example/{i}" for i in range(9)]
+
+
+def test_a_paced_book_keeps_at_most_in_flight_requests_going_and_answers_in_order(tmp_path):
+    net = Network()
+    http = Http(tmp_path, fetch=net)
+    with http.for_book("draftkings", pacing={"in_flight": 3, "min_gap": 0}) as dk:
+        got = dk.get_many(URLS)
+    assert got == [{"url": u} for u in URLS]
+    assert net.peak == 3
+
+
+def test_a_paced_book_starts_requests_at_least_min_gap_apart(tmp_path):
+    net = Network(seconds=0.01)
+    http = Http(tmp_path, fetch=net)
+    with http.for_book("draftkings", pacing={"in_flight": 3, "min_gap": 0.05}) as dk:
+        dk.get_many(URLS[:5])
+    starts = sorted(t for t, _ in net.starts)
+    assert min(b - a for a, b in zip(starts, starts[1:])) >= 0.045
+
+
+def test_a_book_without_pacing_keeps_one_request_at_a_time_1_to_2_s_apart(tmp_path):
+    clock, net = FakeClock(), Network(seconds=0)
+    slept = []
+    http = Http(tmp_path, fetch=net, sleep=lambda t: (slept.append(t), clock.sleep(t)), clock=clock)
+    with http.for_book("draftkings") as dk:
+        dk.get_many(URLS[:4])
+    assert net.peak == 1 and len(slept) == 3 and all(0.9 <= s <= 2 for s in slept)
+
+
+def test_a_cancelled_run_stops_the_rest_of_a_batch(tmp_path):
+    from ppopt.progress import Progress, RunCancelled
+
+    progress = Progress(lambda e: None)
+
+    def cancel_on_first(url, n):
+        progress.cancel()  # the browser went away while the first requests were in flight
+        return 200, {}
+
+    net = Network(status=cancel_on_first)
+    http = Http(tmp_path, fetch=net, progress=progress)
+    with pytest.raises(RunCancelled):
+        with http.for_book("draftkings", pacing={"in_flight": 3, "min_gap": 0}) as dk:
+            dk.get_many(URLS)
+    assert len(net.starts) <= 3
+
+
+# --- a book that pushes back is rate-limited ------------------------------------
+
+def limits_first(url_to_limit, status=429, retry_after=None, times=1):
+    """A book that pushes back on one URL's first `times` requests."""
+    def respond(url, n):
+        if url == url_to_limit and n <= times:
+            return status, {"Retry-After": retry_after} if retry_after is not None else {}
+        return 200, {}
+    return respond
+
+
+def test_a_rate_limited_book_retries_after_retry_after_and_then_goes_one_at_a_time(tmp_path):
+    net, slept = Network(seconds=0.02, status=limits_first(URLS[0], retry_after="2")), []
+    http = Http(tmp_path, fetch=net, delay=(0.01, 0.01), sleep=lambda t: (slept.append(t), time.sleep(min(t, 0.01))))
+    with http.for_book("draftkings", pacing={"in_flight": 3, "min_gap": 0}) as dk:
+        got = dk.get_many(URLS)
+    assert got == [{"url": u} for u in URLS]
+    assert 2 in slept  # waited as asked before retrying
+    assert http.timing["draftkings"]["rate_limited"] is True
+    retried = max(t for t, u in net.starts if u == URLS[0])
+    later = sorted(t for t, u in net.starts if t > retried + 0.02)  # started once the retry had landed
+    assert all(b - a >= 0.02 for a, b in zip(later, later[1:]))  # one at a time: each waits for the last
+
+
+@pytest.mark.parametrize("status", [403, 429])
+def test_a_book_that_pushes_back_twice_fails_naming_the_rate_limit(tmp_path, status):
+    net = Network(seconds=0, status=limits_first(URLS[0], status=status, times=2))
+    http = Http(tmp_path, fetch=net, delay=(0, 0), sleep=lambda t: None)
+    with pytest.raises(FetchError, match=f"rate-limited: HTTP {status}"):
+        with http.for_book("draftkings", pacing={"in_flight": 3, "min_gap": 0}) as dk:
+            dk.get_many(URLS[:1])
+    assert len(net.starts) == 2  # the request and one retry
+
+
+def test_a_book_asking_for_a_long_wait_fails_at_once(tmp_path):
+    net, slept = Network(seconds=0, status=limits_first(URLS[0], retry_after="60")), []
+    http = Http(tmp_path, fetch=net, delay=(0, 0), sleep=slept.append)
+    with pytest.raises(FetchError, match="rate-limited: HTTP 429 .* asked to wait 60s"):
+        with http.for_book("draftkings", pacing={"in_flight": 3, "min_gap": 0}) as dk:
+            dk.get_many(URLS[:1])
+    assert len(net.starts) == 1 and 60 not in slept
+
+
+def test_a_request_made_by_no_book_is_not_retried(tmp_path):
+    net = Network(seconds=0, status=limits_first("https://pp.example/board", status=403))
+    with pytest.raises(FetchError, match="^HTTP 403"):
+        Http(tmp_path, fetch=net, sleep=lambda t: None).get_json("https://pp.example/board")
+    assert len(net.starts) == 1

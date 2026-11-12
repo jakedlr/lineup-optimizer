@@ -108,10 +108,12 @@ def collect(
         ]
         if progress:
             progress.plan("fanduel", sport, 1 + len(fetches))
-        found = []
-        for event_id, teams, tab, markets_in_tab in fetches:
-            url = EVENT.format(state=conf["state"], key=API_KEY, event=event_id, tab=tab)
-            found += parse_event_markets(http.get_json(url), sport, teams, markets_in_tab)
+        payloads = http.get_many([EVENT.format(state=conf["state"], key=API_KEY, event=event_id, tab=tab)
+                                  for event_id, _, tab, _ in fetches])
+        found = [
+            m for (_, teams, _, markets_in_tab), payload in zip(fetches, payloads)
+            for m in parse_event_markets(payload, sport, teams, markets_in_tab)
+        ]
         if fetches and not found and warnings is not None:  # nothing to fetch isn't "not posted"
             warnings.append(no_props_warning("FanDuel", sport, len(events)))
         markets += found

@@ -98,7 +98,11 @@ def test_http_ticks_progress_on_live_and_cached_requests(tmp_path):
 
 class FakeHttp:
     def __init__(self, routes, progress):
-        self.routes, self.progress, self.calls = routes, progress, []
+        self.routes, self.progress, self.calls, self.batches = routes, progress, [], []
+
+    def get_many(self, urls):
+        self.batches.append(list(urls))
+        return [self.get_json(url) for url in urls]
 
     def get_json(self, url, browser=False):
         self.calls.append(url)
@@ -264,3 +268,20 @@ def test_progress_events_go_out_in_the_order_they_happened():
     p.tick("draftkings")
     other[0].join(2)
     assert sent == [1, 2]
+
+
+# --- each league's requests go to the book as one batch, after its league page -------
+
+def test_draftkings_asks_for_a_leagues_subcategories_in_one_batch():
+    http = Fixtures(DK_ROUTES)
+    draftkings.collect(http, Config.load(ROOT), books()["draftkings"], ["NFL"], NOW, 24,
+                       needs={("NFL", GAME): {"rec_yards", "receptions"}})
+    assert http.batches == [http.calls[1:]] and len(http.calls) == 3
+
+
+def test_fanduel_asks_for_a_leagues_tabs_in_one_batch():
+    http = Fixtures(FD_ROUTES)
+    markets = fanduel.collect(http, Config.load(ROOT), books()["fanduel"], ["NFL"], NOW, 24,
+                              needs=every_stat("fanduel"))
+    assert http.batches == [http.calls[1:]] and len(http.calls) == 4
+    assert markets

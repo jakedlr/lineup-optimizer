@@ -105,10 +105,8 @@ def collect(
         subcats = subcategory_ids(league, names) if events else {}
         if progress:
             progress.plan("draftkings", sport, 1 + len(subcats))
-        found = []
-        for stat, (cat, sub) in subcats.items():
-            payload = http.get_json(f"{base}/categories/{cat}/subcategories/{sub}")
-            found += parse_markets(payload, sport, stat, events)
+        payloads = http.get_many([f"{base}/categories/{cat}/subcategories/{sub}" for cat, sub in subcats.values()])
+        found = [m for stat, payload in zip(subcats, payloads) for m in parse_markets(payload, sport, stat, events)]
         # Not posted yet: the board's games are listed, but none of the subcategories their stats come from.
         if events and names and not found and warnings is not None:
             warnings.append(no_props_warning("DraftKings", sport, len(events)))

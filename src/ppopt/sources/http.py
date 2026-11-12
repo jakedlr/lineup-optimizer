@@ -2,12 +2,14 @@
 
 import hashlib
 from collections import Counter
+from concurrent.futures import ThreadPoolExecutor
 import json
 import os
 import random
 import threading
 import time
 from datetime import datetime, timezone
+from email.utils import parsedate_to_datetime
 from pathlib import Path
 from urllib.parse import urlsplit
 
@@ -23,8 +25,9 @@ class FetchError(RuntimeError):
     """A request failed, was blocked, or did not return JSON."""
 
 
-def scrapling_fetch(url: str, browser: bool = False) -> tuple[int, bytes]:
-    """Fetch with Scrapling: TLS-impersonating HTTP, or a stealth browser when browser=True."""
+def scrapling_fetch(url: str, browser: bool = False) -> tuple[int, bytes, dict]:
+    """Fetch with Scrapling: TLS-impersonating HTTP, or a stealth browser when browser=True.
+    Returns status, body and response headers."""
     headers = {"Accept": "application/json"}
     if browser:
         from scrapling.fetchers import StealthyFetcher
@@ -34,11 +37,11 @@ def scrapling_fetch(url: str, browser: bool = False) -> tuple[int, bytes]:
         if body.lstrip()[:1] == b"<":
             # Browsers may wrap JSON in a <pre>; take its text.
             body = (page.css("pre::text").get() or "").encode()
-        return page.status, body
+        return page.status, body, dict(page.headers or {})
     from scrapling.fetchers import Fetcher
 
     page = Fetcher.get(url, impersonate="chrome", headers=headers, timeout=30)
-    return page.status, page.body
+    return page.status, page.body, dict(page.headers or {})
 
 
 def parse_time(value: str) -> datetime:
@@ -55,6 +58,65 @@ def parse_time(value: str) -> datetime:
 def in_window(start: datetime, now: datetime, hours: float) -> bool:
     """True if `start` is in the future and no more than `hours` away."""
     return 0 <= (start - now).total_seconds() <= hours * 3600
+
+
+class Pacer:
+    """How fast one sportsbook may be asked: at most `in_flight` requests at once, each starting `gap()` seconds
+    after the one before. Used as a context manager around each live request."""
+
+    def __init__(self, in_flight: int, gap, clock, sleep):
+        self.in_flight, self.gap, self.clock, self.sleep = in_flight, gap, clock, sleep
+        self._cond = threading.Condition()
+        self._active = 0
+        self._next_start: float | None = None
+
+    @classmethod
+    def slow(cls, delay, clock, sleep) -> "Pacer":
+        """One request at a time, `delay` (a (low, high) range of seconds) apart: how every book was once asked."""
+        return cls(1, lambda: random.uniform(*delay), clock, sleep)
+
+    def __enter__(self):
+        with self._cond:
+            while self._active >= self.in_flight:
+                self._cond.wait()
+            self._active += 1
+            now = self.clock()
+            start = now if self._next_start is None else max(now, self._next_start)
+            self._next_start = start + self.gap()
+        if start > now:
+            self.sleep(start - now)
+        return self
+
+    def __exit__(self, *exc):
+        with self._cond:
+            self._active -= 1
+            self._cond.notify_all()
+        return False
+
+    def slow_down(self, delay):
+        """The book pushed back: from now on, one request at a time, `delay` seconds apart."""
+        with self._cond:
+            self.in_flight = 1
+            self.gap = lambda: random.uniform(*delay)
+
+
+RATE_LIMITED = (403, 429)
+MAX_RETRY_AFTER = 10  # seconds; odds a minute old aren't worth waiting for
+
+
+def retry_after(headers: dict) -> float | None:
+    """Seconds a Retry-After header asks for (a number or an HTTP date), or None."""
+    value = next((v for k, v in headers.items() if k.lower() == "retry-after"), None)
+    if value is None:
+        return None
+    try:
+        return max(0.0, float(value))
+    except ValueError:
+        pass
+    try:
+        return max(0.0, (parsedate_to_datetime(value) - datetime.now(timezone.utc)).total_seconds())
+    except (TypeError, ValueError):
+        return None
 
 
 class Http:
@@ -78,7 +140,8 @@ class Http:
         self.progress = progress  # ppopt.progress.Progress, ticked once per request
         self.clock = clock
         self._live_requests = 0
-        self._hosts_fetched: set[str] = set()
+        self._rate_limited: set[str] = set()  # books that pushed back during this run
+        self._pacers: dict[str, Pacer] = {}  # {book, or host for requests made by no book: its pacer}
         self._by_book: dict[str, Counter] = {}  # {book: Counter(live=..., cached=...)}, failed requests included
         self._lock = threading.Lock()  # books share this Http from their own threads
         self._stopped = threading.Event()
@@ -105,13 +168,25 @@ class Http:
         with self._lock:
             return {book: self._timing[book] for book in self._books if book in self._timing}
 
-    def for_book(self, book: str) -> "BookHttp":
-        """This Http as one book uses it: same odds cache, with the book's live requests and time recorded.
+    def for_book(self, book: str, pacing: dict | None = None) -> "BookHttp":
+        """This Http as one book uses it: same odds cache, paced by `pacing` ({"in_flight", "min_gap"}; without it,
+        one request at a time 1-2 s apart), with the book's live requests and time recorded.
         Hand out views in book order: timing lists books in the order they were handed views."""
         with self._lock:
             if book not in self._books:
                 self._books.append(book)
+            if pacing:
+                gap = float(pacing["min_gap"])
+                self._pacers[book] = Pacer(int(pacing["in_flight"]), lambda: gap, self.clock, self.sleep)
+            else:
+                self._pacers.setdefault(book, Pacer.slow(self.delay, self.clock, self.sleep))
         return BookHttp(self, book)
+
+    def _pacer(self, key: str) -> Pacer:
+        with self._lock:
+            if key not in self._pacers:
+                self._pacers[key] = Pacer.slow(self.delay, self.clock, self.sleep)
+            return self._pacers[key]
 
     def _cache_path(self, url: str) -> Path:
         return self.cache_dir / (hashlib.sha256(url.encode()).hexdigest()[:32] + ".json")
@@ -131,16 +206,15 @@ class Http:
             self._tick(book)
             return data, False
 
-        host = urlsplit(url).netloc
         with self._lock:
-            paused = host in self._hosts_fetched  # pacing is per sportsbook: hosts don't wait on each other
-            self._hosts_fetched.add(host)
             self._live_requests += 1
             self._by_book.setdefault(book, Counter())["live"] += 1
-        if paused:
-            self.sleep(random.uniform(*self.delay))
-
-        status, body = self.fetch(url, browser=browser)
+        # Each book is paced on its own; a request made by no book is paced with others to its host.
+        pacer = self._pacer(book or urlsplit(url).netloc)
+        with pacer:
+            status, body, *rest = self.fetch(url, browser=browser)
+        if status in RATE_LIMITED and book:
+            status, body = self._back_off(url, browser, book, pacer, status, rest[0] if rest else {})
         if status != 200:
             raise FetchError(f"HTTP {status} from {url}")
         try:
@@ -159,6 +233,25 @@ class Http:
         self._tick(book)
         return data, True
 
+    def _back_off(self, url, browser, book, pacer, status, headers) -> tuple[int, bytes]:
+        """The book is rate-limited: slow it to one request at a time, then retry this request once."""
+        pacer.slow_down(self.delay)
+        with self._lock:
+            self._rate_limited.add(book)
+        wait = retry_after(headers)
+        if wait is not None and wait > MAX_RETRY_AFTER:
+            raise FetchError(f"rate-limited: HTTP {status} from {url}, asked to wait {wait:g}s")
+        if wait:
+            self.sleep(wait)
+        with self._lock:
+            self._live_requests += 1
+            self._by_book[book]["live"] += 1
+        with pacer:
+            retry, body, *_ = self.fetch(url, browser=browser)
+        if retry != 200:
+            raise FetchError(f"rate-limited: HTTP {retry} from {url}, again after backing off")
+        return retry, body
+
     def _tick(self, book: str):
         if self.progress is not None:
             self.progress.tick(book)
@@ -174,6 +267,29 @@ class BookHttp:
     def get_json(self, url: str, browser: bool = False):
         return self.http._get_json(url, browser, self.book)[0]
 
+    def get_many(self, urls: list[str]) -> list:
+        """Every URL's response, in order, fetched as fast as the book's pacing allows. The first failure stops
+        requests not yet started and is raised once the ones in flight have landed."""
+        if not urls:
+            return []
+        abort = threading.Event()
+
+        def one(url):
+            if abort.is_set():
+                raise RunCancelled()
+            try:
+                return self.get_json(url)
+            except BaseException:
+                abort.set()
+                raise
+
+        with ThreadPoolExecutor(max_workers=self.http._pacer(self.book).in_flight) as pool:
+            futures = [pool.submit(one, url) for url in urls]
+        errors = [f.exception() for f in futures if f.exception() is not None]
+        if errors:
+            raise next((e for e in errors if not isinstance(e, RunCancelled)), errors[0])
+        return [f.result() for f in futures]
+
     def __enter__(self):
         self.started = self.http.clock()
         return self
@@ -185,6 +301,7 @@ class BookHttp:
             counts = self.http._by_book.get(self.book, Counter())
             self.http._timing[self.book] = {
                 "requests": counts["live"], "cached": counts["cached"], "failed": exc_type is not None,
+                "rate_limited": self.book in self.http._rate_limited,
                 "seconds": self.http.clock() - self.started,
             }
         return False

@@ -211,7 +211,11 @@ def collect_markets(http: Http, cfg: Config, books: dict, sports, now, hours, ne
         warnings = []
         try:
             with view as book_http:
-                return collect(book_http, cfg, books[name], sports, now, hours, warnings=warnings, needs=needs), warnings
+                found = collect(book_http, cfg, books[name], sports, now, hours, warnings=warnings, needs=needs)
+            if http.timing.get(name, {}).get("rate_limited"):
+                warnings.append(f"{BOOK_NAMES.get(name, name)} rate-limited the run, so it finished one request at a "
+                                "time; lower its pacing in books.json")
+            return found, warnings
         except (FetchError, KeyError, ValueError) as e:
             if http.progress is not None:
                 http.progress.close(name)
@@ -223,7 +227,8 @@ def collect_markets(http: Http, cfg: Config, books: dict, sports, now, hours, ne
     sources = [("draftkings", draftkings.collect), ("fanduel", fanduel.collect)]
     with ThreadPoolExecutor(max_workers=len(sources)) as pool:
         # Views are handed out here, in book order, so timing lists the books in that order.
-        futures = [pool.submit(fetch, name, collect, http.for_book(name)) for name, collect in sources]
+        futures = [pool.submit(fetch, name, collect, http.for_book(name, books.get(name, {}).get("pacing")))
+                   for name, collect in sources]
     errors = [f.exception() for f in futures if f.exception() is not None]
     if errors:  # a bug outranks the stop it caused in the other book; otherwise the run was cancelled
         raise next((e for e in errors if not isinstance(e, RunCancelled)), errors[0])

@@ -260,9 +260,30 @@ books fetch side by side, each keeping today's rate. Terms are in `GLOSSARY.md` 
 ## Sprint 7: Concurrent requests per book
 
 **Done criteria**
-- [ ] Each book in `books.json` has `"pacing": {"in_flight": 3, "min_gap": 0.3}`, overridable through `config/`
-- [ ] A book never has more requests in flight than `in_flight`, nor starts two less than `min_gap` apart
-- [ ] On a 403/429 a book is rate-limited: it falls back to one request at a time, 1–2 s apart, retries that request
+- [x] Each book in `books.json` has `"pacing": {"in_flight": 3, "min_gap": 0.3}`, overridable through `config/`
+- [x] A book never has more requests in flight than `in_flight`, nor starts two less than `min_gap` apart
+- [x] On a 403/429 a book is rate-limited: it falls back to one request at a time, 1–2 s apart, retries that request
       once (honouring `Retry-After`), then fails with a warning that names the rate limit
-- [ ] A full slate (NFL + NBA + NHL) runs fresh in under 30 s with no rate-limited warning
+- [x] A full slate (NFL + NBA + NHL) runs fresh in under 30 s with no rate-limited warning
+
+**Notes**
+- Live run, 2026-11-12 01:22 UTC, fresh (no cache), 4 NBA + 13 NHL + 1 NFL game on the same 31k-projection board:
+  **14.0 s**, DraftKings 32 live requests in 9.8 s, FanDuel 45 in 13.4 s, no rate-limited warning. Sprint 6's run
+  made 78 requests in 89.8 s, nearly all of it the 1-2 s pause per request. (DraftKings went from 20 requests to 32
+  because the window now took in an NFL game: its league page plus 12 subcategories.)
+- The sources hand each league's requests to `Http` as one batch (`get_many`, answers in order), after the league
+  page. `Http` paces each book with its own `Pacer`: at most `in_flight` requests at once, starts at least the gap
+  apart. A book with no `pacing`, and any request made by no book (the CLI's PrizePicks fetch), keeps one request
+  at a time 1-2 s apart.
+- The gap now runs from one request's start to the next, not from the end of the last one, so even the slow pace
+  is a touch quicker than before (a 0.3 s request followed by a 1.5 s gap waits 1.2 s).
+- Rate-limited: a 403/429 to a book's request slows that book to one at a time, 1-2 s apart, and retries once after
+  `Retry-After` (seconds or an HTTP date). Asking for more than 10 s fails the book at once; a second refusal fails
+  it too. Either way the warning reads "<book> unavailable: rate-limited: ...". A book that recovered warns that it
+  finished one request at a time. Requests made by no book (PrizePicks) are never retried.
+- `fetch` now returns the response headers as a third value (for `Retry-After`); fakes returning two still work.
+- Tests that passed when first written, guarding behaviour that arrived with the batch: a cancel stops the rest of a
+  batch, and a request made by no book isn't retried.
+
+**Review:** done 2026-11-12.
 
