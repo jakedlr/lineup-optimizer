@@ -9,7 +9,7 @@
   --raised: #eceef1;
   --border: #e3e5e9;
   --rule: #eef0f2;
-  --control: #d2d5da;
+  --control: #868b93;
   --text: #0a0a0a;
   --muted: #62666d;
   --primary: #141414;
@@ -53,7 +53,7 @@
     --raised: #1e2125;
     --border: #262a2f;
     --rule: #1e2125;
-    --control: #3a3f46;
+    --control: #60656d;
     --text: #f3f4f6;
     --muted: #9aa0a8;
     --primary: #f3f4f6;
@@ -74,7 +74,7 @@
   --raised: #1e2125;
   --border: #262a2f;
   --rule: #1e2125;
-  --control: #3a3f46;
+  --control: #60656d;
   --text: #f3f4f6;
   --muted: #9aa0a8;
   --primary: #f3f4f6;
@@ -94,6 +94,10 @@
 }
 
 * { box-sizing: border-box; }
+/* Phones: no grey flash on tap (every control has its own press state), no double-tap wait, and a long press on a
+   control doesn't select its label. Content text stays selectable. */
+html { -webkit-tap-highlight-color: transparent; }
+button, summary { touch-action: manipulation; -webkit-user-select: none; user-select: none; }
 body { margin: 0; min-height: 100dvh; background: var(--ground); }
 h1, h2, h3, p { margin: 0; }
 
@@ -101,6 +105,7 @@ h1, h2, h3, p { margin: 0; }
 .shell {
   max-width: 76rem; margin: 0 auto; padding: 32px var(--margin) 64px;
   display: grid; gap: var(--gap);
+  grid-template-columns: minmax(0, 1fr); /* a long unbroken line (a URL in a warning) can't widen the page */
 }
 .top { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--gap); padding-bottom: 12px; }
 .brand { display: flex; align-items: center; gap: 12px; }
@@ -129,7 +134,7 @@ h1, h2, h3, p { margin: 0; }
 .engine[data-state='offline']::before { background: var(--negative); }
 
 /* Cards: white on the ground, a 1px edge, no shadow. */
-.board, .settings, .alerts, .promo, .run-progress, .slip, .table-wrap, .empty-report {
+.board, .settings, .alerts, .promo, .run-progress, .slip, .table-wrap, .error {
   background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-card);
 }
 
@@ -140,12 +145,16 @@ button {
   border: 1px solid transparent; cursor: pointer;
   transition: transform 160ms var(--ease-out), background-color 150ms ease, color 150ms ease, border-color 150ms ease;
 }
-button:disabled { opacity: 0.45; cursor: not-allowed; }
-button:focus-visible, .results li:focus-visible, input:focus-visible, select:focus-visible, summary:focus-visible {
+/* Disabled stays legible, with its reason beside it; a button at work is busy, at full strength, not disabled. */
+button:disabled:not([aria-busy='true']) { cursor: not-allowed; color: var(--muted); border-color: var(--border); }
+.primary:disabled:not([aria-busy='true']) { background: var(--raised); }
+button[aria-busy='true'], button[aria-disabled='true'] { cursor: progress; }
+button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-visible {
   outline: 2px solid var(--text); outline-offset: 2px;
 }
 button:active:not(:disabled) { transform: scale(0.97); }
 .primary { background: var(--primary); color: var(--primary-ink); min-width: 96px; }
+.run-button { min-width: 8.5rem; } /* "Running… 39%" fits without the row moving */
 .secondary { background: var(--surface); color: var(--text); border-color: var(--control); }
 button.small { min-height: 30px; font-size: var(--fs-small); padding: 0 10px; }
 button.link {
@@ -159,8 +168,9 @@ button.link {
 .chip, .segmented button {
   min-height: 32px; padding: 0 12px; background: transparent; color: var(--muted); border: 1px solid transparent;
 }
-.chip { border-color: var(--control); }
-.chip[aria-pressed='true'] { background: var(--selected); border-color: var(--selected); color: var(--text); }
+.chip { display: inline-flex; align-items: center; gap: 6px; border-color: var(--muted); }
+.chip[aria-pressed='true'] { background: var(--surface); border-color: var(--text); color: var(--text); }
+.chip .check { flex: none; }
 .segmented {
   display: inline-flex; flex-wrap: wrap; gap: 2px; padding: 2px; border-radius: var(--radius-control);
   background: var(--raised);
@@ -172,7 +182,7 @@ button.link {
   .primary:hover:not(:disabled) { background: color-mix(in srgb, var(--primary) 85%, var(--ground)); }
   .secondary:hover:not(:disabled), .chip:hover { border-color: var(--muted); color: var(--text); }
   .segmented button:hover:not([aria-pressed='true']) { color: var(--text); }
-  .results li:hover { background: var(--raised); }
+  .results button:hover { background: var(--raised); }
 }
 
 .field { display: grid; gap: 6px; font-size: var(--fs-small); color: var(--muted); }
@@ -191,16 +201,18 @@ button.link {
 details > summary {
   cursor: pointer; width: fit-content; font-size: var(--fs-body); font-weight: 500; color: var(--text);
   list-style: none; display: flex; align-items: center; gap: 6px;
+  transition: opacity 100ms var(--ease-out);
 }
+details > summary:active { opacity: 0.6; }
 details > summary::-webkit-details-marker { display: none; }
 details > summary::before {
   content: ''; width: 6px; height: 6px; margin: 0 3px 0 1px; flex: none;
   border-right: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor;
-  transform: rotate(-45deg); transition: transform 160ms var(--ease-out);
+  align-self: center; transform: rotate(-45deg); transition: transform 160ms var(--ease-out);
 }
-details[open] > summary::before { transform: rotate(45deg); }
+details[open] > summary::before { transform: translateY(-2px) rotate(45deg); }
 kbd, code {
-  font-family: 'Geist Variable', 'Geist', system-ui, sans-serif; font-size: 0.857em; font-weight: 500;
+  font-family: 'Geist Variable', 'Geist', system-ui, sans-serif; font-size: 11px; font-weight: 500;
   padding: 1px 5px; border-radius: 4px; background: var(--raised); color: var(--text);
 }
 
@@ -214,6 +226,7 @@ kbd, code {
 .board-status .warn { overflow-wrap: anywhere; } /* a fetch failure can quote a long URL */
 .howto { flex-basis: 100%; border-top: 1px solid var(--rule); padding-top: 12px; }
 .howto > summary + p { margin-top: 8px; }
+.howto[data-quiet] > summary { font-size: var(--fs-small); font-weight: 400; color: var(--muted); }
 .howto > button { margin-top: 12px; }
 .howto ol { margin: 8px 0; padding-left: 20px; display: grid; gap: 6px; }
 .howto a { color: var(--text); text-underline-offset: 2px; }
@@ -222,7 +235,7 @@ kbd, code {
 /* --- settings ---------------------------------------------------------------------------- */
 .settings { display: grid; gap: var(--gap); padding: 16px var(--pad); }
 .settings-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 16px; }
-.settings-row { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: var(--gap) 24px; }
+.settings-row { display: flex; flex-wrap: wrap; align-items: start; justify-content: flex-start; gap: var(--gap) 48px; }
 .advanced .grid {
   display: grid; gap: var(--gap) 16px; margin-top: 12px;
   grid-template-columns: repeat(auto-fill, minmax(min(100%, 14rem), 1fr)); align-items: end;
@@ -234,34 +247,55 @@ kbd, code {
 /* --- phone alerts ------------------------------------------------------------------------ */
 /* Folded to one line once a topic is set: the title and where alerts go. Open, the topic and its actions lead, then
    the two tiers as rows split by a rule, then the server and token, tucked away. Changes save themselves. */
-.alerts { padding: 16px var(--pad); }
+.alerts { position: relative; padding: 16px var(--pad); }
 .alerts > details > summary { width: 100%; flex-wrap: wrap; align-items: baseline; gap: 2px 12px; }
+/* The title starts where every card's title does; the arrow sits at the far end of its first line. */
+.alerts > details > summary { position: relative; padding-right: 24px; }
+.alerts > details > summary::before { position: absolute; top: 9px; right: 1px; margin: 0; }
+/* No topic yet: Set up sits in the folded row, beside the arrow (outside the summary: no button in a button). */
+.alerts[data-set-up] > details > summary { padding-right: calc(24px + 4.5rem); }
+.set-up { position: absolute; top: 13px; right: calc(var(--pad) + 24px); }
 .alerts-summary { font-weight: 400; overflow-wrap: anywhere; min-width: 0; }
 .alerts-body { display: grid; gap: var(--gap); margin-top: 12px; }
 .alerts-body > .warn { overflow-wrap: anywhere; }
 .topic { display: flex; flex-wrap: wrap; align-items: end; gap: 8px 12px; }
 .topic-field { flex: 1 1 16rem; }
 .topic-field input { width: 100%; }
-.topic-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.topic-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .topic-notes { display: grid; gap: 4px; overflow-wrap: anywhere; }
 .topic-notes a { color: var(--text); text-underline-offset: 2px; }
-.tiers { display: grid; gap: 8px; }
-.tier {
-  display: grid; grid-template-columns: minmax(12rem, 1fr) auto auto; align-items: end; gap: 8px 24px;
-  padding: 12px 0; border-top: 1px solid var(--rule);
-}
+/* The tiers as rows on shared columns (switch, edge, qualifying legs, what meets it), headed once in grey. */
+.tiers { display: grid; }
+.tier-head, .tier { display: grid; grid-template-columns: 11rem 9.5rem 6rem minmax(0, 1fr); column-gap: 16px; }
+.tier-head { font-size: var(--fs-small); color: var(--muted); padding-bottom: 6px; }
+.tier { align-items: center; row-gap: 8px; padding: 10px 0; border-top: 1px solid var(--rule); }
 .tier:last-of-type { border-bottom: 1px solid var(--rule); }
-.tier .switch { min-height: var(--control-height); justify-self: start; padding-left: 0; }
+.tier .switch { min-height: var(--control-height); justify-self: start; padding-left: 0; white-space: nowrap; }
 .tier-name { font-weight: 500; }
-.tier .field input { width: 88px; }
-.tier-says { grid-column: 1 / -1; }
-.joined { display: flex; }
-.joined input { flex: 1; min-width: 0; border-top-right-radius: 0; border-bottom-right-radius: 0; }
-.joined button { border-top-left-radius: 0; border-bottom-left-radius: 0; margin-left: -1px; }
+.tier .field input { width: 100%; }
+.suffix { display: flex; align-items: center; gap: 6px; color: var(--text); font-size: var(--fs-body); }
+.suffix input { flex: 1 1 auto; }
+.tier-says { grid-column: auto; font-size: var(--fs-small); }
+.tiers > .warn, .tier-more { margin-top: 8px; }
+.tier-more > summary { font-size: var(--fs-small); font-weight: 400; color: var(--muted); }
+.tier-more > p { margin-top: 4px; }
+@media (width > 40rem) {
+  .tier-label {
+    position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0;
+    overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0;
+  }
+}
+.zone-field { max-width: 22rem; }
+.alerts .advanced .grid { grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr)); }
+.joined { display: flex; min-width: 0; }
+.joined input { width: 0; flex: 1 1 auto; min-width: 0; border-top-right-radius: 0; border-bottom-right-radius: 0; }
+.joined button { flex: none; border-top-left-radius: 0; border-bottom-left-radius: 0; margin-left: -1px; }
 .token-set { display: flex; align-items: center; gap: 12px; min-height: var(--control-height); color: var(--text); font-size: var(--fs-body); }
+/* Phone: each tier stacks: its switch, then edge and legs side by side under their own labels, then what meets it. */
 @media (max-width: 40rem) {
-  .tier { grid-template-columns: auto auto 1fr; }
-  .tier .switch { grid-column: 1 / -1; }
+  .tier-head { display: none; }
+  .tier { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .tier .switch, .tier-says { grid-column: 1 / -1; }
 }
 
 /* How the latest run's alert went, beside its mark. */
@@ -275,13 +309,20 @@ kbd, code {
 .label { font-size: var(--fs-section); font-weight: 500; }
 .picker { display: grid; gap: 8px; }
 .picker input[type='search'] { width: 100%; }
-.results { list-style: none; margin: 0; padding: 4px; display: grid; border: 1px solid var(--border); border-radius: var(--radius-control); }
-.results li {
-  display: flex; flex-wrap: wrap; justify-content: space-between; gap: 2px 16px;
-  padding: 8px 10px; border-radius: 4px; cursor: pointer; transition: background-color 120ms ease;
+input[type='search']::-webkit-search-cancel-button { filter: grayscale(1) brightness(0.4); }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) input[type='search']::-webkit-search-cancel-button { filter: grayscale(1) brightness(1.6); }
 }
-.results li:active { background: var(--selected); }
+:root[data-theme='dark'] input[type='search']::-webkit-search-cancel-button { filter: grayscale(1) brightness(1.6); }
+.results { list-style: none; margin: 0; padding: 4px; display: grid; border: 1px solid var(--border); border-radius: var(--radius-control); }
+.results button {
+  width: 100%; min-height: 0; display: flex; flex-wrap: wrap; justify-content: space-between; gap: 2px 16px;
+  padding: 8px 10px; border-radius: 4px; background: transparent; color: var(--text);
+  font-weight: 400; line-height: 1.5; text-align: left; transition: background-color 120ms ease;
+}
+.results button:active:not(:disabled) { background: var(--selected); transform: none; } /* a whole row doesn't shrink */
 .chosen { display: grid; gap: 8px; padding: 12px; border-radius: var(--radius-control); background: var(--raised); }
+.chosen .segmented { background: var(--surface); }
 .chosen-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; }
 .promo-legs { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
 .promo-legs li {
@@ -291,67 +332,109 @@ kbd, code {
 .promo-legs li > span:first-child { font-weight: 500; }
 
 /* --- run --------------------------------------------------------------------------------- */
-.actions { display: flex; align-items: center; gap: var(--gap); flex-wrap: wrap; padding: 4px 0; }
+/* The Run row, straight under the board: Run, Fresh odds and why Run is held on the left; when the next auto run
+   starts, then the auto runs switch, at the far right (the switch comes first from the right, so "Next run"
+   appearing doesn't move it). The bar (Run, the switch) and the notes are one row here; on a phone they part. */
+.run-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px var(--gap); padding: 4px 0; }
+.run-bar, .run-notes { display: contents; }
+.run-row .fresh { font-size: var(--fs-body); }
+.run-row .fresh input { margin-left: 0; }
+.next-run { order: 1; margin-left: auto; }
+.run-row .switch { order: 2; margin-left: auto; }
+.run-row:has(.next-run) .switch { margin-left: 0; }
 
-/* Auto runs: an on/off switch at the far end of the Run row. Off is a grey track; on fills it with ink and the
-   thumb slides across (feedback on the press, nothing else moves). */
-/* Right-aligned on a wide screen, so the switch comes first from the right: "Next run" appearing doesn't move it. */
-.auto-runs { display: flex; flex-direction: row-reverse; align-items: center; gap: 4px 12px; flex-wrap: wrap; margin-left: auto; }
+/* Phone: Run and the auto runs switch go into a bar held to the foot of the screen, from wherever the page is
+   scrolled. It is the last thing in the column, so at the very end it rests in place under the theme, covering
+   nothing. The rest of the row (Fresh odds, why Run is held, the next run) stays here under the board. */
+@media (max-width: 40rem) {
+  .shell { padding-bottom: 0; }
+  .run-row { display: contents; }
+  .run-notes { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 16px; }
+  .next-run { margin-left: 0; }
+  .run-bar {
+    order: 1; position: sticky; bottom: 0; z-index: 5;
+    display: flex; align-items: center; gap: 16px;
+    margin: 0 calc(-1 * var(--margin)); padding: 12px var(--margin) calc(12px + env(safe-area-inset-bottom, 0px));
+    background: var(--surface); border-top: 1px solid var(--border);
+  }
+  .run-bar .run-button { flex: 1; min-height: 44px; }
+  .run-row .switch { margin-left: 0; min-height: 44px; }
+}
+
+/* Auto runs: an on/off switch. Off is an outlined track with a grey thumb, an edge that reads against the card; on
+   fills it with ink and the thumb slides across (feedback on the press, nothing else moves). */
 .switch {
   display: inline-flex; align-items: center; gap: 8px; padding: 0 4px;
   background: transparent; color: var(--text);
 }
 .switch-track {
   position: relative; flex: none; width: 32px; height: 18px; border-radius: 999px;
-  background: var(--control); transition: background-color 160ms ease;
+  --ring: var(--muted); background: transparent;
+  box-shadow: inset 0 0 0 1.5px var(--ring); /* taste-skill-ignore: an inset edge, not a shadow */
+  transition: background-color 160ms ease, box-shadow 160ms ease;
 }
 .switch-thumb {
-  position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border-radius: 50%;
-  background: var(--surface); transition: transform 160ms var(--ease-out);
+  position: absolute; top: 3px; left: 3px; width: 12px; height: 12px; border-radius: 50%;
+  background: var(--muted); transition: transform 160ms var(--ease-out), background-color 160ms ease;
 }
-.switch[aria-checked='true'] .switch-track { background: var(--primary); }
+.switch[aria-checked='true'] .switch-track { background: var(--primary); --ring: var(--primary); }
 .switch[aria-checked='true'] .switch-thumb { transform: translateX(14px); background: var(--primary-ink); }
 .switch:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
-.auto-note { overflow-wrap: anywhere; text-align: right; }
+.auto-note { overflow-wrap: anywhere; text-align: right; text-wrap: balance; max-width: 64ch; margin-left: auto; }
 @media (max-width: 40rem) {
-  .auto-runs { margin-left: 0; flex-direction: row; }
-  .auto-note { text-align: left; }
+  .auto-note { text-align: left; margin-left: 0; }
 }
 
 /* Which run a report or failure came from: "Auto run · 14:15". */
 .run-mark { color: var(--text); font-weight: 500; }
-.error .run-mark { color: inherit; margin-right: 4px; }
+/* A run that failed: a card like the rest, in ink, its mark on the first line behind one small red dot, the reason
+   as a sentence, then Try again. Red is the signal, not the text. */
 .error {
-  color: var(--negative); padding: 12px 16px; border-radius: var(--radius-card);
-  background: color-mix(in srgb, var(--negative) 8%, var(--surface));
+  display: grid; gap: 4px; justify-items: start; padding: 12px 16px;
+  color: var(--text); overflow-wrap: anywhere;
 }
-.run-progress { display: grid; gap: 8px; padding: 16px var(--pad); }
+.error > p { max-width: 100%; }
+.error > p:first-child::before {
+  content: ''; display: inline-block; width: 6px; height: 6px; border-radius: 50%;
+  margin-right: 8px; vertical-align: 1px; background: var(--negative);
+}
+.error button.link { margin: 4px 0 0; font-size: var(--fs-body); }
+.run-progress { display: grid; gap: 8px; padding: 16px var(--pad); scroll-margin: 16px 0 88px; }
 .run-progress-head { display: flex; justify-content: space-between; gap: 16px; font-weight: 500; }
 .bar { height: 8px; border-radius: 999px; overflow: hidden; background: var(--raised); }
+/* Constant progress moves linearly; it holds at 99% until the report replaces it. */
 .bar-fill {
   height: 100%; background: var(--data); transform-origin: left;
-  transition: transform 300ms var(--ease-out);
+  transition: transform 250ms linear;
 }
 
 /* --- report ------------------------------------------------------------------------------ */
-.report { display: grid; gap: 32px; padding-top: 12px; }
+.report { display: grid; grid-template-columns: minmax(0, 1fr); gap: 32px; padding-top: 12px; }
+/* No longer the latest word (a run is going, or a newer one failed): dimmed, not hidden. */
+.report[data-stale] { opacity: 0.5; }
 .report-head, .block-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; }
+.report-head .run-mark { font-size: var(--fs-body); }
+.report-head .alert-failed { display: block; margin-top: 2px; }
 .block { display: grid; gap: 8px; }
-.block h2 { font-size: var(--fs-section); font-weight: 500; }
+.block h2 { font-size: var(--fs-section); font-weight: 600; }
 .warnings {
   margin: 0; padding: 12px 16px 12px 32px; color: var(--warning); border-radius: var(--radius-card);
-  background: color-mix(in srgb, var(--warning) 7%, var(--surface));
+  background: color-mix(in srgb, var(--warning) 7%, var(--surface)); overflow-wrap: anywhere;
 }
 .filters { display: flex; flex-wrap: wrap; gap: 8px; }
 
-.empty-report { padding: 24px var(--pad); display: grid; gap: 4px; }
-.empty-report h2 { font-size: var(--fs-section); font-weight: 500; }
+/* Before the first run: the report's own headings, each over the one sentence of what will go there. */
+.report-empty { display: grid; grid-template-columns: minmax(0, 1fr); gap: 32px; padding-top: 12px; }
+.empty-box {
+  display: flex; align-items: center; min-height: 44px; padding: 10px 16px;
+  border: 1px dashed var(--control); border-radius: var(--radius-card);
+}
 
 /* One slip per row, full width, so every leg fits on one line. Within a slip the legs share columns
    (odds, sport, matchup, player, line) through subgrid; on a narrow screen the legs scroll inside the card. */
 .slips { display: grid; gap: var(--gap); }
 .slip { padding: 16px 20px; min-width: 0; }
-.slip header { display: flex; align-items: baseline; gap: 8px; margin-bottom: 10px; }
+.slip header { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; margin-bottom: 10px; }
 .slip h3 { font-size: var(--fs-section); font-weight: 500; margin-right: auto; }
 .slip header .num:first-of-type { font-size: var(--fs-title); font-weight: 700; letter-spacing: -0.01em; } /* the answer figure leads */
 .slip ul {
@@ -363,11 +446,11 @@ kbd, code {
 .slip-leg .who { font-weight: 500; }
 .tag { font-size: var(--fs-small); font-weight: 500; color: var(--muted); }
 /* Phone: two lines per leg. Odds, sport, matchup and player on the first; the line on the second, starting
-   under the sport. A very long name ends in an ellipsis (full name on hover) rather than wrapping. */
+   under the sport. A very long name wraps (there is no hover on a phone to read a cut one). */
 @media (max-width: 40rem) {
   .slip ul { overflow-x: visible; grid-template-columns: max-content max-content max-content minmax(0, 1fr); column-gap: 12px; row-gap: 12px; }
-  .slip-leg { row-gap: 2px; }
-  .slip-leg .who { overflow: hidden; text-overflow: ellipsis; }
+  .slip-leg { row-gap: 2px; align-items: start; }
+  .slip-leg .who { white-space: normal; overflow: visible; text-overflow: clip; overflow-wrap: anywhere; }
   .slip-leg .pick { grid-column: 2 / -1; grid-row: 2; }
 }
 .badge {
@@ -384,7 +467,23 @@ th:last-child, td:last-child { padding-right: 20px; }
 th.num, td.num { text-align: right; }
 tbody tr:last-child td { border-bottom: 0; }
 td.num { font-variant-numeric: tabular-nums; }
-.c-prob, .c-player { font-weight: 500; }
+/* Top Legs: Edge leads at 500, Prob beside it in regular weight. A negative edge is grey with its minus; red is kept
+   for money. Each book has its own right-aligned figure column, a dash where it has no price. */
+.c-edge, .c-player .who { font-weight: 500; }
+.c-player .who { white-space: nowrap; }
+.c-player .sub { display: none; }
+.c-pick { white-space: nowrap; }
+.c-notes { white-space: normal; min-width: 7rem; }
+.c-meta { display: none; }
+.book { display: inline-block; min-width: 4.5ch; text-align: right; }
+.book + .book { margin-left: 8px; }
+.below-row td { height: 36px; font-size: var(--fs-small); color: var(--muted); border-top: 1px solid var(--border); }
+
+/* Tablet: Sport and Matchup step out of their columns into a grey line under the player. */
+@media (width > 40rem) and (width <= 68.75rem) {
+  .legs-table .c-sport, .legs-table .c-matchup { display: none; }
+  .c-player .sub { display: block; font-size: var(--fs-small); font-weight: 400; color: var(--muted); white-space: nowrap; }
+}
 
 .counts { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px 20px; }
 .counts .num { font-weight: 500; }
@@ -393,22 +492,23 @@ td.num { font-variant-numeric: tabular-nums; }
 @media (max-width: 40rem) {
   .legs-table thead { display: none; }
   .legs-table, .legs-table tbody { display: block; }
+  /* Three lines: player and edge; pick and prob; one grey meta line (league · matchup · books · notes). */
   .legs-table tr {
     display: grid; gap: 2px 12px; padding: 12px 16px; border-bottom: 1px solid var(--rule);
-    grid-template-columns: 1fr auto;
-    grid-template-areas: 'player prob' 'pick edge' 'meta meta' 'books books' 'notes notes';
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas: 'player edge' 'pick prob' 'meta meta';
   }
   .legs-table tbody tr:last-child { border-bottom: 0; }
   .legs-table td { padding: 0; height: auto; border: 0; white-space: normal; }
-  .legs-table td:empty { display: none; }
+  .legs-table .c-player .who { white-space: normal; overflow-wrap: anywhere; }
   .c-player { grid-area: player; }
-  .c-prob { grid-area: prob; }
+  .c-edge { grid-area: edge; }
   .c-pick { grid-area: pick; }
-  .c-edge { grid-area: edge; font-size: var(--fs-small); }
-  .legs-table .c-sport, .legs-table .c-matchup { grid-area: meta; font-size: var(--fs-small); color: var(--muted); }
-  .legs-table .c-matchup { padding-left: 40px; } /* follows the sport on the same line */
-  .c-books { grid-area: books; }
-  .c-notes { grid-area: notes; }
+  .c-prob { grid-area: prob; }
+  .legs-table .c-sport, .legs-table .c-matchup, .legs-table .c-books, .legs-table .c-notes { display: none; }
+  .legs-table .c-meta { display: block; grid-area: meta; font-size: var(--fs-small); color: var(--muted); overflow-wrap: anywhere; }
+  .legs-table tr.below-row { display: block; padding: 8px 16px; border-top: 1px solid var(--border); }
+  .legs-table .below-row td { display: block; border: 0; }
 
   .unpriced-table, .unpriced-table tbody { display: block; }
   .unpriced-table tr { display: flex; flex-wrap: wrap; gap: 2px 8px; padding: 10px 16px; border-bottom: 1px solid var(--rule); }
@@ -417,10 +517,17 @@ td.num { font-variant-numeric: tabular-nums; }
   .unpriced-table .u-reason { flex-basis: 100%; }
 }
 
+/* --- foot ------------------------------------------------------------------------------- */
+/* The theme is set once and rarely again: it sits small at the foot of the page, not in the header. */
+.foot {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px;
+  margin-top: 20px; padding: 20px 0 8px; border-top: 1px solid var(--border);
+}
+
 /* --- run notification -------------------------------------------------------------------
    One pop-up at a time, floating at the bottom right, clear of the Run button (which sits at the left of
-   the column). On a phone it spans the top with the page's gutters: the Run button is mid-page or low
-   when it is pressed, never under the header. It floats, so it takes the one faint shadow, and no border. */
+   the column). On a phone it spans the top with the page's gutters, clear of the Run bar held to the foot
+   of the screen. It floats, so it takes the one faint shadow, and no border. */
 .toasts {
   position: fixed; z-index: 10; right: 24px; bottom: 24px; width: min(360px, calc(100vw - 48px));
   pointer-events: none;
@@ -439,9 +546,10 @@ td.num { font-variant-numeric: tabular-nums; }
 .toast[data-kind='failed'] .toast-title::before { background: var(--negative); }
 .toast-body { font-size: var(--fs-small); color: var(--muted); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
 .toast-close {
-  flex: none; min-height: 28px; width: 28px; padding: 0; margin-top: -5px;
+  position: relative; flex: none; min-height: 28px; width: 28px; padding: 0; margin-top: -5px;
   display: grid; place-items: center; background: transparent; color: var(--muted); border-radius: 4px;
 }
+.toast-close::after { content: ''; position: absolute; inset: -8px; } /* a 44px target for a 28px mark */
 @media (hover: hover) and (pointer: fine) {
   .toast-close:hover { background: var(--raised); color: var(--text); }
 }
@@ -455,19 +563,50 @@ td.num { font-variant-numeric: tabular-nums; }
 /* --- motion --------------------------------------------------------------------------------
    A working screen performs no entrances. Motion is feedback: presses (above), and a result arriving,
    which fades in once (no travel, no stagger). Reduced motion drops the press scale. */
-.report, .run-progress, .error, .promo-legs li, .empty-report {
+.report, .run-progress, .error, .promo-legs li {
   transition: opacity 180ms ease;
   @starting-style { opacity: 0; }
 }
-/* A run notification arrives the same way: a fade, no travel. It leaves at once. */
+/* The report the page opens on is simply there: only a new result fades in. The same 180ms carries a report's
+   dimming when it goes stale, and back. */
+.report[data-opened] {
+  @starting-style { opacity: 1; }
+}
+.report[data-opened][data-stale] {
+  @starting-style { opacity: 0.5; }
+}
+/* A run notification arrives the same way: a fade, no travel. It leaves faster than it came. */
 .toast {
   transition: opacity 180ms var(--ease-out);
   @starting-style { opacity: 0; }
 }
+.toast[data-leaving] { opacity: 0; transition-duration: 150ms; }
+/* Switching theme swaps every colour at once: nothing fades through the old theme (theme.ts holds this for two
+   frames). */
+:root[data-theme-switching] *, :root[data-theme-switching] *::before, :root[data-theme-switching] *::after {
+  transition: none !important;
+}
 @media (prefers-reduced-motion: reduce) {
   button:active:not(:disabled) { transform: none; }
-  .switch-thumb, .switch-track { transition: none; }
+  .switch-thumb { transition: background-color 160ms ease; } /* the track and thumb still change colour */
   details > summary::before { transition: none; }
   .bar-fill { transition: none; }
-  .toast { transition: none; }
+}
+
+/* --- loading --------------------------------------------------------------------------------
+   While the settings load, each card shows its title at once and a flat bar the size of each control, so nothing
+   below moves when they land. No shimmer: a working screen performs no entrances. */
+.ph { display: block; background: var(--raised); border-radius: var(--radius-control); }
+.ph-chip { width: 52px; height: 32px; }
+.ph-input { width: 124px; height: var(--control-height); }
+.ph-line { width: 88px; height: 21px; }
+.ph-segmented { width: 19rem; max-width: 100%; height: 32px; }
+
+/* --- touch --------------------------------------------------------------------------------
+   A coarse pointer gets 16px in fields (smaller and iOS zooms the page into them) and taller targets on the small
+   controls, without moving anything: the hit area grows, the drawing doesn't. */
+@media (pointer: coarse) {
+  .field input, .field select { font-size: 16px; }
+  .segmented button, details > summary, button.link { position: relative; }
+  .segmented button::after, details > summary::after, button.link::after { content: ''; position: absolute; inset: -8px 0; }
 }

@@ -89,6 +89,7 @@ describe('Run notification', () => {
     const user = await runOnce(report)
     await within(region()).findByText('Run finished')
     await user.click(within(region()).getByRole('button', { name: /dismiss notification/i }))
+    act(() => vi.advanceTimersByTime(150)) // it fades out first
     expect(region()).toBeEmptyDOMElement()
   })
 

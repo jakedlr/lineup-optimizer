@@ -70,8 +70,8 @@ describe('Latest report on opening', () => {
     stub()
     render(<App />)
     const alert = await screen.findByRole('alert')
-    expect(alert).toHaveTextContent('no sportsbook odds available')
-    expect(screen.getByText('Run · 14:08')).toBeInTheDocument()
+    expect(alert).toHaveTextContent('No sportsbook odds available')
+    expect(screen.getByText('Run · 14:08 failed')).toBeInTheDocument()
   })
 
   it("a new run's report replaces it, marked with when the server started it, not this browser's clock", async () => {
@@ -83,7 +83,7 @@ describe('Latest report on opening', () => {
     render(<App />)
     await screen.findByText('Auto run · 14:15')
     await user.click(runButton())
-    expect(await screen.findByText(/\$33 stake · cash/)).toBeInTheDocument()
+    expect(await screen.findByText(/\$33 stake · multiplicative devig/)).toBeInTheDocument()
     expect(screen.getByText('Run · 16:40')).toBeInTheDocument()
     expect(screen.queryByText('Auto run · 14:15')).not.toBeInTheDocument()
   })
@@ -218,7 +218,7 @@ describe('Watching a run this page did not start', () => {
     await screen.findByText(/auto run going/i)
     ends(run, { type: 'error', detail: "the board couldn't be fetched, so auto runs were switched off" })
     expect(await screen.findByRole('alert')).toHaveTextContent(/so auto runs were switched off/)
-    expect(screen.getByText('Auto run · 14:15')).toBeInTheDocument()
+    expect(screen.getByText('Auto run · 14:15 failed')).toBeInTheDocument()
     expect(within(toasts()).getByText('Run failed')).toBeInTheDocument()
   })
 
@@ -381,7 +381,7 @@ describe('Runs known by id (Sprint 9 review)', () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
     render(<App />)
     await user.click(await screen.findByRole('button', { name: /^run$/i }))
-    expect(await screen.findByRole('alert')).toHaveTextContent('stake: must be more than 0')
+    expect(await screen.findByRole('alert')).toHaveTextContent('Stake: must be more than 0')
     expect(await screen.findByText('Auto run · 14:30')).toBeInTheDocument()
     expect(within(toasts()).getByText('Run finished')).toBeInTheDocument()
   })
@@ -416,7 +416,7 @@ describe('Runs known by id (Sprint 9 review)', () => {
 
     server.state.latest = { ...runInfo('auto', localTime(14, 30)), finished_at: localTime(14, 31), error: 'books down' }
     await poll()
-    expect(await screen.findByText('Auto run · 14:30')).toBeInTheDocument()
+    expect(await screen.findByText('Auto run · 14:30 failed')).toBeInTheDocument()
     expect(within(toasts()).getByText('Run failed')).toBeInTheDocument()
   })
 
@@ -523,7 +523,7 @@ describe('Runs known by id (Sprint 9 review)', () => {
       server.state.running = null // cancelled, and so never recorded
       await poll()
       expect(await screen.findByRole('alert')).toHaveTextContent(/the run was stopped/i)
-      expect(screen.getByText('Run · 09:05')).toBeInTheDocument()
+      expect(screen.getByText('Run · 09:05 failed')).toBeInTheDocument()
       expect(within(toasts()).queryByText('Run failed')).not.toBeInTheDocument()
       await waitFor(() => expect(runButton()).toBeEnabled())
     })

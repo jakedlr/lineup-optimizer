@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { getBoardLines, type BoardLine, type PromoLeg, type Side } from './api'
 import { pick } from './format'
 import { Segmented } from './Segmented'
-import type { Promotion } from './settings'
+import type { Problem, Promotion } from './settings'
 
 interface Props {
   promotion: Promotion
@@ -10,6 +10,8 @@ interface Props {
   sports: string[]
   hours: number | null
   boardKey: string | null // changes whenever a new board is saved
+  /** Why a run can't go, when it's the promotion: said in this card. */
+  problem?: Problem | null
 }
 
 const MAX_RESULTS = 8
@@ -24,13 +26,14 @@ function matches(line: BoardLine, query: string) {
     .every((word) => hay.includes(word))
 }
 
-function LegPicker({ sports, hours, boardKey, onAdd }: Omit<Props, 'promotion' | 'onChange'> & { onAdd: (l: PromoLeg) => void }) {
+function LegPicker({ sports, hours, boardKey, onAdd }: Omit<Props, 'promotion' | 'onChange' | 'problem'> & { onAdd: (l: PromoLeg) => void }) {
   // Each fetch result is tagged with what it was fetched for, so stale results are simply ignored.
   const [fetched, setFetched] = useState<{ key: string; lines?: BoardLine[]; error?: string } | null>(null)
   const [query, setQuery] = useState('')
   const [chosen, setChosen] = useState<BoardLine | null>(null)
   const [side, setSide] = useState<Side>('over')
   const [promoLine, setPromoLine] = useState('')
+  const [checked, setChecked] = useState(false) // the promo line is checked once it's left or added, not while typed
 
   const sportsKey = sports.join(',')
   const requestKey = boardKey && sportsKey && hours !== null ? `${boardKey}|${sportsKey}|${hours}` : null
@@ -58,12 +61,15 @@ function LegPicker({ sports, hours, boardKey, onAdd }: Omit<Props, 'promotion' |
     setChosen(l)
     setPromoLine(String(l.line))
     setSide('over')
+    setChecked(false)
   }
 
   const lineValue = Number(promoLine)
   const lineOk = promoLine.trim() !== '' && isHalfPoint(lineValue)
+  const lineBad = checked && !lineOk
 
   const add = () => {
+    setChecked(true)
     if (!chosen || !lineOk) return
     onAdd({ ...chosen, side, line: lineValue })
     setChosen(null)
@@ -93,22 +99,17 @@ function LegPicker({ sports, hours, boardKey, onAdd }: Omit<Props, 'promotion' |
         results.length === 0 ? (
           <p className="muted small">No lines on the board match. Check the leagues and hours ahead above.</p>
         ) : (
-          <ul className="results" role="listbox" aria-label="Board lines">
+          <ul className="results" aria-label="Board lines">
             {results.map((l) => (
-              <li
-                key={`${l.player}|${l.stat_label}|${l.line}|${l.matchup}`}
-                role="option"
-                aria-selected={false}
-                tabIndex={0}
-                onClick={() => choose(l)}
-                onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), choose(l))}
-              >
-                <span>
-                  <strong>{l.player}</strong> · {l.stat_label} {l.line}
-                </span>
-                <span className="muted small">
-                  {l.sport} {l.matchup}
-                </span>
+              <li key={`${l.player}|${l.stat_label}|${l.line}|${l.matchup}`}>
+                <button type="button" onClick={() => choose(l)}>
+                  <span>
+                    <strong>{l.player}</strong> · {l.stat_label} {l.line}
+                  </span>
+                  <span className="muted small">
+                    {l.sport} {l.matchup}
+                  </span>
+                </button>
               </li>
             ))}
           </ul>
@@ -140,21 +141,28 @@ function LegPicker({ sports, hours, boardKey, onAdd }: Omit<Props, 'promotion' |
                 inputMode="decimal"
                 step="0.5"
                 value={promoLine}
+                aria-invalid={lineBad}
+                aria-describedby={lineBad ? 'promo-line-note' : undefined}
                 onChange={(e) => setPromoLine(e.target.value)}
+                onBlur={() => setChecked(true)}
               />
             </label>
-            <button type="button" className="secondary" disabled={!lineOk} onClick={add}>
+            <button type="button" className="secondary" onClick={add}>
               Add promo leg
             </button>
           </div>
-          {!lineOk && <p className="warn">Promo lines are half-point lines, e.g. {Math.floor(lineValue || chosen.line)}.5.</p>}
+          {lineBad && (
+            <p id="promo-line-note" className="warn">
+              Promo lines are half-point lines, e.g. {Math.floor(lineValue || chosen.line)}.5.
+            </p>
+          )}
         </div>
       )}
     </div>
   )
 }
 
-export function PromoPanel({ promotion, onChange, sports, hours, boardKey }: Props) {
+export function PromoPanel({ promotion, onChange, sports, hours, boardKey, problem }: Props) {
   const set = (patch: Partial<Promotion>) => onChange({ ...promotion, ...patch })
   const feedPromosApply = promotion.kind !== 'bonus' && promotion.kind !== 'boost'
 
@@ -192,15 +200,13 @@ export function PromoPanel({ promotion, onChange, sports, hours, boardKey }: Pro
             value={promotion.boost}
             onChange={(e) => set({ boost: e.target.value })}
           />
-          <span className="muted small">Multiplies the slip payout, e.g. 1.4 turns 6x into 8.4x.</span>
+          <span className="muted small">1.4 turns a 6x payout into 8.4x.</span>
         </label>
       )}
 
       {promotion.kind === 'legs' && (
         <>
-          <p className="muted small">
-            A discounted pick from PrizePicks, e.g. one only shown in the app. A slip holds at most one.
-          </p>
+          <p className="muted small">A discounted PrizePicks pick. A slip holds at most one.</p>
           {promotion.legs.length > 0 && (
             <ul className="promo-legs" aria-label="Promo legs">
               {promotion.legs.map((l, i) => (
@@ -230,6 +236,8 @@ export function PromoPanel({ promotion, onChange, sports, hours, boardKey }: Pro
         </>
       )}
 
+      {problem?.field === 'promotion' && <p className="warn small">{problem.text}</p>}
+
       <label className="check">
         <input
           type="checkbox"
@@ -242,6 +250,21 @@ export function PromoPanel({ promotion, onChange, sports, hours, boardKey }: Pro
           {!feedPromosApply && <span className="muted small"> · not used with a bonus or boost</span>}
         </span>
       </label>
+    </section>
+  )
+}
+
+/** The Promotion card while the settings load: the title at once, and a flat bar where its picker will be. */
+export function PromoPlaceholder() {
+  return (
+    <section className="promo" aria-labelledby="promo-ph-h" aria-busy="true">
+      <div className="promo-head">
+        <h2 id="promo-ph-h" className="label">
+          Promotion
+        </h2>
+        <span className="ph ph-segmented" aria-hidden="true" />
+      </div>
+      <span className="ph ph-line" aria-hidden="true" />
     </section>
   )
 }

@@ -52,6 +52,15 @@ async function autoRunAlerted(request: APIRequestContext) {
 
 const panel = (page: Page) => page.getByRole('region', { name: 'Phone alerts' })
 
+/** Open the panel, which starts folded (unless this browser left it open). */
+async function openPanel(page: Page) {
+  const alerts = panel(page)
+  await expect(alerts.locator('.alerts-summary')).toBeVisible() // the server has said where alerts go
+  if ((await alerts.locator('details').first().getAttribute('open')) === null) await alerts.getByRole('heading', { name: 'Phone alerts' }).click()
+  await expect(alerts.locator('details').first()).toHaveAttribute('open', '')
+  return alerts
+}
+
 test.beforeEach(async ({ request }) => {
   expect((await request.delete(`${NTFY}/_published`)).ok()).toBe(true)
 })
@@ -110,7 +119,10 @@ test('an alert ntfy never got is shown as not delivered, and auto runs go on', a
 test('the panel picks a topic, checks it, and sends a test alert through the stand-in', async ({ page, request }) => {
   await page.goto('/')
   const alerts = panel(page)
-  await expect(alerts.locator('details').first()).toHaveAttribute('open', '') // no topic yet: open
+  await expect(alerts.locator('details').first()).not.toHaveAttribute('open') // folded, offering to set it up
+  await alerts.getByRole('button', { name: 'Set up' }).click()
+  await expect(alerts.locator('details').first()).toHaveAttribute('open', '')
+  await expect(alerts.getByText('Set a topic to check or test it.')).toBeVisible()
   await alerts.getByText('Server and token').click()
   await alerts.getByLabel('Server').fill(IN_APP)
   await alerts.getByRole('button', { name: 'Random' }).click()
@@ -135,18 +147,27 @@ test('the panel picks a topic, checks it, and sends a test alert through the sta
   await alerts.getByRole('button', { name: 'Send test' }).click()
   await expect(alerts.getByText(/^Test alert not sent: ntfy refused it \(403: forbidden\)$/)).toBeVisible()
 
-  // Opened again with a topic set, the panel is folded away, naming it.
+  // Opened again, the panel is as this browser left it (open), naming the topic; folded, it stays folded.
+  await page.reload()
+  await expect(alerts.getByText('reserved-topic on ntfy')).toBeVisible()
+  await expect(alerts.locator('details').first()).toHaveAttribute('open', '')
+  await alerts.getByRole('heading', { name: 'Phone alerts' }).click()
+  await expect(alerts.locator('details').first()).not.toHaveAttribute('open')
+  // The browser says the panel folded (its toggle event) a moment after the click; a person can't reload faster.
+  await expect.poll(() => page.evaluate(() => localStorage.getItem('ppopt.alertsOpen'))).toBeNull()
   await page.reload()
   await expect(alerts.getByText('reserved-topic on ntfy')).toBeVisible()
   await expect(alerts.locator('details').first()).not.toHaveAttribute('open')
 })
 
-test("the time zone alert titles' clock is in is chosen under Server and token, and kept", async ({ page, request }) => {
+test("the time zone alert titles' clock is in is chosen after the tiers, by city and offset, and kept", async ({ page, request }) => {
   const held = async () => (await (await request.get('/api/alerts')).json()).timezone
   await page.goto('/')
-  const alerts = panel(page)
-  await alerts.getByText('Server and token').click()
-  const zone = alerts.getByLabel('Time zone')
+  const alerts = await openPanel(page)
+  const zone = alerts.getByLabel('Alert times in')
+  await expect(zone).toBeVisible() // not tucked under Server and token
+  await expect(zone.locator('option').first()).toHaveAttribute('value', ZONE) // this browser's first
+  await expect(zone.locator('option[value="Asia/Tokyo"]')).toHaveText('Tokyo (GMT+9)')
   await expect.poll(held).not.toBeNull() // the first page to open chose this browser's
   await expect(zone).toHaveValue(await held())
   const other = ZONE === 'Asia/Tokyo' ? 'Europe/Oslo' : 'Asia/Tokyo'
@@ -154,14 +175,13 @@ test("the time zone alert titles' clock is in is chosen under Server and token, 
   await expect.poll(held).toBe(other)
 
   await page.reload() // opening again doesn't put this browser's back
-  await alerts.getByText('Server and token').click()
   await expect(zone).toHaveValue(other)
   expect(await held()).toBe(other)
 })
 
 test('the tiers save as they are changed, and warn when medium is set above high', async ({ page, request }) => {
   await page.goto('/')
-  const alerts = panel(page)
+  const alerts = await openPanel(page)
   const high = alerts.getByRole('group', { name: 'High tier' })
   const medium = alerts.getByRole('group', { name: 'Medium tier' })
   await expect(high.getByText('3 or more games with a leg ≥ +1.0%')).toBeVisible()
@@ -175,12 +195,13 @@ test('the tiers save as they are changed, and warn when medium is set above high
     .toMatchObject({ high: { enabled: true, edge: 1, legs: 2 }, medium: { enabled: false, edge: 2.5, legs: 3 } })
 })
 
-for (const viewport of [{ width: 390, height: 844 }, { width: 1440, height: 900 }]) {
+for (const viewport of [{ width: 390, height: 844 }, { width: 768, height: 1024 }, { width: 1440, height: 900 }]) {
   test(`the alerts panel fits a ${viewport.width}px screen, each tier's controls on its row`, async ({ page }) => {
     await page.setViewportSize(viewport)
     await page.goto('/')
-    const alerts = panel(page)
+    const alerts = await openPanel(page)
     await alerts.getByText('Server and token').click()
+    await expect(alerts.getByRole('button', { name: 'Save token' })).toBeVisible() // inside the card at 768 too
     await alerts.getByLabel('Topic').fill('a-rather-long-topic-name-that-someone-typed-in-by-hand-0123456789')
     await expect(alerts.getByRole('link', { name: /^ntfy\.sh\// })).toBeVisible()
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
@@ -200,8 +221,20 @@ for (const viewport of [{ width: 390, height: 844 }, { width: 1440, height: 900 
       const legs = (await tier.getByLabel('Qualifying legs').boundingBox())!
       expect(toggle.height).toBeGreaterThanOrEqual(32) // a comfortable target
       expect(Math.abs(edge.y - legs.y)).toBeLessThan(2) // edge and legs side by side
-      if (viewport.width > 640) expect(Math.abs(toggle.y + toggle.height / 2 - (edge.y + edge.height / 2))).toBeLessThan(4)
-      else expect(toggle.y + toggle.height).toBeLessThanOrEqual(edge.y) // the switch heads the row on a phone
+      if (viewport.width > 640) {
+        expect(Math.abs(toggle.y + toggle.height / 2 - (edge.y + edge.height / 2))).toBeLessThan(4)
+        // One grey header over the columns, and what meets the tier at the end of its own row.
+        const head = alerts.locator('.tier-head')
+        expect(Math.abs((await head.getByText('Edge', { exact: true }).boundingBox())!.x - edge.x)).toBeLessThan(2)
+        expect(Math.abs((await head.getByText('Qualifying legs', { exact: true }).boundingBox())!.x - legs.x)).toBeLessThan(2)
+        const says = (await tier.locator('.tier-says').boundingBox())!
+        expect(says.x).toBeGreaterThan(legs.x + legs.width)
+        expect(Math.abs(says.y + says.height / 2 - (edge.y + edge.height / 2))).toBeLessThan(8)
+        expect(await tier.locator('.tier-says').evaluate((el) => getComputedStyle(el).fontSize)).toBe('12px')
+      } else {
+        expect(toggle.y + toggle.height).toBeLessThanOrEqual(edge.y) // the switch heads the row on a phone
+        await expect(tier.getByText('Edge', { exact: true })).toBeVisible() // its own labels, the header row hidden
+      }
     }
   })
 }

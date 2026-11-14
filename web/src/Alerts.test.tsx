@@ -57,13 +57,44 @@ async function opened(alerts: Partial<typeof server.state.alerts> = {}) {
 }
 
 describe('Phone alerts panel', () => {
-  it('is open with no topic set, saying auto runs send none', async () => {
+  it('starts folded with no topic set, saying auto runs send none, and offers to set it up', async () => {
     stub()
     render(<App />)
-    await waitFor(() => expect(details().open).toBe(true))
+    await waitFor(() => expect(within(panel()).getByText(/no topic: auto runs send no alerts/i)).toBeInTheDocument())
+    expect(details().open).toBe(false)
     expect(topic()).toHaveValue('')
-    expect(within(panel()).getByText(/no topic: auto runs send no alerts/i)).toBeInTheDocument()
+    await userEvent.click(within(panel()).getByRole('button', { name: 'Set up' }))
+    expect(details().open).toBe(true)
+    expect(within(panel()).queryByRole('button', { name: 'Set up' })).not.toBeInTheDocument()
     expect(within(panel()).getByRole('button', { name: 'Send test' })).toBeDisabled()
+    expect(within(panel()).getByText('Set a topic to check or test it.')).toBeInTheDocument()
+    expect(within(panel()).getByRole('button', { name: 'Check' })).toHaveAccessibleDescription('Set a topic to check or test it.')
+  })
+
+  it('remembers in this browser whether it was left open', async () => {
+    server.state.alerts = { ...server.state.alerts, topic: 'pp-abc', saved: true }
+    stub()
+    const { unmount } = render(<App />)
+    await waitFor(() => expect(topic()).toHaveValue('pp-abc'))
+    expect(details().open).toBe(false)
+    await userEvent.click(within(panel()).getByText('Phone alerts'))
+    await waitFor(() => expect(details().open).toBe(true))
+    unmount()
+    render(<App />)
+    await waitFor(() => expect(topic()).toHaveValue('pp-abc'))
+    expect(details().open).toBe(true)
+    expect(within(panel()).queryByRole('button', { name: 'Set up' })).not.toBeInTheDocument()
+  })
+
+  it('starts folded when this browser cannot say how it was left', async () => {
+    vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
+      throw new Error('blocked')
+    })
+    stub()
+    render(<App />)
+    await waitFor(() => expect(within(panel()).getByText(/no topic/i)).toBeInTheDocument())
+    expect(details().open).toBe(false)
+    vi.restoreAllMocks()
   })
 
   it('is collapsed once a topic is set, naming it', async () => {
@@ -91,7 +122,7 @@ describe('Phone alerts panel', () => {
 
   it("Random picks a hard-to-guess topic and saves it at once; the note says why it's needed", async () => {
     const fetchMock = await opened()
-    expect(within(panel()).getByText(/anyone who knows a public topic's name can read and post to it/i)).toBeInTheDocument()
+    expect(within(panel()).getByText(/anyone with a public topic's name can read it/i)).toBeInTheDocument()
     await userEvent.click(within(panel()).getByRole('button', { name: 'Random' }))
     const value = (topic() as HTMLInputElement).value
     expect(value).toMatch(/^pp-[a-z0-9]{12}$/)
@@ -197,7 +228,18 @@ describe('Phone alerts panel', () => {
     expect(within(high).getByText('3 or more games with a leg ≥ +1.0%')).toBeInTheDocument()
     expect(within(tier('Medium')).getByText('priority 3')).toBeInTheDocument()
     expect(within(tier('Medium')).getByText('3 or more games with a leg ≥ +0.5%')).toBeInTheDocument()
-    expect(within(panel()).getByText('Neither met: priority 1 (silent). Unchanged legs repeat at priority 1.')).toBeInTheDocument()
+    expect(within(high).getByText('%')).toBeInTheDocument() // the edge is in %, as the report reads it
+    expect(within(high).queryByText('pts')).not.toBeInTheDocument()
+    expect(within(high).queryByText('+')).not.toBeInTheDocument() // a lone + read as a stepper
+    const neither = within(panel()).getByText('Neither met: priority 1 (silent). Unchanged legs repeat at priority 1.')
+    expect(neither.closest('details')).not.toHaveAttribute('open') // folded away until asked for
+  })
+
+  it('heads the tier columns once, over the edge and qualifying legs', async () => {
+    await opened()
+    const header = panel().querySelector('.tier-head')!
+    expect(header).toHaveAttribute('aria-hidden', 'true')
+    expect(header).toHaveTextContent('EdgeQualifying legs')
   })
 
   it('saves a tier switched off, and an edge or leg count, each on its own', async () => {
@@ -265,7 +307,7 @@ describe('Phone alerts panel', () => {
   describe("alert titles' clock", () => {
     const here = Intl.DateTimeFormat().resolvedOptions().timeZone
     const other = here === 'Asia/Tokyo' ? 'Europe/Oslo' : 'Asia/Tokyo'
-    const zone = () => within(panel()).getByLabelText('Time zone')
+    const zone = () => within(panel()).getByLabelText('Alert times in')
 
     it("is set to this browser's time zone the first time, while the server has none", async () => {
       server.state.alerts = { ...server.state.alerts, timezone: null }
@@ -284,13 +326,22 @@ describe('Phone alerts panel', () => {
       expect(alertPatches(fetchMock)).toEqual([])
     })
 
-    it('is chosen under Server and token, and saved as the other fields are', async () => {
+    it('is chosen after the tiers, and saved as the other fields are', async () => {
       const fetchMock = await opened()
-      await userEvent.click(within(panel()).getByText('Server and token'))
+      expect(zone().compareDocumentPosition(tier('Medium')) & Node.DOCUMENT_POSITION_PRECEDING).toBeTruthy()
+      expect(within(panel()).getByText('Server and token').closest('details')!.contains(zone())).toBe(false)
       expect(zone()).toHaveValue(here)
       await userEvent.selectOptions(zone(), other)
       await waitFor(() => expect(alertPatches(fetchMock)).toEqual([{ timezone: other }]))
       expect(server.state.alerts.timezone).toBe(other)
+    })
+
+    it("names each zone by its city and offset, this browser's first", async () => {
+      await opened()
+      const first = within(zone()).getAllByRole('option')[0] as HTMLOptionElement
+      expect(first.value).toBe(here)
+      const tokyo = within(zone()).getByRole('option', { name: /^Tokyo \(GMT\+9\)$/ }) as HTMLOptionElement
+      expect(tokyo.value).toBe('Asia/Tokyo')
     })
   })
 
@@ -365,6 +416,22 @@ describe('Phone alerts panel', () => {
       expect(sent(fetchMock, 'POST /api/alerts/test')).toEqual([])
     })
 
+    it('say what they are doing while they go, and the other stays as it was', async () => {
+      let answer!: () => void
+      server.state.check = () => new Promise<Response>((r) => (answer = () => r(Response.json({ state: 'unused', detail: 'quiet' })))) as unknown as Response
+      await opened()
+      await userEvent.click(button('Check'))
+      const checking = within(panel()).getByRole('button', { name: 'Checking…' })
+      expect(checking).toHaveAttribute('aria-busy', 'true')
+      expect(checking).toBeEnabled()
+      expect(button('Send test')).toBeEnabled()
+      expect(button('Send test')).not.toHaveAttribute('aria-busy')
+      await waitFor(() => expect(answer).toBeTypeOf('function'))
+      act(() => answer())
+      expect(await within(panel()).findByText('Looks unused: quiet')).toBeInTheDocument()
+      expect(button('Check')).not.toHaveAttribute('aria-busy')
+    })
+
     it('are off while the server typed is not valid', async () => {
       await opened()
       await typeServer('ntfy.lan')
@@ -414,7 +481,7 @@ describe("The latest run's alert", () => {
     stub()
     render(<App />)
     await screen.findByText('Auto run · 14:15')
-    expect(screen.queryByText(/^Alert/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/^Alert (sent|not delivered)/)).not.toBeInTheDocument()
     server.state.latest = { ...server.state.latest, alert: alertSent }
     await act(() => vi.advanceTimersByTimeAsync(5000))
     expect(await screen.findByText('Alert sent · priority 4')).toBeInTheDocument()

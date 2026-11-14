@@ -1,19 +1,52 @@
+import { Fragment } from 'react'
 import { AlertNote } from './AlertNote'
 import type { AlertOutcome, Leg, Report } from './api'
-import { bookAbbr, pct, pick, signedDollars, signedPct, slipName } from './format'
+import {
+  ago,
+  bookAbbr,
+  minutesSince,
+  money,
+  pct,
+  pick,
+  signedMoney,
+  signedPct,
+  signOf,
+  slipName,
+  STALE_MINUTES,
+} from './format'
 import { Segmented } from './Segmented'
 import type { Settings } from './settings'
+import { useNow } from './useNow'
 
 type SlipFilter = Pick<Settings, 'slipType' | 'slipSize'>
 
 interface Props extends SlipFilter {
   report: Report
-  /** Which run it came from: "Auto run · 14:15", "Run · 14:08". */
+  /** Which run it came from: "Auto run · 14:15", "Run · 14:08", "Previous run · 09:53". */
   label?: string
+  /** When that run started, for the report's age. */
+  at?: string
   /** How this run's alert went, when it sent one and the server has said. */
   alert?: AlertOutcome | null
   top: number
   onFilter: (f: Partial<SlipFilter>) => void
+  /** No longer the latest word: a run is going, or one failed since. The report dims. */
+  stale?: boolean
+  /** A run is going that will replace it. */
+  busy?: boolean
+  /** The report the page opened on: it is simply there, without the fade a new result arrives with. */
+  opened?: boolean
+}
+
+/** Green for a gain, nothing for a figure that prints as zero. */
+const signClass = (s: -1 | 0 | 1, below: string) => (s > 0 ? 'pos' : s < 0 ? below : '')
+
+/** The run settings a report was made with, as one line: "$10 stake · worst-case devig · NFL, NBA · next 24 h". */
+function settingsLine(s: Report['settings']) {
+  const devig = s.devig === 'worst' ? 'worst-case devig' : `${s.devig} devig`
+  return [`${money(s.stake)} stake`, s.mode !== 'cash' && s.mode, devig, s.sports.join(', '), `next ${s.hours} h`]
+    .filter(Boolean)
+    .join(' · ')
 }
 
 function stamp(d = new Date()) {
@@ -77,7 +110,6 @@ function BestSlips({ report, slipType, slipSize, onFilter }: Omit<Props, 'top' |
           </div>
         )}
       </div>
-      <p className="muted small">One leg per game, ${report.settings.stake} stake.</p>
       {report.slips.length === 0 ? (
         <p className="muted">None: not enough distinct games.</p>
       ) : shown.length === 0 ? (
@@ -90,7 +122,7 @@ function BestSlips({ report, slipType, slipSize, onFilter }: Omit<Props, 'top' |
             <article key={`${s.type}${s.size}`} className="slip">
               <header>
                 <h3>{slipName(s)}</h3>
-                <span className={s.ev >= 0 ? 'pos num' : 'neg num'}>{signedDollars(s.ev)}</span>
+                <span className={`num ${signClass(signOf(s.ev, 2), 'neg')}`}>{signedMoney(s.ev)}</span>
                 <span className="muted num small">{signedPct(s.ev_pct)}</span>
               </header>
               <ul>
@@ -106,57 +138,101 @@ function BestSlips({ report, slipType, slipSize, onFilter }: Omit<Props, 'top' |
   )
 }
 
+const bookPrice = (p: number) => (p * 100).toFixed(1)
+
 function TopLegs({ report, top }: { report: Report; top: number }) {
   const legs = report.legs.slice(0, top)
   const ref = report.ref_slip
+  const refName = slipName({ type: ref.type === 'flex' ? 'flex' : 'power', size: ref.size })
+  const clears = (l: Leg) => (l.edge ?? 0) >= 0
+  const firstBelow = legs.findIndex((l) => !clears(l))
+  // Every book that priced a leg, in one order, so each keeps its own column of figures.
+  const books = [...new Set(report.legs.flatMap((l) => Object.keys(l.books)))].sort()
   return (
     <section aria-labelledby="legs-h" className="block">
       <h2 id="legs-h">Top Legs</h2>
-      <p className="muted small">
-        {legs.length} of {report.legs.length}. Edge is against the {ref.type} {ref.size} break-even of {pct(ref.break_even)} per leg.
-      </p>
-      <div className="table-wrap">
-        <table className="legs-table">
-          <thead>
-            <tr>
-              <th className="num">Prob</th>
-              <th className="num">Edge</th>
-              <th>Sport</th>
-              <th>Matchup</th>
-              <th>Player</th>
-              <th>Pick</th>
-              <th>Books</th>
-              <th>Notes</th>
-            </tr>
-          </thead>
-          <tbody>
-            {legs.map((l) => {
-              const notes = [
-                l.promo_type && `${l.promo_type}${l.modelled ? ' (modelled)' : ''}`,
-                l.same_game && 'same game',
-                l.disagreement >= 0.03 && `books differ ${(l.disagreement * 100).toFixed(1)} pts`,
-              ].filter(Boolean)
-              return (
-                <tr key={`${l.game}|${l.player}|${l.stat}|${l.side}|${l.line}`}>
-                  <td className="num c-prob">{pct(l.prob)}</td>
-                  <td className={`num c-edge ${(l.edge ?? 0) >= 0 ? 'pos' : 'neg'}`}>{signedPct(l.edge ?? 0)}</td>
-                  <td className="c-sport">{l.sport}</td>
-                  <td className="nowrap c-matchup">{l.matchup}</td>
-                  <td className="nowrap c-player">{l.player}</td>
-                  <td className="c-pick">{pick(l)}</td>
-                  <td className="nowrap muted small c-books">
-                    {Object.entries(l.books)
-                      .sort()
-                      .map(([b, p]) => `${bookAbbr(b)} ${(p * 100).toFixed(1)}`)
-                      .join('  ')}
-                  </td>
-                  <td className="muted small c-notes">{notes.join(', ')}</td>
+      {report.legs.length === 0 ? (
+        <p className="muted">No legs priced in this window.</p>
+      ) : (
+        <>
+          <p className="muted small">
+            {report.legs.filter(clears).length} of {report.legs.length} legs clear the {refName} break-even ({pct(ref.break_even)})
+          </p>
+          <div className="table-wrap">
+            <table className="legs-table">
+              <thead>
+                <tr>
+                  <th className="num">Edge</th>
+                  <th className="num">Prob</th>
+                  <th className="c-sport">Sport</th>
+                  <th className="c-matchup">Matchup</th>
+                  <th>Player</th>
+                  <th>Pick</th>
+                  <th className="c-books">
+                    <span className="visually-hidden">Books: </span>
+                    {books.map((b) => (
+                      <span key={b} className="book num">
+                        {bookAbbr(b)}
+                      </span>
+                    ))}
+                  </th>
+                  <th>Notes</th>
                 </tr>
-              )
-            })}
-          </tbody>
-        </table>
-      </div>
+              </thead>
+              <tbody>
+                {legs.map((l, i) => {
+                  const notes = [
+                    l.promo_type && `${l.promo_type}${l.modelled ? ' (modelled)' : ''}`,
+                    l.same_game && 'same game',
+                    l.disagreement >= 0.03 && `books differ ${(l.disagreement * 100).toFixed(1)}%`,
+                  ].filter((n): n is string => !!n)
+                  const priced = books.filter((b) => b in l.books).map((b) => `${bookAbbr(b)} ${bookPrice(l.books[b])}`)
+                  const edge = l.edge ?? 0
+                  return (
+                    <Fragment key={`${l.game}|${l.player}|${l.stat}|${l.side}|${l.line}`}>
+                      {i === firstBelow && (
+                        <tr className="below-row">
+                          <td colSpan={8}>
+                            Below the {refName} break-even, {pct(ref.break_even)} per leg
+                          </td>
+                        </tr>
+                      )}
+                      <tr>
+                        <td className={`num c-edge ${signClass(signOf(edge, 1, 100), 'muted')}`}>{signedPct(edge)}</td>
+                        <td className="num c-prob">{pct(l.prob)}</td>
+                        <td className="c-sport">{l.sport}</td>
+                        <td className="nowrap c-matchup">{l.matchup}</td>
+                        <td className="c-player">
+                          <span className="who">{l.player}</span>
+                          <span className="sub">
+                            {l.sport} · {l.matchup}
+                          </span>
+                        </td>
+                        <td className="c-pick">{pick(l)}</td>
+                        <td className="nowrap muted small c-books">
+                          {books.map((b) =>
+                            b in l.books ? (
+                              <span key={b} className="book num">
+                                {bookPrice(l.books[b])}
+                              </span>
+                            ) : (
+                              <span key={b} className="book num">
+                                –
+                              </span>
+                            ),
+                          )}
+                        </td>
+                        <td className="muted small c-notes">{notes.join(', ')}</td>
+                        <td className="c-meta">{[l.sport, l.matchup, ...priced, ...notes].join(' · ')}</td>
+                      </tr>
+                    </Fragment>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
     </section>
   )
 }
@@ -203,20 +279,31 @@ function Unpriced({ report }: { report: Report }) {
   )
 }
 
-export function ReportView({ report, label, alert, top, slipType, slipSize, onFilter }: Props) {
-  const s = report.settings
+function Age({ at }: { at: string }) {
+  const minutes = minutesSince(at, useNow())
+  return <span className={minutes > STALE_MINUTES ? 'warn' : undefined}>{ago(minutes)}</span>
+}
+
+export function ReportView({ report, label, at, alert, top, slipType, slipSize, onFilter, stale, busy, opened }: Props) {
   return (
-    <div className="report">
+    <div className="report" data-stale={stale ? '' : undefined} aria-busy={busy || undefined} data-opened={opened ? '' : undefined}>
       <div className="report-head">
         <p className="muted small">
-          {label && <span className="run-mark">{label}</span>}
-          {label && alert && (
+          {label && (
             <>
+              <span className="run-mark">{label}</span>
               {' · '}
-              <AlertNote alert={alert} />
             </>
           )}
-          {label && ' · '}${s.stake} stake · {s.mode} · devig {s.devig} · {s.sports.join(', ')} · next {s.hours} h
+          {at && (
+            <>
+              <Age at={at} />
+              {' · '}
+            </>
+          )}
+          <span>{settingsLine(report.settings)}</span>
+          {/* A failed alert is set on its own line below (index.css), so it never runs into the settings. */}
+          {alert && (alert.sent ? <> · <AlertNote alert={alert} /></> : <AlertNote alert={alert} />)}
         </p>
         <button type="button" className="secondary small" onClick={() => download(report)}>
           Download JSON

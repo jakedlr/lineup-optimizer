@@ -12,7 +12,7 @@ test('a promo leg picked from the board is priced into the report', async ({ pag
   await promotion.getByRole('button', { name: 'Promo legs' }).click()
 
   await page.getByLabel('Find a line on the board').fill('embiid')
-  await page.getByRole('option', { name: /Joel Embiid/ }).first().click()
+  await page.getByRole('list', { name: 'Board lines' }).getByRole('button', { name: /Joel Embiid/ }).first().click()
   await page.getByLabel('Promo line', { exact: true }).fill('30.5')
   await page.getByRole('button', { name: 'Add promo leg' }).click()
   await expect(page.getByRole('list', { name: 'Promo legs' })).toContainText('Joel Embiid · Over 30.5 Pts+Rebs+Asts')

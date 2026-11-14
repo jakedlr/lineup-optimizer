@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type DragEvent } from 'react'
 import type { BoardInfo } from './api'
-import { ago, minutesSince, STALE_MINUTES } from './format'
+import { ago, minutesSince, sentence, STALE_MINUTES } from './format'
 
 interface Props {
   board: BoardInfo | null | undefined // undefined while loading
@@ -25,13 +25,11 @@ function useNow(intervalMs = 30_000) {
 const PRIZEPICKS = 'https://app.prizepicks.com'
 const SOURCE: Record<BoardInfo['source'], string> = { fetched: 'Fetched', uploaded: 'Uploaded' }
 
-const sentence = (text: string) => text.charAt(0).toUpperCase() + text.slice(1)
-
 function HowToGetABoard({ appUrl }: { appUrl: string | null }) {
   return (
     <>
       <p className="muted small">
-        Runs still try PrizePicks first, and use an uploaded board only while the fetch keeps failing. To save one:
+        Runs try PrizePicks first and use an upload only while the fetch fails. To save one:
       </p>
       <ol>
         <li>
@@ -81,8 +79,9 @@ export function BoardPanel({ board, fetching, fetchError, uploading, locked, app
 
   const age = board ? minutesSince(board.saved_at, now) : 0
   const stale = !!board && age > STALE_MINUTES
-  // Open only when there's no usable board, and not while a fetch might still bring one.
-  const fallbackOpen = !fetching && (board === null || stale)
+  // Asked plainly, and open, only when there's no usable board (and not while a fetch might still bring one) or the
+  // fetch failed; otherwise offered quietly.
+  const needed = (!fetching && (board === null || stale)) || (!!fetchError && !fetching)
 
   return (
     <section
@@ -127,8 +126,8 @@ export function BoardPanel({ board, fetching, fetchError, uploading, locked, app
 
       {board !== undefined && (
         // keyed on its default so it re-opens when the board stops being usable, but stays wherever the user put it otherwise
-        <details className="howto" open={fallbackOpen} key={String(fallbackOpen)}>
-          <summary>Board fetch failing? Upload one instead</summary>
+        <details className="howto" open={needed} key={String(needed)} data-quiet={!needed || undefined}>
+          <summary>{needed ? 'Board fetch failing? Upload one instead' : 'Upload a board instead'}</summary>
           <HowToGetABoard appUrl={appUrl} />
           <button type="button" className="secondary" disabled={locked} onClick={() => input.current?.click()}>
             {uploading ? 'Uploading…' : board ? 'Replace board' : 'Choose file'}

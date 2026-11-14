@@ -112,13 +112,11 @@ for (const viewport of [{ width: 375, height: 800 }, { width: 1440, height: 900 
     await expect(toggle).toHaveAttribute('aria-checked', 'false')
     await expect.poll(colour).not.toBe(onColour) // on and off look different, not just positioned
 
-    // A comfortable target, beside Run on a wide screen, and the page still fits a phone.
+    // A comfortable target, beside Run (on a phone, in the Run bar), and the page still fits a phone.
     const target = (await toggle.boundingBox())!
-    expect(target.height).toBeGreaterThanOrEqual(32)
-    if (viewport.width > 640) {
-      const run = (await page.getByRole('button', { name: 'Run', exact: true }).boundingBox())!
-      expect(Math.abs(target.y + target.height / 2 - (run.y + run.height / 2))).toBeLessThan(4)
-    }
+    expect(target.height).toBeGreaterThanOrEqual(viewport.width > 640 ? 32 : 44)
+    const run = (await page.getByRole('button', { name: 'Run', exact: true }).boundingBox())!
+    expect(Math.abs(target.y + target.height / 2 - (run.y + run.height / 2))).toBeLessThan(4)
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
   })
 }

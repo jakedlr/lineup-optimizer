@@ -180,25 +180,36 @@ export interface Promotion {
 
 export const NO_PROMOTION: Promotion = { kind: 'none', boost: '1.5', legs: [], feedPromos: true }
 
-export type Problem = string | null
+/** A setting that can hold a run back, and so where the page says why. */
+export type ProblemField = 'sports' | 'stake' | 'hours' | 'promotion'
+
+/** Why these settings can't be run yet: the setting at fault, and the words for it. */
+export interface Problem {
+  field: ProblemField
+  text: string
+}
+
+/** Is `r` the reason a run can't go, rather than the request? */
+export const isProblem = (r: RunSettings | Problem): r is Problem => 'field' in r && 'text' in r
 
 /** The request for these settings, or the reason they can't be run yet. */
 export function toRun(s: Settings, noCache: boolean, promo: Promotion = NO_PROMOTION): RunSettings | Problem {
-  if (s.sports.length === 0) return 'Pick at least one league.'
+  if (s.sports.length === 0) return { field: 'sports', text: 'Pick at least one league.' }
   const stake = positive(s.stake)
-  if (stake === null) return 'Stake must be more than $0.'
+  if (stake === null) return { field: 'stake', text: 'Stake must be more than $0.' }
   const hours = positive(s.hours)
-  if (hours === null) return 'Hours ahead must be more than 0.'
+  if (hours === null) return { field: 'hours', text: 'Hours ahead must be more than 0.' }
 
+  const held = (text: string): Problem => ({ field: 'promotion', text })
   let boost: number | null = null
   if (promo.kind === 'boost') {
     boost = positive(promo.boost)
-    if (boost === null || boost <= 1) return 'Boost must be more than 1 (e.g. 1.4).'
+    if (boost === null || boost <= 1) return held('Boost must be more than 1 (e.g. 1.4).')
   }
-  if (promo.kind === 'legs' && promo.legs.length === 0) return 'Add a promo leg, or set Promotion to None.'
+  if (promo.kind === 'legs' && promo.legs.length === 0) return held('Add a promo leg, or set Promotion to None.')
   if (promo.kind === 'legs') {
     const off = promo.legs.find((l) => !s.sports.includes(l.sport))
-    if (off) return `${off.player} is an ${off.sport} promo leg, but ${off.sport} isn't selected.`
+    if (off) return held(`${off.player} is an ${off.sport} promo leg, but ${off.sport} isn't selected.`)
   }
   const feedPromosApply = promo.kind !== 'bonus' && promo.kind !== 'boost'
 

@@ -55,9 +55,10 @@ function Tier({ name, label, priority, tier, onChange }: { name: TierName; label
         <span className="muted small">priority {priority}</span>
       </button>
       <div className="field">
-        <label htmlFor={`${id}-edge`}>Edge</label>
-        <span className="prefix">
-          +
+        <label htmlFor={`${id}-edge`} className="tier-label">
+          Edge
+        </label>
+        <span className="suffix">
           <input
             id={`${id}-edge`}
             type="number"
@@ -70,11 +71,13 @@ function Tier({ name, label, priority, tier, onChange }: { name: TierName; label
             aria-describedby={`${id}-says`}
             onChange={(e) => onChange({ ...tier, edge: e.target.value })}
           />
-          <span className="muted">pts</span>
+          <span className="muted">%</span>
         </span>
       </div>
       <div className="field">
-        <label htmlFor={`${id}-legs`}>Qualifying legs</label>
+        <label htmlFor={`${id}-legs`} className="tier-label">
+          Qualifying legs
+        </label>
         <input
           id={`${id}-legs`}
           type="number"
@@ -95,20 +98,47 @@ function Tier({ name, label, priority, tier, onChange }: { name: TierName; label
   )
 }
 
+const OPEN_KEY = 'ppopt.alertsOpen'
+
+/** Whether this browser left the panel open: folded unless it says so. */
+function loadOpen(): boolean {
+  try {
+    return localStorage.getItem(OPEN_KEY) === '1'
+  } catch {
+    return false
+  }
+}
+
+function saveOpen(open: boolean) {
+  try {
+    if (open) localStorage.setItem(OPEN_KEY, '1')
+    else localStorage.removeItem(OPEN_KEY)
+  } catch {
+    // not remembered; still applied
+  }
+}
+
+/** This browser's time zone, listed first. */
+const here = () => Intl.DateTimeFormat().resolvedOptions().timeZone
+
 /**
- * Where auto runs' alerts go and when they're loud (GLOSSARY: Alert, Alert tier, Qualifying leg). Open while no topic
- * is set; folded away once one is, naming it. Changes save themselves, as the run settings do.
+ * Where auto runs' alerts go and when they're loud (GLOSSARY: Alert, Alert tier, Qualifying leg). Folded to one line
+ * naming where alerts go (with a Set up button while there's no topic), open or folded as this browser last left it.
+ * Changes save themselves, as the run settings do.
  */
 export function AlertsPanel({ alerts }: { alerts: AlertSettings }) {
   const { form, saved, change, flush, unsaved, setToken, clearToken, saveError, loadError } = alerts
-  const [open, setOpen] = useState<boolean | null>(null)
+  const [open, setOpenState] = useState(loadOpen)
   const [checked, setChecked] = useState<Said | null>(null)
   const [tested, setTested] = useState<Said | null>(null)
   const [busy, setBusy] = useState<'check' | 'test' | null>(null)
   const [token, setTokenInput] = useState('')
   const id = useId()
 
-  if (form && open === null) setOpen(!form.topic) // decided once, on opening: never folded away mid-edit
+  const setOpen = (next: boolean) => {
+    setOpenState(next)
+    saveOpen(next)
+  }
 
   const set = <K extends keyof AlertForm>(key: K, value: AlertForm[K]) => form && change({ ...form, [key]: value })
 
@@ -117,7 +147,9 @@ export function AlertsPanel({ alerts }: { alerts: AlertSettings }) {
   const usable = !!topic && !topicBad
   const server = form?.server ?? ''
   const serverBad = form ? serverProblem(server) : null
-  const ready = usable && !serverBad && busy === null // Check and Send test go through the saved server
+  const ready = usable && !serverBad // Check and Send test go through the saved server
+  // Why Check and Send test can't go, when nothing else on the panel says so.
+  const why = !topic ? 'Set a topic to check or test it.' : !topicBad && serverBad ? 'Fix the server under Server and token first.' : null
   const shown = (said: Said | null) => (said && said.topic === topic && said.server === server ? said : null)
 
   const random = () => {
@@ -135,6 +167,7 @@ export function AlertsPanel({ alerts }: { alerts: AlertSettings }) {
   }
 
   const check = async () => {
+    if (busy) return
     setBusy('check')
     const about = { server, topic }
     try {
@@ -149,6 +182,7 @@ export function AlertsPanel({ alerts }: { alerts: AlertSettings }) {
   }
 
   const test = async () => {
+    if (busy) return
     setBusy('test')
     const about = { server, topic }
     try {
@@ -173,12 +207,13 @@ export function AlertsPanel({ alerts }: { alerts: AlertSettings }) {
       ? `${saved.topic} on ${host(saved.server)}`
       : 'No topic: auto runs send no alerts'
   const zone = form?.timezone ?? ''
-  const zones = useMemo(() => zoneChoices(zone), [zone])
+  const zones = useMemo(() => zoneChoices(zone, here()), [zone])
   const zoneBad = form && form.timezone && !zoneValue(form.timezone) ? 'Not a time zone this browser knows, e.g. America/New_York.' : null
+  const setUp = !open && !!saved && !saved.topic
 
   return (
-    <section className="alerts" aria-labelledby={`${id}-h`}>
-      <details open={!!open} onToggle={(e) => setOpen(e.currentTarget.open)}>
+    <section className="alerts" aria-labelledby={`${id}-h`} data-set-up={setUp || undefined}>
+      <details open={open} onToggle={(e) => e.currentTarget.open !== open && setOpen(e.currentTarget.open)}>
         <summary>
           <h2 id={`${id}-h`} className="label">
             Phone alerts
@@ -209,12 +244,31 @@ export function AlertsPanel({ alerts }: { alerts: AlertSettings }) {
                 <button type="button" className="secondary" onClick={random}>
                   Random
                 </button>
-                <button type="button" className="secondary" disabled={!ready} onClick={check}>
-                  Check
+                <button
+                  type="button"
+                  className="secondary"
+                  disabled={!ready}
+                  aria-busy={busy === 'check' || undefined}
+                  aria-describedby={why ? `${id}-why` : undefined}
+                  onClick={check}
+                >
+                  {busy === 'check' ? 'Checking…' : 'Check'}
                 </button>
-                <button type="button" className="secondary" disabled={!ready} onClick={test}>
-                  Send test
+                <button
+                  type="button"
+                  className="secondary"
+                  disabled={!ready}
+                  aria-busy={busy === 'test' || undefined}
+                  aria-describedby={why ? `${id}-why` : undefined}
+                  onClick={test}
+                >
+                  {busy === 'test' ? 'Sending…' : 'Send test'}
                 </button>
+                {why && (
+                  <span id={`${id}-why`} className="muted small">
+                    {why}
+                  </span>
+                )}
               </div>
             </div>
             <div id={`${id}-topic-note`} className="topic-notes small">
@@ -222,7 +276,7 @@ export function AlertsPanel({ alerts }: { alerts: AlertSettings }) {
                 <p className="warn">{topicBad}</p>
               ) : (
                 <p className="muted">
-                  Anyone who knows a public topic's name can read and post to it; Random makes it hard to guess.
+                  Anyone with a public topic's name can read it and post to it; Random makes one hard to guess.
                   {usable && !serverBad && (
                     <>
                       {' '}
@@ -240,12 +294,52 @@ export function AlertsPanel({ alerts }: { alerts: AlertSettings }) {
             </div>
 
             <div className="tiers">
+              <div className="tier-head" aria-hidden="true">
+                <span />
+                <span>Edge</span>
+                <span>Qualifying legs</span>
+              </div>
               {TIERS.map(({ name, label, priority }) => (
                 <Tier key={name} name={name} label={label} priority={priority} tier={form[name]} onChange={(t) => set(name, t)} />
               ))}
-              <p className="muted small">Neither met: priority 1 (silent). Unchanged legs repeat at priority 1.</p>
               {barsCrossed(form) && (
                 <p className="warn small">Medium's edge bar is above high's: an alert meeting medium will usually meet high first.</p>
+              )}
+              <details className="tier-more">
+                <summary>When neither is met</summary>
+                <p className="muted small">Neither met: priority 1 (silent). Unchanged legs repeat at priority 1.</p>
+              </details>
+            </div>
+
+            <div className="field zone-field">
+              <label htmlFor={`${id}-zone`}>Alert times in</label>
+              {zones.length ? (
+                <select id={`${id}-zone`} value={form.timezone} onChange={(e) => set('timezone', e.target.value)}>
+                  {!form.timezone && <option value="">UTC (none chosen)</option>}
+                  {zones.map((z) => (
+                    <option key={z.value} value={z.value}>
+                      {z.label}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <input
+                  id={`${id}-zone`}
+                  type="text"
+                  autoComplete="off"
+                  autoCapitalize="off"
+                  spellCheck={false}
+                  placeholder="UTC"
+                  value={form.timezone}
+                  aria-invalid={!!zoneBad}
+                  aria-describedby={zoneBad ? `${id}-zone-note` : undefined}
+                  onChange={(e) => set('timezone', e.target.value)}
+                />
+              )}
+              {zoneBad && (
+                <p id={`${id}-zone-note`} className="warn small">
+                  {zoneBad}
+                </p>
               )}
             </div>
 
@@ -267,37 +361,6 @@ export function AlertsPanel({ alerts }: { alerts: AlertSettings }) {
                   {serverBad && (
                     <p id={`${id}-server-note`} className="warn small">
                       {serverBad}
-                    </p>
-                  )}
-                </div>
-                <div className="field">
-                  <label htmlFor={`${id}-zone`}>Time zone</label>
-                  {zones.length ? (
-                    <select id={`${id}-zone`} value={form.timezone} onChange={(e) => set('timezone', e.target.value)}>
-                      {!form.timezone && <option value="">UTC (none chosen)</option>}
-                      {zones.map((z) => (
-                        <option key={z} value={z}>
-                          {z}
-                        </option>
-                      ))}
-                    </select>
-                  ) : (
-                    <input
-                      id={`${id}-zone`}
-                      type="text"
-                      autoComplete="off"
-                      autoCapitalize="off"
-                      spellCheck={false}
-                      placeholder="UTC"
-                      value={form.timezone}
-                      aria-invalid={!!zoneBad}
-                      aria-describedby={zoneBad ? `${id}-zone-note` : undefined}
-                      onChange={(e) => set('timezone', e.target.value)}
-                    />
-                  )}
-                  {zoneBad && (
-                    <p id={`${id}-zone-note`} className="warn small">
-                      {zoneBad}
                     </p>
                   )}
                 </div>
@@ -339,6 +402,11 @@ export function AlertsPanel({ alerts }: { alerts: AlertSettings }) {
           </div>
         )}
       </details>
+      {setUp && (
+        <button type="button" className="secondary small set-up" onClick={() => setOpen(true)}>
+          Set up
+        </button>
+      )}
     </section>
   )
 }

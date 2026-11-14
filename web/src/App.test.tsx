@@ -42,16 +42,19 @@ describe('App shell', () => {
     expect(screen.getByRole('heading', { level: 1, name: /prizepicks ev optimizer/i })).toBeInTheDocument()
   })
 
-  it('reports the engine online when /api/health answers ok', async () => {
+  it('reports the engine online when its status polls are answered', async () => {
     stub({ 'GET /api/board': noBoard })
     render(<App />)
     expect(await screen.findByText(/engine online/i)).toBeInTheDocument()
   })
 
-  it('reports the engine offline when /api/health fails', async () => {
-    stub({ 'GET /api/health': () => Promise.reject(new TypeError('network down')), 'GET /api/board': noBoard })
+  it('reports the engine offline once its status polls go unanswered', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    stub({ 'GET /api/status': () => Promise.reject(new TypeError('network down')), 'GET /api/board': noBoard })
     render(<App />)
+    await act(() => vi.advanceTimersByTimeAsync(5000))
     expect(await screen.findByText(/engine offline/i)).toBeInTheDocument()
+    vi.useRealTimers()
   })
 })
 
@@ -64,7 +67,7 @@ describe('Board', () => {
   const fetched = saved('fetched')
   const uploaded = saved('uploaded')
   const fetchCalls = (fetchMock: ReturnType<typeof stub>) => fetchMock.mock.calls.filter(([url]) => url === '/api/board/fetch')
-  const fallback = () => screen.getByText(/board fetch failing\? upload one instead/i).closest('details')!
+  const fallback = () => screen.getByText(/upload (one|a board) instead/i).closest('details')!
 
   it('with no board, fetches one on opening, quietly, then says where it came from', async () => {
     let answer!: (r: Response) => void
@@ -194,7 +197,7 @@ describe('Board upload fallback', () => {
     stub({ 'GET /api/board': () => Response.json({ saved_at, projections: 10, source: 'fetched' }) })
     render(<App />)
     await screen.findByText(/fetched 2 min ago/i)
-    expect(screen.getByText(/board fetch failing\? upload one instead/i).closest('details')).not.toHaveAttribute('open')
+    expect(screen.getByText('Upload a board instead').closest('details')).not.toHaveAttribute('open') // offered quietly
   })
 })
 
@@ -203,7 +206,7 @@ describe('Run', () => {
     stub({ 'GET /api/board': () => Response.json({ saved_at: minutesAgo(1), projections: 11, source: 'fetched' }), 'POST /api/run': () => Response.json(report) })
     render(<App />)
     const empty = await screen.findByRole('region', { name: /no report yet/i })
-    expect(empty).toHaveTextContent(/best slips, top legs/i)
+    expect(empty).toHaveTextContent(/best slips.*top legs/i)
     await userEvent.click(await screen.findByRole('button', { name: /^run$/i }))
     await screen.findByRole('region', { name: /best slips/i })
     expect(screen.queryByRole('region', { name: /no report yet/i })).not.toBeInTheDocument()
@@ -285,7 +288,7 @@ describe('Run settings', () => {
 
     for (const s of ['NFL', 'NHL', 'MLB']) await userEvent.click(screen.getByRole('button', { name: s }))
     expect(screen.getByRole('button', { name: /^run$/i })).toBeDisabled()
-    expect(screen.getByText(/pick at least one league/i)).toBeInTheDocument()
+    expect(screen.getAllByText(/pick at least one league/i)).toHaveLength(2) // under the chips, and beside Run
   })
 
   it('sends stake and the advanced settings', async () => {
@@ -639,7 +642,7 @@ describe('Promotions', () => {
     await userEvent.clear(boost)
     await userEvent.type(boost, '1')
     expect(screen.getByRole('button', { name: /^run$/i })).toBeDisabled()
-    expect(screen.getByText(/boost must be more than 1/i)).toBeInTheDocument()
+    expect(screen.getAllByText(/boost must be more than 1/i)).toHaveLength(2) // in the Promotion card, and beside Run
 
     await userEvent.clear(boost)
     await userEvent.type(boost, '1.4')
@@ -656,12 +659,12 @@ describe('Promotions', () => {
     const fetchMock = await ready()
     await userEvent.click(within(promotion()).getByRole('button', { name: /promo legs/i }))
     expect(screen.getByRole('button', { name: /^run$/i })).toBeDisabled()
-    expect(screen.getByText(/add a promo leg/i)).toBeInTheDocument()
+    expect(screen.getAllByText(/add a promo leg/i)).toHaveLength(2)
 
     await userEvent.type(await screen.findByLabelText(/find a line/i), 'embiid pts')
-    const results = screen.getByRole('listbox', { name: /board lines/i })
-    expect(within(results).getAllByRole('option')).toHaveLength(1)
-    await userEvent.click(within(results).getByRole('option', { name: /joel embiid.*pts\+rebs\+asts.*35\.5/i }))
+    const results = screen.getByRole('list', { name: /board lines/i })
+    expect(within(results).getAllByRole('button')).toHaveLength(1)
+    await userEvent.click(within(results).getByRole('button', { name: /joel embiid.*pts\+rebs\+asts.*35\.5/i }))
 
     const line = screen.getByLabelText('Promo line')
     expect(line).toHaveValue(35.5)
@@ -685,13 +688,14 @@ describe('Promotions', () => {
     await ready()
     await userEvent.click(within(promotion()).getByRole('button', { name: /promo legs/i }))
     await userEvent.type(await screen.findByLabelText(/find a line/i), 'maye')
-    await userEvent.click(screen.getByRole('option', { name: /drake maye/i }))
+    await userEvent.click(screen.getByRole('button', { name: /drake maye/i }))
     await userEvent.click(screen.getByRole('button', { name: 'Under' }))
     const line = screen.getByLabelText('Promo line')
     await userEvent.clear(line)
     await userEvent.type(line, '260')
-    expect(screen.getByRole('button', { name: /add promo leg/i })).toBeDisabled()
+    await userEvent.click(screen.getByRole('button', { name: /add promo leg/i }))
     expect(screen.getByText(/half-point/i)).toBeInTheDocument()
+    expect(screen.queryByRole('list', { name: /promo legs/i })).not.toBeInTheDocument()
 
     await userEvent.clear(line)
     await userEvent.type(line, '260.5')
@@ -747,7 +751,7 @@ describe('Run progress', () => {
   it('shows a progress bar with a percentage and the current step', async () => {
     const { run } = await start()
     const bar = await screen.findByRole('progressbar', { name: /run progress/i })
-    expect(bar).toHaveAttribute('aria-valuenow', '0')
+    expect(bar).not.toHaveAttribute('aria-valuenow') // indeterminate until the requests are planned
 
     run.event({ type: 'progress', done: 4, total: 10, step: 'DraftKings NBA' })
     await screen.findByText('40%')
@@ -854,7 +858,7 @@ describe('Review fixes', () => {
   async function addEmbiidPromo() {
     await userEvent.click(within(screen.getByRole('group', { name: /promotion/i })).getByRole('button', { name: /promo legs/i }))
     await userEvent.type(await screen.findByLabelText(/find a line/i), 'embiid')
-    await userEvent.click(screen.getByRole('option', { name: /joel embiid/i }))
+    await userEvent.click(screen.getByRole('button', { name: /joel embiid/i }))
     await userEvent.click(screen.getByRole('button', { name: /add promo leg/i }))
     await screen.findByRole('list', { name: /promo legs/i })
   }
@@ -874,7 +878,7 @@ describe('Review fixes', () => {
     await addEmbiidPromo()
     await userEvent.click(screen.getByRole('button', { name: 'NBA' }))
     expect(screen.getByRole('button', { name: /^run$/i })).toBeDisabled()
-    expect(screen.getByText(/joel embiid is an nba promo leg/i)).toBeInTheDocument()
+    expect(screen.getAllByText(/joel embiid is an nba promo leg/i)).toHaveLength(2)
   })
 
   it('clears promo legs when a new board is uploaded', async () => {

@@ -503,3 +503,48 @@ matters. Terms in `GLOSSARY.md` (*Alert*, *Alert tier*, *Qualifying leg*).
   - `runs.read_saved` loads both settings files; `models.changes_some` is the shared PATCH check; `/api/status`
     keeps both `updated_at`s in memory.
 
+## Sprint 11: UX/UI pass
+
+**Goal:** the page answers "which picks are worth playing right now?" on its first screen, and looks designed rather
+than templated, keeping achromatic-ledger. Three audits (laws of UX and WCAG 2.2 AA; taste-skill app-screen review;
+Emil Kowalski's motion, `break-ui` and `mobile-native`) found 45 issues; four were major and went to the user as
+before/after mock-ups.
+
+**Done criteria**
+- [x] Major changes signed off from before/after screenshots: one-column order with Run and the report above the
+      setup cards (M1, option B over a two-column rail); a phone Run bar held to the foot of the screen and the
+      theme control at the page foot (M2); control edges at 3:1 (M3). Folding losing slips (M4) was declined.
+- [x] At 1440x900 with a report, Run and the top of Best Slips are on the first screen; at 390x844 Run is in reach
+      at any scroll position, with no sideways scroll
+- [x] Worst-case data doesn't break the layout: long URLs in warnings and errors, long names, huge EVs, zero legs
+- [x] An old report reads as old: dimmed with "Previous run · HH:MM" while a run goes or after a newer failure, and
+      its age shown; a new result fades in, the report shown on opening doesn't
+- [x] Pending, disabled and failed states are designed (busy Run reads "Running… 39%"; disabled buttons legible
+      with a reason; an error card with Try again)
+- [x] `lint.mjs --app web/src` and `inspect.mjs --app` at 1440/768/390: 0 FAIL, 0 WARN
+
+**Notes**
+- Layout: header, board strip, the Run row (Run, Fresh odds moved out of Advanced, why Run is held, Next run, Auto
+  runs), progress or error, the report, then Run settings, Promotion and Phone alerts. Below 40rem Run and the Auto
+  runs switch sit in a sticky bar; Next run stays in the page. Pressing Run scrolls its own progress card into view.
+- Tokens: `--control` is #868b93 light (3.43:1 on white) and #60656d dark (3.06:1 on the dark surface).
+- Report: Edge leads Top Legs, with a divider row at the reference slip's break-even and grey (not red) negative
+  edges; one right-aligned column per book; money through `Intl` with thousands separators and no "−$0.00"; a
+  three-line leg card on phones and a sub-line for sport and matchup on tablets; "worst-case devig" in the run line.
+- Progress waits indeterminately ("Waiting for PrizePicks · 0:07") until requests are planned, moves linearly, and
+  holds at 99% until the report arrives.
+- Panels: league chips on are outlined in ink with a check; Run settings says when it was saved and that auto runs
+  use it; a blocked Run explains itself at the field too; the promo picker is a plain list of buttons, its line
+  checked on blur or Add; the board card offers a quiet "Upload a board instead" unless the board is missing, stale
+  or failing; "Engine offline: retrying" after two unanswered status polls (the one-off `/api/health` check is
+  gone).
+- Phone alerts: starts folded (open state remembered per browser) with *Set up* while there's no topic; compact tier
+  rows under one Edge / Qualifying legs header; edge in % everywhere; *Alert times in* after the tiers, listing zones
+  as "Los Angeles (GMT-8)" with the browser's first; Save token no longer overflows at 768.
+- Motion and touch: no transitions during a theme switch; the toast pauses under the pointer or focus and fades out
+  in 150 ms; reduced motion drops transforms but keeps colour and opacity; no tap flash, 16px fields on touch
+  screens, taller tap areas; `theme-color` follows the theme.
+- Keyboard order in the desktop Run row is Run, Auto runs, then Fresh odds (the switch sits at the far right); the
+  order still reads sensibly, so it was left.
+- Not run on a real phone: tap flash, iOS zoom and the status-bar colour were checked in Chromium's emulation.
+

@@ -268,7 +268,7 @@ def report_for(args, root: Path, payload: dict, http: Http, now: datetime, colle
         raise UserError(f"promo leg: {e}") from e
     needs = board_needs([*lines, *used_promos, *manual])
     if not lines and not used_promos and not manual:
-        raise UserError(f"no PrizePicks games start in the next {args.hours:g} hours in {','.join(args.sports)}; "
+        raise UserError(f"no PrizePicks games start in the next {args.hours:g} hours in {', '.join(args.sports)}; "
                         "try more hours or other leagues, or save a fresh board if this one is old")
     books = json.loads(config_file(root, "books.json").read_text())
     live_before = getattr(http, "live_requests", 0)  # the CLI may have fetched PrizePicks on this Http

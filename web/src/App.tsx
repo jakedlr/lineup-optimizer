@@ -19,48 +19,32 @@ import {
 } from './api'
 import { AlertNote } from './AlertNote'
 import { AlertsPanel } from './AlertsPanel'
-import { AutoRunsSwitch } from './AutoRunsSwitch'
+import { AutoRunsSwitch, NextRun } from './AutoRunsSwitch'
 import { BoardPanel } from './BoardPanel'
-import { clock, minutesSince, runLabel, STALE_MINUTES } from './format'
+import { clock, minutesSince, runLabel, sentence, STALE_MINUTES } from './format'
 import { ReportView } from './ReportView'
-import { PromoPanel } from './PromoPanel'
+import { PromoPanel, PromoPlaceholder } from './PromoPanel'
 import { advance, type Shown } from './progress'
 import { RunProgressBar } from './RunProgressBar'
 import { RunToast } from './RunToast'
-import { count, DEFAULT_TOP, NO_PROMOTION, positive, toRun, type Promotion } from './settings'
+import { count, DEFAULT_TOP, isProblem, NO_PROMOTION, positive, toRun, type Promotion } from './settings'
 import { Segmented } from './Segmented'
-import { SettingsPanel } from './SettingsPanel'
+import { SettingsPanel, SettingsPlaceholder } from './SettingsPanel'
 import { sendSystemNotice } from './systemNotify'
-import { applyTheme, loadTheme, type Theme } from './theme'
+import { applyTheme, loadTheme, watchSystemTheme, type Theme } from './theme'
 import { useRunNotifier } from './useRunNotifier'
 import { useAlertSettings } from './useAlertSettings'
 import { useRunSettings } from './useRunSettings'
-import { useServerStatus, type StatusHandler } from './useServerStatus'
-
-type Engine = 'checking' | 'online' | 'offline'
+import { useServerStatus, type Engine, type StatusHandler } from './useServerStatus'
 
 const ENGINE_LABEL: Record<Engine, string> = {
   checking: 'Checking engine…',
   online: 'Engine online',
-  offline: 'Engine offline',
+  offline: 'Engine offline: retrying',
 }
 
-function useEngineStatus(): Engine {
-  const [engine, setEngine] = useState<Engine>('checking')
-
-  useEffect(() => {
-    let live = true
-    fetch('/api/health')
-      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`))))
-      .then((body: { status?: string }) => live && setEngine(body.status === 'ok' ? 'online' : 'offline'))
-      .catch(() => live && setEngine('offline'))
-    return () => {
-      live = false
-    }
-  }, [])
-
-  return engine
-}
+/** Run, while this page's run goes: how far along it is, once the sportsbook requests are planned (never 100%). */
+const runningLabel = (p: Shown | null) => (p && p.total > 0 ? `Running… ${Math.min(p.percent, 99)}%` : 'Running…')
 
 /** The product's mark: an entry slip with its picks, drawn in ink. */
 function SlipMark() {
@@ -109,19 +93,21 @@ const heldFor = (run: RunHead) =>
 const STOPPED = 'the run was stopped: this page lost its connection to it'
 
 function App() {
-  const engine = useEngineStatus()
   const [board, setBoard] = useState<BoardInfo | null | undefined>(undefined)
   const [uploading, setUploading] = useState(false)
   const [fetching, setFetching] = useState(false)
   const [fetchError, setFetchError] = useState<string | null>(null)
   const [going, setGoing] = useState<Going | null>(null)
-  const [report, setReport] = useState<{ report: Report; label: string; id: string | null } | null>(null)
+  // The report shown, with the run it came from; `opened` when it is the one the page opened on (it arrives unfaded).
+  const [report, setReport] = useState<{ report: Report; by: StartedBy; at: string; id: string | null; opened: boolean } | null>(null)
   const [failure, setFailure] = useState<{ error: string; label: string; id: string | null } | null>(null)
+  // Whether the server has said what the page opens on: "No report yet" waits for that, so it never flashes.
+  const [opened, setOpened] = useState(false)
   // How the latest recorded run's alert went, as the server last said (null while none, or still sending).
   const [latestAlert, setLatestAlert] = useState<{ id: string; alert: AlertOutcome } | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [refused, setRefused] = useState<string | null>(null)
-  const { options, settings, change, sync: syncSettings, loadError, saveError } = useRunSettings()
+  const { options, settings, change, sync: syncSettings, loadError, saveError, savedAt } = useRunSettings()
   const alerts = useAlertSettings()
   const [noCache, setNoCache] = useState(false)
   const [promotion, setPromotion] = useState<Promotion>(NO_PROMOTION)
@@ -139,6 +125,7 @@ function App() {
   const autoQuietThrough = useRef(0) // status answers asked at or before this were asked before the switch changed
 
   useEffect(() => applyTheme(theme), [theme])
+  useEffect(() => (theme === 'system' ? watchSystemTheme() : undefined), [theme])
 
   const begin = (g: Going | null) => {
     goingRef.current = g
@@ -146,11 +133,11 @@ function App() {
   }
 
   /** Show how a run ended, marked with how and when it started. */
-  const show = useCallback((run: Omit<RunRef, 'id'> & { id?: string | null }, outcome: Outcome) => {
+  const show = useCallback((run: Omit<RunRef, 'id'> & { id?: string | null }, outcome: Outcome, opening = false) => {
     const label = runLabel(run.started_by, run.started_at)
     const id = run.id ?? null
     if ('report' in outcome) {
-      setReport({ report: outcome.report, label, id })
+      setReport({ report: outcome.report, by: run.started_by, at: run.started_at, id, opened: opening })
       setFailure(null)
     } else {
       setFailure({ error: outcome.error, label, id })
@@ -218,7 +205,7 @@ function App() {
     getLatest()
       .then((entry) => {
         if (!entry || !same(entry, shown.current)) return
-        show(entry, entry.report ? { report: entry.report } : { error: entry.error })
+        show(entry, entry.report ? { report: entry.report } : { error: entry.error }, quietly)
         const { id, alert } = entry
         const told = id && alert ? { id, alert } : null
         if (told) setLatestAlert((was) => (JSON.stringify(was) === JSON.stringify(told) ? was : told))
@@ -255,7 +242,8 @@ function App() {
     if (shown.current === undefined) {
       // Opening: the latest run is old news, shown without a notification.
       shown.current = latest
-      if (latest) void showLatest(true)
+      if (latest) void showLatest(true).finally(() => setOpened(true))
+      else setOpened(true)
     }
     const isNew = (r: RunRef) => !shown.current || after(r, shown.current)
     if (running && isNew(running)) attach(running, false)
@@ -298,11 +286,13 @@ function App() {
     }
   }, [])
 
-  const request = settings ? toRun(settings, noCache, promotion) : null
-  const problem = typeof request === 'string' ? request : null
+  const asked = settings ? toRun(settings, noCache, promotion) : null
+  const problem = asked && isProblem(asked) ? asked : null
+  const request = asked && !isProblem(asked) ? asked : null
   const held = going && !going.own && going.run ? heldFor(going.run) : null
   // A run fetches the board too; starting one mid-fetch would hit the partner feed right behind this one (HTTP 429).
-  const blocked = problem ?? held ?? (fetching ? 'Fetching the board…' : null) ?? refused
+  const blocked = problem?.text ?? held ?? (fetching ? 'Fetching the board…' : null) ?? refused
+  const heldNote = !going?.own && blocked ? blocked : null
 
   const upload = async (file: File) => {
     setUploading(true)
@@ -321,7 +311,7 @@ function App() {
   }
 
   const run = async () => {
-    if (!request || typeof request === 'string' || fetching || goingRef.current) return
+    if (!request || fetching || goingRef.current) return
     let named: RunHead | null = null // the server names the run as it starts it
     begin({ own: true, run: null })
     setError(null)
@@ -332,6 +322,7 @@ function App() {
     const onRun = (h: RunHead) => {
       named = h
       begin({ own: true, run: h })
+      setNoCache(false) // fresh odds are for the run asked for, and the server has it now
     }
     try {
       const next = await runReport(request, { onRun, onProgress: (p) => setProgress((prev) => advance(prev, p)), onBoard: setBoard })
@@ -376,6 +367,8 @@ function App() {
   /** How the alert of the run shown went, when that run is the latest and the server has said. */
   const alertOf = (id: string | null) => (id !== null && latestAlert?.id === id ? latestAlert.alert : null)
   const failureAlert = failure && alertOf(failure.id)
+  // The report shown is no longer the latest word while a run is going, or once a newer run failed: it dims.
+  const stale = !!going || !!failure
 
   return (
     <main className="shell">
@@ -384,21 +377,11 @@ function App() {
           <SlipMark />
           <div>
             <h1>PrizePicks EV Optimizer</h1>
-          <p className="engine" data-state={engine} role="status">
-              {ENGINE_LABEL[engine]}
+            <p className="engine" data-state={status.engine} role="status">
+              {ENGINE_LABEL[status.engine]}
             </p>
           </div>
         </div>
-        <Segmented<Theme>
-          label="Theme"
-          value={theme}
-          options={[
-            { value: 'system', label: 'System' },
-            { value: 'light', label: 'Light' },
-            { value: 'dark', label: 'Dark' },
-          ]}
-          onPick={setTheme}
-        />
       </header>
 
       <BoardPanel
@@ -411,53 +394,57 @@ function App() {
         onFile={upload}
       />
 
-      {options && settings && (
-        <>
-          <SettingsPanel
-            options={options}
-            settings={settings}
-            onChange={change}
-            noCache={noCache}
-            onNoCache={setNoCache}
-            saveError={saveError}
-          />
-          <AlertsPanel alerts={alerts} />
-          <PromoPanel
-            promotion={promotion}
-            onChange={setPromotion}
-            sports={settings.sports}
-            hours={positive(settings.hours)}
-            boardKey={board?.saved_at ?? null}
-          />
-        </>
-      )}
-
-      <div className="actions">
-        <button
-          type="button"
-          className="primary"
-          disabled={!request || !!blocked || !!going || uploading}
-          onClick={run}
-        >
-          {going?.own ? 'Running…' : 'Run'}
-        </button>
-        {!going?.own && blocked && <span className="warn">{blocked}</span>}
-        <AutoRunsSwitch auto={auto} onToggle={toggleAuto} />
+      {/* The Run row. On a phone its bar (Run and the auto runs switch) holds to the foot of the screen; the rest of
+          the row stays here in the page. */}
+      <div className="run-row">
+        <div className="run-bar">
+          <button
+            type="button"
+            className="primary run-button"
+            disabled={!request || !!blocked || !!going || uploading}
+            aria-busy={going?.own || undefined}
+            aria-describedby={heldNote ? 'run-held' : undefined}
+            onClick={run}
+          >
+            {going?.own ? runningLabel(progress) : 'Run'}
+          </button>
+          <AutoRunsSwitch auto={auto} onToggle={toggleAuto} />
+        </div>
+        <div className="run-notes">
+          <label className="check fresh">
+            <input type="checkbox" checked={noCache} onChange={(e) => setNoCache(e.target.checked)} />
+            <span>
+              Fresh odds <span className="muted small">(skip the 1-minute cache)</span>
+            </span>
+          </label>
+          {heldNote && (
+            <span id="run-held" className="warn">
+              {heldNote}
+            </span>
+          )}
+          <NextRun auto={auto} />
+        </div>
       </div>
       {autoNote && <p className="warn small auto-note">{autoNote}</p>}
 
-      {going && <RunProgressBar progress={progress} />}
+      {going && (
+        <RunProgressBar progress={progress} startedAt={going.own ? undefined : going.run?.started_at} reveal={going.own} />
+      )}
 
       {(error ?? loadError) && (
-        <p className="error" role="alert">
-          {error ?? loadError}
-        </p>
+        <div className="error" role="alert">
+          <p>{sentence((error ?? loadError)!)}</p>
+        </div>
       )}
 
       {failure && (
-        <p className="error" role="alert">
-          <span className="run-mark">{failure.label}</span> {failure.error}
-        </p>
+        <div className="error" role="alert">
+          <p className="run-mark">{failure.label} failed</p>
+          <p>{sentence(failure.error)}</p>
+          <button type="button" className="link" disabled={!request || !!blocked || !!going || uploading} onClick={run}>
+            Try again
+          </button>
+        </div>
       )}
       {failureAlert && (
         <p className="small alert-line">
@@ -465,20 +452,28 @@ function App() {
         </p>
       )}
 
-      {!report && !going && (
-        <section className="empty-report" aria-labelledby="empty-h">
-          <h2 id="empty-h">No report yet</h2>
-          <p className="muted">
-            Run prices every line on the board against FanDuel and DraftKings, then lists the Best Slips, Top Legs and
-            anything left unpriced.
-          </p>
+      {!report && !going && opened && (
+        <section className="report-empty" aria-label="No report yet">
+          <div className="block">
+            <h2>Best Slips</h2>
+            <p className="empty-box muted">Run builds the best Power and Flex slip of each size, one leg per game.</p>
+          </div>
+          <div className="block">
+            <h2>Top Legs</h2>
+            <p className="empty-box muted">Every line on the board priced against FanDuel and DraftKings, best edge first.</p>
+          </div>
         </section>
       )}
 
       {report && settings && (
         <ReportView
+          key={report.id ?? report.at}
           report={report.report}
-          label={report.label}
+          label={runLabel(report.by, report.at, stale)}
+          at={report.at}
+          stale={stale}
+          busy={!!going}
+          opened={report.opened}
           alert={alertOf(report.id)}
           top={count(settings.top) ?? DEFAULT_TOP}
           slipType={settings.slipType}
@@ -487,7 +482,49 @@ function App() {
         />
       )}
 
-      <RunToast notice={notifier.notice} onClose={notifier.dismiss} />
+      {options && settings ? (
+        <SettingsPanel
+          options={options}
+          settings={settings}
+          onChange={change}
+          saveError={saveError}
+          savedAt={savedAt}
+          problem={problem}
+        />
+      ) : (
+        !loadError && <SettingsPlaceholder />
+      )}
+      {options && settings ? (
+        <PromoPanel
+          promotion={promotion}
+          onChange={setPromotion}
+          sports={settings.sports}
+          hours={positive(settings.hours)}
+          boardKey={board?.saved_at ?? null}
+          problem={problem}
+        />
+      ) : (
+        !loadError && <PromoPlaceholder />
+      )}
+      <AlertsPanel alerts={alerts} />
+
+      <footer className="foot">
+        <span className="muted small" aria-hidden="true">
+          Theme
+        </span>
+        <Segmented<Theme>
+          label="Theme"
+          value={theme}
+          options={[
+            { value: 'system', label: 'System' },
+            { value: 'light', label: 'Light' },
+            { value: 'dark', label: 'Dark' },
+          ]}
+          onPick={setTheme}
+        />
+      </footer>
+
+      <RunToast notice={notifier.notice} onClose={notifier.dismiss} onHold={notifier.hold} />
     </main>
   )
 }

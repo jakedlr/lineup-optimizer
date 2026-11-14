@@ -4,12 +4,20 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- The phone's status bar takes the page's ground (index.css --ground; theme.ts GROUND keeps it in step). -->
+    <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f2f4f7" />
+    <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0b0c0e" />
     <title>PrizePicks EV Optimizer</title>
     <script>
-      // Apply a remembered theme before first paint, so a forced theme never flashes the system one.
+      // Apply a remembered theme before first paint, so a forced theme never flashes the system one, and paint the
+      // status bar to match it.
       try {
         const t = localStorage.getItem('ppopt.theme')
-        if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t
+        if (t === 'light' || t === 'dark') {
+          document.documentElement.dataset.theme = t
+          const ground = t === 'dark' ? '#0b0c0e' : '#f2f4f7'
+          for (const m of document.querySelectorAll('meta[name="theme-color"]')) m.content = ground
+        }
       } catch {}
     </script>
   </head>

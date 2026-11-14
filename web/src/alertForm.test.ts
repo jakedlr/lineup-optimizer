@@ -12,6 +12,8 @@ import {
   subscribeUrl,
   tierSummary,
   topicProblem,
+  zoneChoices,
+  zoneLabel,
 } from './alertForm'
 
 // Sprint 10: the alert settings as the page edits them (GLOSSARY: Alert, Alert tier, Qualifying leg).
@@ -149,5 +151,37 @@ describe('wording', () => {
   it('links to the topic on its server, to subscribe', () => {
     expect(subscribeUrl('https://ntfy.sh', 'pp-abc')).toBe('https://ntfy.sh/pp-abc')
     expect(subscribeUrl('http://ntfy.lan/', 'pp-abc')).toBe('http://ntfy.lan/pp-abc')
+  })
+})
+
+describe('Alert time zones', () => {
+  const winter = new Date('2026-01-15T12:00:00Z')
+  const summer = new Date('2026-07-15T12:00:00Z')
+
+  it('are named by their city and their offset at the time', () => {
+    expect(zoneLabel('America/Los_Angeles', winter)).toBe('Los Angeles (GMT-8)')
+    expect(zoneLabel('America/Los_Angeles', summer)).toBe('Los Angeles (GMT-7)')
+    expect(zoneLabel('Asia/Kolkata', winter)).toBe('Kolkata (GMT+5:30)')
+    expect(zoneLabel('America/Argentina/Buenos_Aires', winter)).toBe('Buenos Aires (GMT-3)')
+  })
+
+  it("put this browser's first, then the rest by name, keeping the IANA id as the value", () => {
+    const choices = zoneChoices('Asia/Tokyo', 'Europe/Oslo', winter)
+    expect(choices[0]).toEqual({ value: 'Europe/Oslo', label: 'Oslo (GMT+1)' })
+    const rest = choices.slice(1).map((c) => c.label)
+    expect(rest).toEqual([...rest].sort((a, b) => a.localeCompare(b)))
+    expect(choices.filter((c) => c.value === 'Europe/Oslo')).toHaveLength(1)
+    expect(choices.find((c) => c.value === 'Asia/Tokyo')?.label).toBe('Tokyo (GMT+9)')
+  })
+
+  it('keep a chosen zone the browser does not list', () => {
+    const choices = zoneChoices('US/Pacific', 'Europe/Oslo', winter)
+    expect(choices.map((c) => c.value)).toContain('US/Pacific')
+  })
+})
+
+describe('Edge in percent', () => {
+  it('says its range in percent, as the report reads an edge', () => {
+    expect(edgeProblem('30')).toBe('Edge is 0.1% to 20%, in steps of 0.1.')
   })
 })

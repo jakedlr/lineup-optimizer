@@ -59,5 +59,14 @@ export function useRunSettings() {
     [changeSaved],
   )
 
-  return { options, settings: saved.form, change, sync: saved.sync, loadError, saveError: saved.saveError }
+  return {
+    options,
+    settings: saved.form,
+    change,
+    sync: saved.sync,
+    loadError,
+    saveError: saved.saveError,
+    /** When the server last saved the run settings, as this page last heard (null: never). */
+    savedAt: saved.saved?.updated_at ?? null,
+  }
 }

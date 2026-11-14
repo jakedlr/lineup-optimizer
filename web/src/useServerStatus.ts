@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, type RefObject } from 'react'
+import { useCallback, useEffect, useRef, useState, type RefObject } from 'react'
 import { getStatus, type Status } from './api'
 
 export type StatusHandler = (status: Status, seq: number) => void
@@ -6,6 +6,11 @@ export type StatusHandler = (status: Status, seq: number) => void
 /** How often the page asks the server what it's doing: often while you look, rarely from a background tab. */
 export const POLL_MS = 5000
 export const HIDDEN_POLL_MS = 30_000
+/** Looks in a row that may go unanswered before the engine is called offline: one is a blip. */
+export const MISSES_OFFLINE = 2
+
+/** Whether the engine answers: not known until the first look does. */
+export type Engine = 'checking' | 'online' | 'offline'
 
 const hidden = () => document.visibilityState === 'hidden'
 
@@ -13,16 +18,31 @@ const hidden = () => document.visibilityState === 'hidden'
  * Polls GET /api/status, handing each answer to `handler.current` with its sequence number: answers are numbered in the
  * order they were asked, so a caller can set aside one asked before something it knows changed (`asked()` is the
  * number of the latest one asked). Looks again at once when the tab comes back into view, and on `look()`.
+ * `engine` says whether the engine answers: offline after MISSES_OFFLINE looks in a row went unanswered, online again
+ * at the next answer.
  */
 export function useServerStatus(handler: RefObject<StatusHandler>) {
   const seq = useRef(0)
   const live = useRef(true)
+  const misses = useRef(0)
+  const [engine, setEngine] = useState<Engine>('checking')
 
   const look = useCallback(() => {
     const n = ++seq.current
     getStatus()
-      .then((s) => live.current && handler.current(s, n))
-      .catch(() => {}) // the next look will tell
+      .then(
+        (s) => {
+          if (!live.current) return
+          misses.current = 0
+          setEngine('online')
+          handler.current(s, n)
+        },
+        () => {
+          // unanswered: the next look will tell
+          if (live.current && ++misses.current >= MISSES_OFFLINE) setEngine('offline')
+        },
+      )
+      .catch(() => {})
   }, [handler])
 
   useEffect(() => {
@@ -47,5 +67,5 @@ export function useServerStatus(handler: RefObject<StatusHandler>) {
   }, [look])
 
   const asked = useCallback(() => seq.current, [])
-  return { look, asked }
+  return { look, asked, engine }
 }

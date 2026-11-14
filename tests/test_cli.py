@@ -369,6 +369,13 @@ def test_no_games_in_window_message_fits_cli_and_app():
     assert "more hours" in msg and "fresh board" in msg
 
 
+def test_no_games_in_window_message_lists_leagues_with_a_space():
+    later = datetime(2026, 11, 2, 19, 0, tzinfo=timezone.utc)
+    with pytest.raises(cli.UserError, match="in NFL, NHL;"):
+        cli.report_for(cli.parse_args(["--sports", "NFL,NHL"]), ROOT, pp_payload(), http=None, now=later,
+                       collect=lambda *a: (_ for _ in ()).throw(AssertionError("no fetch")))
+
+
 @pytest.mark.parametrize("argv", [["--no-promos"], ["--bonus"], ["--boost", "1.4"]])
 def test_games_with_only_dropped_feed_promos_are_not_fetched(argv):
     payload = pp_payload()

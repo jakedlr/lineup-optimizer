@@ -57,14 +57,50 @@ export function zoneValue(s: string): string | null {
   }
 }
 
-/** The IANA time zones to choose from, `current` among them; empty where the browser can't list them. */
-export function zoneChoices(current: string): string[] {
-  const list = typeof Intl.supportedValuesOf === 'function' ? Intl.supportedValuesOf('timeZone') : []
-  if (!list.length) return []
-  return current && !list.includes(current) ? [current, ...list].sort() : list
+const labels = new Map<string, string>()
+
+/** A zone as a person names it: its city and its offset from GMT at `at`, "Los Angeles (GMT-8)". */
+export function zoneLabel(zone: string, at = new Date()): string {
+  const key = `${zone}|${Math.floor(at.getTime() / 3_600_000)}` // offsets change on the hour at most
+  const known = labels.get(key)
+  if (known) return known
+  const city = zone.split('/').pop()!.replace(/_/g, ' ')
+  let label = city
+  try {
+    const parts = new Intl.DateTimeFormat('en-US', { timeZone: zone, timeZoneName: 'shortOffset' }).formatToParts(at)
+    const offset = parts.find((p) => p.type === 'timeZoneName')?.value
+    if (offset) label = `${city} (${offset})`
+  } catch {
+    // a zone this browser can't format: its city alone
+  }
+  labels.set(key, label)
+  return label
 }
 
-/** An edge threshold in percentage points (0.1-20, in steps of 0.1), or null. */
+/** A time zone to choose: its IANA id, and how it reads. */
+export interface ZoneChoice {
+  value: string
+  label: string
+}
+
+/**
+ * The time zones to choose from, `here` (this browser's) first, then the rest by name; `current` is among them even
+ * when the browser doesn't list it. Empty where the browser can't list zones.
+ */
+export function zoneChoices(current: string, here: string, at = new Date()): ZoneChoice[] {
+  const list = typeof Intl.supportedValuesOf === 'function' ? Intl.supportedValuesOf('timeZone') : []
+  if (!list.length) return []
+  const zones = new Set(list)
+  if (current) zones.add(current)
+  const first = zoneValue(here)
+  const rest = [...zones]
+    .filter((z) => z !== first)
+    .map((z) => ({ value: z, label: zoneLabel(z, at) }))
+    .sort((a, b) => a.label.localeCompare(b.label))
+  return first ? [{ value: first, label: zoneLabel(first, at) }, ...rest] : rest
+}
+
+/** An edge threshold in percent (0.1-20, in steps of 0.1), or null. */
 export function edgeValue(s: string): number | null {
   const n = Number(s)
   if (s.trim() === '' || !Number.isFinite(n) || n < 0.1 || n > 20) return null
@@ -77,7 +113,7 @@ export function legsValue(s: string): number | null {
   return s.trim() !== '' && Number.isInteger(n) && n >= 1 && n <= 6 ? n : null
 }
 
-export const edgeProblem = (s: string) => (edgeValue(s) === null ? 'Edge is 0.1 to 20 points, in steps of 0.1.' : null)
+export const edgeProblem = (s: string) => (edgeValue(s) === null ? 'Edge is 0.1% to 20%, in steps of 0.1.' : null)
 export const legsProblem = (s: string) => (legsValue(s) === null ? 'Qualifying legs is a whole number from 1 to 6.' : null)
 
 const tierForm = (t: AlertTier): TierForm => ({ enabled: t.enabled, edge: t.edge.toFixed(1), legs: String(t.legs) })

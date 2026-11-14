@@ -36,8 +36,8 @@ connection, so it can't be hosted for you.
    came from and when. If the fetch fails, the run uses the last saved board and says so, and
    *Board fetch failing? Upload one instead* lets you drop in one saved from your browser (below).
 2. **Pick your settings.** Leagues and stake are on the page. *Advanced* has hours ahead, the devig
-   method (worst case of the four by default), which slip the edge is measured against, how many legs to
-   list, and *Fresh odds* to skip the 1-minute odds cache for one run.
+   method (worst case of the four by default), which slip the edge is measured against, and how many legs to
+   list. *Fresh odds*, beside Run, skips the 1-minute odds cache for one run.
 3. **Choose a promotion,** if you have one: a bonus (free) entry, a payout boost, or promo legs picked
    from the board (search a player, choose the stat, set Over/Under and the discounted line). Promo
    lines already in the feed, such as tacos, are included unless you untick them.
@@ -49,7 +49,7 @@ The slip type and size filters and the number of legs change the view without ru
 *Download JSON* saves the whole report. Run settings (leagues, stake, hours, devig, reference slip) are
 saved in the app, so every browser and every auto run uses the same ones; the number of legs, the slip
 filters, notifications and the theme are remembered per browser. Promotions and *Fresh odds* are never
-saved, since they apply to one entry. The theme follows your system, or pick Light or Dark at the top.
+saved, since they apply to one entry. The theme follows your system, or pick Light or Dark at the foot of the page.
 
 **Auto runs.** Switch on *Auto runs* next to Run and the app runs by itself at :00, :15, :30 and :45,
 with or without the page open, using the saved run settings (feed promos included, no other
@@ -62,7 +62,7 @@ says why. The page always opens on the latest run's report, labelled *Auto run Â
 hard-to-guess topic (anyone who knows a public topic's name can read and post to it), and subscribe to
 it in the app (*Send test* checks it arrives). Every auto run then pushes its six best legs (one per
 game) to your phone. It's loud only when it matters: **High** (priority 4, default 3+ games with a leg at
-+1.0 pts edge or better) or **Medium** (priority 3, +0.5 pts), each adjustable and switchable; otherwise,
++1.0% edge or better) or **Medium** (priority 3, +0.5%), each adjustable and switchable; otherwise,
 or when a tier has no new leg since its last alert, it arrives silently at priority 1. A board
 fetch that fails, switching auto runs off, alerts at priority 4. *Check* says whether a topic looks
 unused, has recent messages, or is reserved; *Server and token* points at a self-hosted or protected
