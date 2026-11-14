@@ -360,6 +360,11 @@ still parse, labelled "promo"). Decision: `docs/adr/0002-board-from-partner-feed
 - `PPOPT_BOARD_FILE` stands in for the partner feed, as `PPOPT_ODDS_FILE` does for the books. e2e mounts
   `web/e2e/.feed/` read-only and runs three Playwright projects in order: `feed-down` (the fallback specs, feed file
   removed), `feed-up` (writes the shifted fixture board as the feed), then every other spec in parallel.
+- The board panel updates as soon as a run has saved its board, not when the report lands (asked for at review):
+  the run stream sends a `board` event (the board info) straight after the board step when the fetch succeeded;
+  a fallback run sends none. `stream_run` hands the work an `announce` callback and ends only on `report`/`error`.
+  Live: the event arrived 2.9 s into a 16.9 s run.
 - Live, 2026-11-14 07:54 UTC, rebuilt app: `POST /api/board/fetch` saved 30,253 projections in 3.6 s; a fresh
   NBA/NHL/NFL run took 14.1 s (DraftKings 8 requests, FanDuel 46), 217 legs, no warnings.
 
+**Review:** done 2026-11-14. Checked live in the app; the board's fetched time now updates mid-run.

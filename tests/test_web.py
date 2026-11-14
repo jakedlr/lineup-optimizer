@@ -388,6 +388,25 @@ def test_a_streamed_fallback_run_leads_its_warnings_with_the_failed_fetch(tmp_pa
     assert "partner feed" in events[-1]["report"]["warnings"][0]
 
 
+def test_a_streamed_run_announces_the_fetched_board_as_soon_as_it_is_saved(tmp_path):
+    client = engine_app(tmp_path)
+    _, events = stream(client)
+    at = [i for i, e in enumerate(events) if e["type"] == "board"]
+    assert len(at) == 1
+    board = events[at[0]]["board"]
+    assert board == client.get("/api/board").json() and board["source"] == "fetched"
+    # Straight after the board step: before any sportsbook request is planned.
+    assert [e["step"] for e in events[:at[0]]] == ["Fetching the PrizePicks board"]
+
+
+def test_a_streamed_fallback_run_announces_no_board(tmp_path):
+    client = engine_app(tmp_path, fetch_board=feed_down())
+    upload(client)
+    _, events = stream(client)
+    assert events[-1]["type"] == "report"
+    assert not [e for e in events if e["type"] == "board"]
+
+
 # --- review fixes --------------------------------------------------------------
 
 def test_closing_the_stream_cancels_the_run():
@@ -398,7 +417,7 @@ def test_closing_the_stream_cancels_the_run():
 
     finished = threading.Event()
 
-    def work(progress):
+    def work(progress, announce):
         try:
             while True:
                 progress.tick()  # a request every loop, like a book fetching props

@@ -140,7 +140,8 @@ class RunSettings(BaseModel):
 
 
 def stream_run(work):
-    """Run `work(progress)` on a worker thread and yield NDJSON: progress events, then one "report" or "error".
+    """Run `work(progress, announce)` on a worker thread and yield NDJSON: progress events (and any event the work
+    announces, such as the board it fetched), then one "report" or "error".
 
     Closing the generator (Starlette does when the client goes away) cancels the run: the worker stops at its
     next sportsbook request instead of scraping for a page nobody is watching.
@@ -150,7 +151,7 @@ def stream_run(work):
 
     def worker():
         try:
-            events.put({"type": "report", "report": work(progress)})
+            events.put({"type": "report", "report": work(progress, events.put)})
         except RunCancelled:
             pass
         except cli.UserError as e:
@@ -163,7 +164,7 @@ def stream_run(work):
         while True:
             event = events.get()
             yield json.dumps(event) + "\n"
-            if event["type"] != "progress":
+            if event["type"] in ("report", "error"):
                 return
     finally:
         progress.cancel()
@@ -330,11 +331,13 @@ def create_app(static_dir=None, data_dir=None, root=None, collect=None, now=None
     def run(request: Request, settings: Annotated[RunSettings | None, Body()] = None):
         args = (settings or RunSettings()).apply(cli.parse_args([]))
 
-        def report(progress: Progress | None = None) -> dict:
+        def report(progress: Progress | None = None, announce=lambda event: None) -> dict:
             if progress:
                 progress.step("Fetching the PrizePicks board")
             # The run keeps the board it fetched (or fell back to): a later save can't change what it reports on.
             payload, fallback = board_for_run()
+            if not fallback:  # the page shows the new board now, not when the report lands
+                announce({"type": "board", "board": board_info()})
             http = Http(data_dir / "cache", use_cache=not args.no_cache, progress=progress)
             result = cli.report_for(args, root, payload, http, now(), collect=collect)
             if fallback:

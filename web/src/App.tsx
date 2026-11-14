@@ -131,7 +131,7 @@ function App() {
     setFetchError(null) // the run fetches again, and its report says if it had to fall back
     setProgress(null)
     try {
-      const next = await runReport(request, (p) => setProgress((prev) => advance(prev, p)))
+      const next = await runReport(request, (p) => setProgress((prev) => advance(prev, p)), setBoard)
       setReport(next)
       notifier.notify({ ok: true, report: next })
     } catch (e) {

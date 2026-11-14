@@ -143,14 +143,20 @@ export interface RunProgress {
 
 type RunEvent =
   | ({ type: 'progress' } & RunProgress)
+  | { type: 'board'; board: BoardInfo }
   | { type: 'report'; report: Report }
   | { type: 'error'; detail: string }
 
 /**
- * Run the engine. The server streams NDJSON: progress events, then one "report" or "error".
+ * Run the engine. The server streams NDJSON: progress events, a "board" event once the run has fetched and saved
+ * the board, then one "report" or "error".
  * A plain JSON answer (an older server, or an error found before the run started) is handled too.
  */
-export async function runReport(settings: RunSettings, onProgress: (p: RunProgress) => void = () => {}): Promise<Report> {
+export async function runReport(
+  settings: RunSettings,
+  onProgress: (p: RunProgress) => void = () => {},
+  onBoard: (b: BoardInfo) => void = () => {},
+): Promise<Report> {
   const res = await fetch('/api/run', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Accept: 'application/x-ndjson' },
@@ -169,6 +175,7 @@ export async function runReport(settings: RunSettings, onProgress: (p: RunProgre
       if (!line.trim()) continue
       const event = JSON.parse(line) as RunEvent
       if (event.type === 'progress') onProgress({ done: event.done, total: event.total, step: event.step })
+      else if (event.type === 'board') onBoard(event.board)
       else if (event.type === 'report') return event.report
       else throw new ApiError(event.detail)
     }

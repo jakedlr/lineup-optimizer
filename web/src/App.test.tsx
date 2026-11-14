@@ -591,6 +591,25 @@ describe('Run progress', () => {
     expect(screen.queryByRole('progressbar')).not.toBeInTheDocument()
   })
 
+  it('shows the fetched board as soon as the run has it, before the report', async () => {
+    const run = controlledRun()
+    stub({
+      'GET /api/board': () => Response.json({ saved_at: minutesAgo(20), projections: 11, source: 'uploaded' }),
+      'POST /api/run': run.response,
+    })
+    render(<App />)
+    await userEvent.click(await screen.findByRole('button', { name: /^run$/i }))
+    expect(await screen.findByText(/uploaded 1\d min ago/i)).toBeInTheDocument()
+
+    run.event({ type: 'progress', done: 0, total: 0, step: 'Fetching the PrizePicks board' })
+    run.event({ type: 'board', board: { saved_at: minutesAgo(0), projections: 30253, source: 'fetched' } })
+    expect(await screen.findByText(/30,253 lines/)).toBeInTheDocument()
+    expect(screen.getByText(/^fetched/i)).toBeInTheDocument()
+    expect(screen.queryByText(/uploaded 1\d min ago/i)).not.toBeInTheDocument()
+    expect(screen.getByRole('progressbar', { name: /run progress/i })).toBeInTheDocument() // still running
+    run.close()
+  })
+
   it('copes with events split across chunks', async () => {
     const { run } = await start()
     const line = JSON.stringify({ type: 'progress', done: 1, total: 4, step: 'FanDuel NFL' }) + '\n'
