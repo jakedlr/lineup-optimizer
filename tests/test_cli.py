@@ -181,6 +181,48 @@ def test_main_table_output(tmp_path, capsys, monkeypatch):
     assert "CHI vs NE" in top_legs and "CHI vs NE" in best_slips
 
 
+def test_main_fetches_the_board_by_default(capsys, monkeypatch):
+    monkeypatch.setattr(cli.prizepicks, "fetch", lambda http: pp_payload())
+    monkeypatch.setattr(cli, "collect_markets", lambda *a, **k: (markets(), []))
+    monkeypatch.setattr(cli, "utcnow", lambda: NOW)
+    assert cli.main(["--json"], root=ROOT) == 0
+    assert json.loads(capsys.readouterr().out)["legs"]
+
+
+def test_pp_file_skips_the_fetch(tmp_path, capsys, monkeypatch):
+    pp_file = tmp_path / "pp.json"
+    pp_file.write_text(json.dumps(pp_payload()))
+
+    def fetch(http):
+        raise AssertionError("fetched the board despite --pp-file")
+
+    monkeypatch.setattr(cli.prizepicks, "fetch", fetch)
+    monkeypatch.setattr(cli, "collect_markets", lambda *a, **k: (markets(), []))
+    monkeypatch.setattr(cli, "utcnow", lambda: NOW)
+    assert cli.main(["--pp-file", str(pp_file), "--json"], root=ROOT) == 0
+
+
+def test_a_failed_board_fetch_names_the_reason_and_the_pp_file_fallback(capsys, monkeypatch):
+    from ppopt.sources.http import FetchError
+
+    def fetch(http):
+        raise FetchError("HTTP 503 from the partner feed")
+
+    monkeypatch.setattr(cli.prizepicks, "fetch", fetch)
+    assert cli.main([], root=ROOT) == 2
+    err = capsys.readouterr().err
+    assert "partner feed" in err and "HTTP 503 from the partner feed" in err
+    assert cli.prizepicks.APP_URL in err and "--pp-file" in err
+    assert "blocks automated requests" not in err
+
+
+def test_pp_file_help_calls_it_the_fallback(capsys):
+    with pytest.raises(SystemExit):
+        cli.parse_args(["--help"])
+    help_text = " ".join(capsys.readouterr().out.split())
+    assert "--pp-file" in help_text and "fallback" in help_text
+
+
 def _row(sport, game, player, line, stat_label, prob, promo_type=""):
     return {
         "sport": sport, "game": game, "player": player, "side": "over", "line": line,
@@ -362,7 +404,7 @@ def _fetching_collect(http, *a):
 def test_report_counts_live_sportsbook_requests_and_a_cached_rerun_counts_none(tmp_path):
     from ppopt.sources.http import Http
 
-    fetch = lambda url, browser=False: (200, b"{}")
+    fetch = lambda url: (200, b"{}")
     args = cli.parse_args([])
     first = cli.report_for(args, ROOT, pp_payload(), Http(tmp_path, fetch=fetch), NOW, collect=_fetching_collect)
     second = cli.report_for(args, ROOT, pp_payload(), Http(tmp_path, fetch=fetch), NOW, collect=_fetching_collect)
@@ -373,7 +415,7 @@ def test_report_counts_live_sportsbook_requests_and_a_cached_rerun_counts_none(t
 def test_no_cache_report_counts_every_request_live(tmp_path):
     from ppopt.sources.http import Http
 
-    fetch = lambda url, browser=False: (200, b"{}")
+    fetch = lambda url: (200, b"{}")
     args = cli.parse_args(["--no-cache"])
     cli.report_for(args, ROOT, pp_payload(), Http(tmp_path, fetch=fetch), NOW, collect=_fetching_collect)
     http = Http(tmp_path, use_cache=not args.no_cache, fetch=fetch)
@@ -383,7 +425,7 @@ def test_no_cache_report_counts_every_request_live(tmp_path):
 def test_live_requests_leave_out_the_prizepicks_fetch(tmp_path):
     from ppopt.sources.http import Http
 
-    http = Http(tmp_path, fetch=lambda url, browser=False: (200, b"{}"), sleep=lambda s: None)
+    http = Http(tmp_path, fetch=lambda url: (200, b"{}"), sleep=lambda s: None)
     http.get_json("https://prizepicks.test/projections")  # the board, fetched before pricing
     report = cli.report_for(cli.parse_args([]), ROOT, pp_payload(), http, NOW, collect=_fetching_collect)
     assert report["live_requests"] == 1
@@ -431,7 +473,7 @@ def test_each_book_is_timed_with_its_own_live_requests(monkeypatch, tmp_path):
 
     monkeypatch.setattr(cli.draftkings, "collect", fetching("https://dk.example/a", "https://dk.example/b"))
     monkeypatch.setattr(cli.fanduel, "collect", fetching("https://fd.example/a"))
-    http = Http(tmp_path, fetch=lambda url, browser=False: (200, b"{}"), sleep=lambda s: None)
+    http = Http(tmp_path, fetch=lambda url: (200, b"{}"), sleep=lambda s: None)
     cli.collect_markets(http, None, {"draftkings": {}, "fanduel": {}}, ["NFL"], NOW, 24, set())
     assert {book: t["requests"] for book, t in http.timing.items()} == {"draftkings": 2, "fanduel": 1}
 
@@ -570,7 +612,7 @@ def test_a_book_that_breaks_stops_the_other_at_its_next_request(monkeypatch, tmp
             http.get_json(f"https://fd.example/{i}")
         return []
 
-    def fetch(url, browser=False):
+    def fetch(url):
         time.sleep(0.001)
         return 200, b"{}"
 
@@ -593,7 +635,7 @@ def test_the_breaking_books_error_surfaces_not_the_stop_it_caused(monkeypatch, t
     def broken(*a, **k):
         raise TypeError("a bug in the FanDuel parser")
 
-    def fetch(url, browser=False):
+    def fetch(url):
         import time
         time.sleep(0.001)
         return 200, b"{}"
@@ -613,7 +655,7 @@ class InFlight:
     def __init__(self, limit=()):
         self.lock, self.now, self.peak, self.limit, self.seen = threading.Lock(), 0, 0, set(limit), set()
 
-    def __call__(self, url, browser=False):
+    def __call__(self, url):
         import time
         with self.lock:
             self.now += 1

@@ -64,7 +64,8 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     src.add_argument("--sports", type=lambda s: [x.strip().upper() for x in s.split(",") if x.strip()],
                      default=SPORTS, help="comma-separated leagues (default: NFL,NBA,NHL,MLB)")
     src.add_argument("--hours", type=_positive, default=24, help="only games starting within this many hours (default: 24)")
-    src.add_argument("--pp-file", type=Path, help="PrizePicks projections JSON saved from your browser")
+    src.add_argument("--pp-file", type=Path, help="fallback when the board fetch fails: PrizePicks projections JSON saved from a logged-in browser "
+                          "(skips the fetch)")
     src.add_argument("--no-cache", action="store_true", help="ignore cached responses and fetch fresh odds")
 
     price = p.add_argument_group("pricing")
@@ -303,9 +304,9 @@ def load_prizepicks(args, http: Http) -> tuple[dict, list[str]]:
         return prizepicks.fetch(http), []
     except FetchError as e:
         raise UserError(
-            f"could not fetch PrizePicks ({e}); it blocks automated requests.\n"
-            "Save the board from your logged-in browser and pass it with --pp-file:\n"
-            f"  {prizepicks.URL}\n"
+            f"could not fetch the board from PrizePicks' partner feed: {e}\n"
+            "Fallback: open the app's feed in a browser logged in to PrizePicks and save the page:\n"
+            f"  {prizepicks.APP_URL}\n"
             "  -> Ctrl+S -> samples/projections.json, then: ./getOdds --pp-file samples/projections.json"
         ) from e
 

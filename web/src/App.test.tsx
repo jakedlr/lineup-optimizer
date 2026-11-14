@@ -5,11 +5,20 @@ import App from './App'
 import { options, report, routes } from './test/fixtures'
 
 const health = () => Response.json({ status: 'ok' })
-const noBoard = () => Response.json({ detail: 'no board uploaded yet' }, { status: 404 })
+const noBoard = () => Response.json({ detail: 'no board yet' }, { status: 404 })
+const feedDown = () =>
+  Response.json({ detail: "couldn't fetch the board from PrizePicks' partner feed: HTTP 503 from partner-api" }, { status: 502 })
 const minutesAgo = (m: number) => new Date(Date.now() - m * 60_000).toISOString()
 
 function stub(table: Parameters<typeof routes>[0]) {
-  const fn = vi.fn(routes({ 'GET /api/health': health, 'GET /api/options': () => Response.json(options), ...table }))
+  const fn = vi.fn(
+    routes({
+      'GET /api/health': health,
+      'GET /api/options': () => Response.json(options),
+      'POST /api/board/fetch': feedDown,
+      ...table,
+    }),
+  )
   vi.stubGlobal('fetch', fn)
   return fn
 }
@@ -40,43 +49,98 @@ describe('App shell', () => {
 })
 
 describe('Board', () => {
-  it('asks for a board and keeps Run disabled until there is one', async () => {
-    stub({ 'GET /api/board': noBoard })
+  // saved_at is fixed before the page mounts, so "N min ago" can't round down to N-1
+  const saved = (source: string) => (m: number, projections = 11) => {
+    const saved_at = minutesAgo(m)
+    return () => Response.json({ saved_at, projections, source })
+  }
+  const fetched = saved('fetched')
+  const uploaded = saved('uploaded')
+  const fetchCalls = (fetchMock: ReturnType<typeof stub>) => fetchMock.mock.calls.filter(([url]) => url === '/api/board/fetch')
+  const fallback = () => screen.getByText(/board fetch failing\? upload one instead/i).closest('details')!
+
+  it('with no board, fetches one on opening, quietly, then says where it came from', async () => {
+    let answer!: (r: Response) => void
+    const fetchMock = stub({
+      'GET /api/board': noBoard,
+      'POST /api/board/fetch': () => new Promise<Response>((r) => (answer = r)),
+    })
     render(<App />)
-    expect(await screen.findByText(/no board yet/i)).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /^run$/i })).toBeDisabled()
+    expect(await screen.findByText(/fetching board/i)).toBeInTheDocument()
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    answer(Response.json({ saved_at: minutesAgo(0), projections: 30207, source: 'fetched' }))
+    expect(await screen.findByText(/fetched just now/i)).toBeInTheDocument()
+    expect(screen.getByText(/30,207 lines/)).toBeInTheDocument()
+    expect(screen.queryByText(/fetching board/i)).not.toBeInTheDocument()
+    expect(fetchCalls(fetchMock)).toHaveLength(1)
+    expect(fallback()).not.toHaveAttribute('open')
   })
 
-  it('shows the saved board and how old it is', async () => {
-    const saved_at = minutesAgo(5)
-    stub({ 'GET /api/board': () => Response.json({ saved_at, projections: 1234 }) })
+  it('shows a fresh fetched board and how old it is, without fetching again', async () => {
+    const fetchMock = stub({ 'GET /api/board': fetched(5, 1234) })
     render(<App />)
-    expect(await screen.findByText(/saved 5 min ago/i)).toBeInTheDocument()
+    expect(await screen.findByText(/fetched 5 min ago/i)).toBeInTheDocument()
     expect(screen.getByText(/1,234 lines/i)).toBeInTheDocument()
     expect(screen.queryByText(/lines may have moved/i)).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: /^run$/i })).toBeEnabled()
+    expect(fetchCalls(fetchMock)).toHaveLength(0)
   })
 
-  it('flags a board older than 30 minutes as stale', async () => {
-    const saved_at = minutesAgo(45)
-    stub({ 'GET /api/board': () => Response.json({ saved_at, projections: 10 }) })
+  it('says when the board was uploaded instead', async () => {
+    stub({ 'GET /api/board': uploaded(12) })
     render(<App />)
-    expect(await screen.findByText(/saved 45 min ago/i)).toBeInTheDocument()
+    expect(await screen.findByText(/uploaded 12 min ago/i)).toBeInTheDocument()
+  })
+
+  it('fetches a fresh board on opening when the saved one is stale', async () => {
+    const fetchMock = stub({
+      'GET /api/board': uploaded(45),
+      'POST /api/board/fetch': () => Response.json({ saved_at: minutesAgo(0), projections: 12, source: 'fetched' }),
+    })
+    render(<App />)
+    expect(await screen.findByText(/fetched just now/i)).toBeInTheDocument()
+    expect(fetchCalls(fetchMock)).toHaveLength(1)
+    expect(screen.queryByText(/lines may have moved/i)).not.toBeInTheDocument()
+  })
+
+  it('when the fetch fails on a stale board, flags it, says why, and opens the upload fallback', async () => {
+    stub({ 'GET /api/board': uploaded(45) })
+    render(<App />)
+    expect(await screen.findByText(/HTTP 503 from partner-api/)).toBeInTheDocument()
+    expect(screen.getByText(/uploaded 45 min ago/i)).toBeInTheDocument()
     expect(screen.getByText(/lines may have moved/i)).toBeInTheDocument()
+    expect(fallback()).toHaveAttribute('open')
+  })
+
+  it('with no board and a failing fetch, says why, opens the upload fallback, and still lets you run', async () => {
+    stub({ 'GET /api/board': noBoard })
+    render(<App />)
+    expect(await screen.findByText(/couldn't fetch the board from PrizePicks' partner feed: HTTP 503/i)).toBeInTheDocument()
+    expect(screen.getByText(/no board yet/i)).toBeInTheDocument()
+    expect(fallback()).toHaveAttribute('open')
+    expect(screen.getByRole('button', { name: /^run$/i })).toBeEnabled()
+  })
+
+  it('locks the upload while the board is being fetched', async () => {
+    stub({ 'GET /api/board': noBoard, 'POST /api/board/fetch': () => new Promise<Response>(() => {}) })
+    render(<App />)
+    await screen.findByText(/fetching board/i)
+    expect(screen.getByLabelText(/choose board file/i)).toBeDisabled()
   })
 
   it('uploads a chosen file and shows the new board', async () => {
     const fetchMock = stub({
       'GET /api/board': noBoard,
-      'PUT /api/board': () => Response.json({ saved_at: minutesAgo(0), projections: 11 }),
+      'PUT /api/board': () => Response.json({ saved_at: minutesAgo(0), projections: 11, source: 'uploaded' }),
     })
     render(<App />)
-    await screen.findByText(/no board yet/i)
+    await screen.findByText(/HTTP 503/)
 
     const file = new File(['{"data":[]}'], 'projections.json', { type: 'application/json' })
     await userEvent.upload(screen.getByLabelText(/choose board file/i), file)
 
-    expect(await screen.findByText(/saved just now/i)).toBeInTheDocument()
+    expect(await screen.findByText(/uploaded just now/i)).toBeInTheDocument()
+    expect(screen.queryByText(/HTTP 503/)).not.toBeInTheDocument()
     const put = fetchMock.mock.calls.find(([, init]) => init?.method === 'PUT')!
     expect((put[1]!.body as FormData).get('file')).toBe(file)
   })
@@ -87,44 +151,49 @@ describe('Board', () => {
       'PUT /api/board': () => Response.json({ detail: "that file isn't a PrizePicks projections feed" }, { status: 422 }),
     })
     render(<App />)
-    await screen.findByText(/no board yet/i)
+    await screen.findByText(/HTTP 503/)
     await userEvent.upload(screen.getByLabelText(/choose board file/i), new File(['x'], 'x.json'))
     expect(await screen.findByRole('alert')).toHaveTextContent(/isn't a PrizePicks projections feed/i)
   })
+
+  it('refreshes the board after a run, since the run saved a fresh one', async () => {
+    let boards = 0
+    const before = fetched(20)
+    stub({
+      'GET /api/board': () => (boards++ === 0 ? before() : fetched(0, 13)()),
+      'POST /api/run': () => Response.json(report),
+    })
+    render(<App />)
+    await screen.findByText(/fetched 20 min ago/i)
+    await userEvent.click(screen.getByRole('button', { name: /^run$/i }))
+    expect(await screen.findByText(/fetched just now/i)).toBeInTheDocument()
+    expect(screen.getByText(/13 lines/)).toBeInTheDocument()
+  })
 })
 
-describe('Board instructions', () => {
-  const FEED = 'https://api.prizepicks.com/projections?per_page=1000&single_stat=true&game_mode=pickem'
-
-  it('links to the PrizePicks feed to save, opening in a new tab', async () => {
+describe('Board upload fallback', () => {
+  it('links to the app feed the engine names, opening in a new tab', async () => {
     stub({ 'GET /api/board': noBoard })
     render(<App />)
-    await screen.findByText(/no board yet/i)
+    await screen.findByText(/HTTP 503/)
     const link = screen.getByRole('link', { name: /api\.prizepicks\.com\/projections/i })
-    expect(link).toHaveAttribute('href', FEED)
+    expect(link).toHaveAttribute('href', options.board_app_url)
     expect(link).toHaveAttribute('target', '_blank')
     expect(screen.getByRole('link', { name: /app\.prizepicks\.com/i })).toHaveAttribute('href', 'https://app.prizepicks.com')
   })
 
-  it('shows the steps when there is no board or it is stale, and tucks them away otherwise', async () => {
-    const fresh = minutesAgo(2)
-    stub({ 'GET /api/board': () => Response.json({ saved_at: fresh, projections: 10 }) })
-    const { unmount } = render(<App />)
-    await screen.findByText(/saved 2 min ago/i)
-    expect(screen.getByText(/how to get a board/i).closest('details')).not.toHaveAttribute('open')
-    unmount()
-
-    const stale = minutesAgo(45)
-    stub({ 'GET /api/board': () => Response.json({ saved_at: stale, projections: 10 }) })
+  it('is tucked away while the board is usable', async () => {
+    const saved_at = minutesAgo(2)
+    stub({ 'GET /api/board': () => Response.json({ saved_at, projections: 10, source: 'fetched' }) })
     render(<App />)
-    await screen.findByText(/saved 45 min ago/i)
-    expect(screen.getByText(/how to get a board/i).closest('details')).toHaveAttribute('open')
+    await screen.findByText(/fetched 2 min ago/i)
+    expect(screen.getByText(/board fetch failing\? upload one instead/i).closest('details')).not.toHaveAttribute('open')
   })
 })
 
 describe('Run', () => {
   it('shows what a run will produce before the first one', async () => {
-    stub({ 'GET /api/board': () => Response.json({ saved_at: minutesAgo(1), projections: 11 }), 'POST /api/run': () => Response.json(report) })
+    stub({ 'GET /api/board': () => Response.json({ saved_at: minutesAgo(1), projections: 11, source: 'fetched' }), 'POST /api/run': () => Response.json(report) })
     render(<App />)
     const empty = await screen.findByRole('region', { name: /no report yet/i })
     expect(empty).toHaveTextContent(/best slips, top legs/i)
@@ -133,7 +202,7 @@ describe('Run', () => {
     expect(screen.queryByRole('region', { name: /no report yet/i })).not.toBeInTheDocument()
   })
 
-  const withBoard = { 'GET /api/board': () => Response.json({ saved_at: minutesAgo(1), projections: 11 }) }
+  const withBoard = { 'GET /api/board': () => Response.json({ saved_at: minutesAgo(1), projections: 11, source: 'fetched' }) }
 
   it('runs with defaults and renders the report', async () => {
     const fetchMock = stub({ ...withBoard, 'POST /api/run': () => Response.json(report) })
@@ -171,7 +240,7 @@ describe('Run', () => {
 })
 
 describe('Run settings', () => {
-  const withBoard = { 'GET /api/board': () => Response.json({ saved_at: minutesAgo(1), projections: 11 }) }
+  const withBoard = { 'GET /api/board': () => Response.json({ saved_at: minutesAgo(1), projections: 11, source: 'fetched' }) }
 
   function runBodies(fetchMock: ReturnType<typeof stub>) {
     return fetchMock.mock.calls
@@ -291,7 +360,7 @@ describe('Run settings', () => {
 })
 
 describe('Report controls (no re-run)', () => {
-  const withBoard = { 'GET /api/board': () => Response.json({ saved_at: minutesAgo(1), projections: 11 }) }
+  const withBoard = { 'GET /api/board': () => Response.json({ saved_at: minutesAgo(1), projections: 11, source: 'fetched' }) }
 
   async function withReport() {
     const fetchMock = stub({ ...withBoard, 'POST /api/run': () => Response.json(report) })
@@ -347,7 +416,7 @@ describe('Report controls (no re-run)', () => {
 })
 
 describe('Promotions', () => {
-  const withBoard = { 'GET /api/board': () => Response.json({ saved_at: minutesAgo(1), projections: 11 }) }
+  const withBoard = { 'GET /api/board': () => Response.json({ saved_at: minutesAgo(1), projections: 11, source: 'fetched' }) }
   const LINES = 'GET /api/board/lines?sports=NFL%2CNBA%2CNHL%2CMLB&hours=24'
   const boardLines = [
     { sport: 'NBA', matchup: 'CLE vs PHI', player: 'Joel Embiid', stat_label: 'Points', line: 27.5 },
@@ -471,7 +540,7 @@ describe('Promotions', () => {
 })
 
 describe('Run progress', () => {
-  const withBoard = { 'GET /api/board': () => Response.json({ saved_at: minutesAgo(1), projections: 11 }) }
+  const withBoard = { 'GET /api/board': () => Response.json({ saved_at: minutesAgo(1), projections: 11, source: 'fetched' }) }
 
   /** A run response we feed by hand, one chunk at a time. */
   function controlledRun() {
@@ -584,7 +653,7 @@ describe('Theme', () => {
 })
 
 describe('Review fixes', () => {
-  const withBoard = { 'GET /api/board': () => Response.json({ saved_at: minutesAgo(1), projections: 11 }) }
+  const withBoard = { 'GET /api/board': () => Response.json({ saved_at: minutesAgo(1), projections: 11, source: 'fetched' }) }
   const LINES = 'GET /api/board/lines?sports=NFL%2CNBA%2CNHL%2CMLB&hours=24'
   const boardLines = [{ sport: 'NBA', matchup: 'CLE vs PHI', player: 'Joel Embiid', stat_label: 'Pts+Rebs+Asts', line: 35.5 }]
 
@@ -618,13 +687,13 @@ describe('Review fixes', () => {
     stub({
       ...withBoard,
       [LINES]: () => Response.json(boardLines),
-      'PUT /api/board': () => Response.json({ saved_at: new Date().toISOString(), projections: 9 }),
+      'PUT /api/board': () => Response.json({ saved_at: new Date().toISOString(), projections: 9, source: 'uploaded' }),
     })
     render(<App />)
     await screen.findByRole('button', { name: 'NBA', pressed: true })
     await addEmbiidPromo()
     await userEvent.upload(screen.getByLabelText(/choose board file/i), new File(['{"data":[]}'], 'b.json'))
-    await screen.findByText(/saved just now/i)
+    await screen.findByText(/uploaded just now/i)
     expect(screen.queryByRole('list', { name: /promo legs/i })).not.toBeInTheDocument()
   })
 

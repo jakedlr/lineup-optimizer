@@ -49,10 +49,25 @@ from tests.test_cli import NOW, markets, pp_payload
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def engine_app(tmp_path, collect=None):
+def feed(payload=None):
+    """A partner feed that answers with this board (the fixture board by default)."""
+    return lambda: payload or pp_payload()
+
+
+def feed_down(reason="HTTP 503 from the partner feed"):
+    """A partner feed that can't be reached."""
+    from ppopt.sources.http import FetchError
+
+    def fetch():
+        raise FetchError(reason)
+
+    return fetch
+
+
+def engine_app(tmp_path, collect=None, fetch_board=None):
     collect = collect or (lambda *a: (markets(), []))
     return TestClient(create_app(static_dir=tmp_path, data_dir=tmp_path / "data", root=ROOT,
-                                 collect=collect, now=lambda: NOW))
+                                 collect=collect, now=lambda: NOW, fetch_board=fetch_board or feed()))
 
 
 def upload(client, payload=None, raw=None):
@@ -87,10 +102,11 @@ def test_board_must_be_a_prizepicks_projections_feed(tmp_path):
     assert client.get("/api/board").status_code == 404
 
 
-def test_run_without_a_board_is_409(tmp_path):
-    r = engine_app(tmp_path).post("/api/run")
-    assert r.status_code == 409
-    assert "board" in r.json()["detail"].lower()
+def test_run_without_a_board_or_a_feed_fails_asking_for_an_upload_with_the_reason(tmp_path):
+    r = engine_app(tmp_path, fetch_board=feed_down()).post("/api/run")
+    assert r.status_code == 422
+    detail = r.json()["detail"]
+    assert "partner feed" in detail and "HTTP 503 from the partner feed" in detail and "upload" in detail
 
 
 def test_run_returns_the_report_with_defaults(tmp_path):
@@ -114,14 +130,65 @@ def test_run_engine_errors_are_422_with_the_message(tmp_path):
     assert "draftkings unavailable: blocked" in r.json()["detail"]
 
 
-def test_run_warns_when_the_board_is_stale(tmp_path):
-    client = engine_app(tmp_path)
+def test_a_failed_fetch_falls_back_to_the_saved_board_with_one_warning_saying_why_and_how_old(tmp_path):
+    client = engine_app(tmp_path, fetch_board=feed_down())
     upload(client)
     board = tmp_path / "data" / "board.json"
     old = NOW.timestamp() - 45 * 60
     os.utime(board, (old, old))
-    warnings = client.post("/api/run").json()["warnings"]
-    assert any("45 minutes old" in w for w in warnings)
+    r = client.post("/api/run")
+    assert r.status_code == 200
+    warnings = r.json()["warnings"]
+    first = warnings[0]
+    assert "partner feed" in first and "HTTP 503 from the partner feed" in first
+    assert "saved board" in first and "uploaded 45 minutes ago" in first and "may have moved" in first
+    assert not any("minutes" in w for w in warnings[1:]), "the board's age is warned about twice"
+    assert client.get("/api/board").json()["source"] == "uploaded"
+
+
+def test_a_fallback_to_a_fresh_saved_board_still_says_the_fetch_failed(tmp_path):
+    client = engine_app(tmp_path, fetch_board=feed_down())
+    upload(client)
+    board = tmp_path / "data" / "board.json"
+    recent = NOW.timestamp() - 5 * 60
+    os.utime(board, (recent, recent))
+    first = client.post("/api/run").json()["warnings"][0]
+    assert "partner feed" in first and "uploaded 5 minutes ago" in first
+    assert "may have moved" not in first
+
+
+def test_a_fallback_board_names_where_it_came_from(tmp_path):
+    from ppopt.web import create_app as make
+
+    data = tmp_path / "data"
+    fetched = TestClient(make(static_dir=tmp_path, data_dir=data, root=ROOT, collect=lambda *a: (markets(), []),
+                              now=lambda: NOW, fetch_board=feed()))
+    assert fetched.post("/api/board/fetch").status_code == 200
+    down = engine_app(tmp_path, fetch_board=feed_down())
+    assert "fetched" in down.post("/api/run").json()["warnings"][0]
+
+
+def test_every_run_fetches_a_fresh_board_and_saves_it(tmp_path):
+    client = engine_app(tmp_path)
+    r = client.post("/api/run")
+    assert r.status_code == 200 and r.json()["legs"]
+    info = client.get("/api/board").json()
+    assert info["source"] == "fetched"
+    assert info["projections"] == len(pp_payload()["data"])
+    assert json.loads((tmp_path / "data" / "board.json").read_text()) == pp_payload()
+    assert not any("partner feed" in w for w in r.json()["warnings"])
+
+
+def test_a_run_prices_the_fetched_board_over_an_uploaded_one(tmp_path):
+    client = engine_app(tmp_path)
+    nba_only = pp_payload()
+    nba_only["data"] = [p for p in nba_only["data"]
+                        if p["relationships"]["league"]["data"]["id"] == "7"]
+    upload(client, nba_only)
+    assert client.get("/api/board").json()["source"] == "uploaded"
+    report = client.post("/api/run").json()
+    assert "NFL" in {l["sport"] for l in report["legs"]}
+    assert client.get("/api/board").json()["source"] == "fetched"
 
 
 def test_odds_file_replaces_live_books(tmp_path, monkeypatch):
@@ -286,7 +353,8 @@ def test_run_streams_progress_then_the_report(tmp_path):
     assert r.status_code == 200
     progress = [e for e in events if e["type"] == "progress"]
     assert progress and all({"done", "total", "step"} <= set(e) for e in progress)
-    assert progress[0]["done"] == 0 and progress[0]["total"] > 0
+    assert progress[0] == {"type": "progress", "done": 0, "total": 0, "step": "Fetching the PrizePicks board"}
+    assert progress[1]["done"] == 0 and progress[1]["total"] > 0
     assert progress[-1]["step"] == "Pricing lines and building slips"
     assert events[-1]["type"] == "report"
     assert events[-1]["report"]["legs"]
@@ -301,9 +369,23 @@ def test_streamed_engine_errors_end_the_stream(tmp_path):
 
 def test_problems_found_before_running_are_still_plain_http_errors(tmp_path):
     client = engine_app(tmp_path)
-    assert client.post("/api/run", json={}, headers=NDJSON).status_code == 409
-    upload(client)
     assert client.post("/api/run", json={"stake": 0}, headers=NDJSON).status_code == 422
+
+
+def test_a_streamed_run_with_no_feed_and_no_board_ends_in_an_error_asking_for_an_upload(tmp_path):
+    client = engine_app(tmp_path, fetch_board=feed_down())
+    _, events = stream(client)
+    assert events[0]["step"] == "Fetching the PrizePicks board"
+    assert events[-1]["type"] == "error"
+    assert "HTTP 503 from the partner feed" in events[-1]["detail"] and "upload" in events[-1]["detail"]
+
+
+def test_a_streamed_fallback_run_leads_its_warnings_with_the_failed_fetch(tmp_path):
+    client = engine_app(tmp_path, fetch_board=feed_down())
+    upload(client)
+    _, events = stream(client)
+    assert events[-1]["type"] == "report"
+    assert "partner feed" in events[-1]["report"]["warnings"][0]
 
 
 # --- review fixes --------------------------------------------------------------
@@ -352,7 +434,7 @@ def _books_app(tmp_path, monkeypatch):
     from ppopt import web
     from ppopt.sources.http import Http
 
-    monkeypatch.setattr(web, "Http", functools.partial(Http, fetch=lambda url, browser=False: (200, b"{}"),
+    monkeypatch.setattr(web, "Http", functools.partial(Http, fetch=lambda url: (200, b"{}"),
                                                        sleep=lambda s: None))
 
     def collect(http, *a):
@@ -384,7 +466,8 @@ def test_canned_odds_count_as_live(tmp_path, monkeypatch):
     f = tmp_path / "markets.json"
     f.write_text(json.dumps(rows))
     monkeypatch.setenv("PPOPT_ODDS_FILE", str(f))
-    client = TestClient(create_app(static_dir=tmp_path, data_dir=tmp_path / "data", root=ROOT, now=lambda: NOW))
+    client = TestClient(create_app(static_dir=tmp_path, data_dir=tmp_path / "data", root=ROOT, now=lambda: NOW,
+                                   fetch_board=feed()))
     upload(client)
     assert client.post("/api/run").json()["live_requests"] >= 1
     assert client.post("/api/run").json()["live_requests"] >= 1  # canned odds are never a cached run
@@ -400,3 +483,133 @@ def test_concurrent_board_uploads_all_succeed(tmp_path):
     assert codes == [200] * 40
     assert json.loads((tmp_path / "data" / "board.json").read_text())["data"]
     assert not list((tmp_path / "data").glob("*.tmp"))
+
+
+# --- board from the partner feed (Sprint 8) ---------------------------------------
+
+def test_an_uploaded_board_says_so(tmp_path):
+    client = engine_app(tmp_path)
+    assert upload(client).json()["source"] == "uploaded"
+    assert client.get("/api/board").json()["source"] == "uploaded"
+
+
+def test_a_board_saved_before_sources_were_recorded_reads_as_uploaded(tmp_path):
+    client = engine_app(tmp_path)
+    upload(client)
+    meta = tmp_path / "data" / "board.meta.json"
+    meta.write_text(json.dumps({"projections": 11, "filename": "projections.json"}))
+    assert client.get("/api/board").json()["source"] == "uploaded"
+
+
+def test_fetching_the_board_now_saves_it_and_returns_its_info(tmp_path):
+    client = engine_app(tmp_path)
+    r = client.post("/api/board/fetch")
+    assert r.status_code == 200
+    info = r.json()
+    assert info["source"] == "fetched" and info["projections"] == len(pp_payload()["data"])
+    assert datetime.fromisoformat(info["saved_at"]).tzinfo is not None
+    assert client.get("/api/board").json() == info
+    assert client.get("/api/board/lines").json(), "the fetched board feeds the promo-leg picker"
+
+
+def test_a_failed_fetch_now_is_502_with_the_reason_and_keeps_the_saved_board(tmp_path):
+    client = engine_app(tmp_path, fetch_board=feed_down())
+    before = upload(client).json()
+    r = client.post("/api/board/fetch")
+    assert r.status_code == 502
+    assert "partner feed" in r.json()["detail"] and "HTTP 503 from the partner feed" in r.json()["detail"]
+    assert client.get("/api/board").json() == before
+
+
+def test_a_fetch_that_answers_with_something_other_than_a_feed_is_a_failure(tmp_path):
+    client = engine_app(tmp_path, fetch_board=lambda: {"hello": 1})
+    r = client.post("/api/board/fetch")
+    assert r.status_code == 502 and "projections feed" in r.json()["detail"]
+    assert client.get("/api/board").status_code == 404
+
+
+def test_fetches_runs_and_uploads_never_write_the_board_at_once(tmp_path):
+    """Two fetches, or a fetch during a run's own fetch, must not interleave their writes."""
+    import threading
+    import time
+    from concurrent.futures import ThreadPoolExecutor
+
+    lock, state = threading.Lock(), {"now": 0, "peak": 0}
+
+    def slow_feed():
+        with lock:
+            state["now"] += 1
+            state["peak"] = max(state["peak"], state["now"])
+        time.sleep(0.02)
+        with lock:
+            state["now"] -= 1
+        return pp_payload()
+
+    client = engine_app(tmp_path, fetch_board=slow_feed)
+    calls = [lambda: client.post("/api/board/fetch"), lambda: client.post("/api/run"), lambda: upload(client)] * 6
+    with ThreadPoolExecutor(8) as pool:
+        codes = [r.status_code for r in pool.map(lambda call: call(), calls)]
+    assert codes == [200] * len(calls)
+    assert state["peak"] == 1
+    assert not list((tmp_path / "data").glob("*.tmp"))
+
+
+def test_the_run_saves_its_board_into_the_cache(tmp_path, monkeypatch):
+    client = engine_app(tmp_path)
+    client.post("/api/run")
+    real = json.loads
+    parsed = []
+    monkeypatch.setattr("ppopt.web.json.loads", lambda s, *a, **k: parsed.append(len(s)) or real(s, *a, **k))
+    client.get("/api/board/lines")
+    board_size = (tmp_path / "data" / "board.json").stat().st_size
+    assert board_size not in parsed, "the fetched board was parsed again"
+
+
+def test_board_file_env_stands_in_for_the_partner_feed(tmp_path, monkeypatch):
+    feed_file = tmp_path / "feed" / "projections.json"
+    monkeypatch.setenv("PPOPT_BOARD_FILE", str(feed_file))
+    client = TestClient(create_app(static_dir=tmp_path, data_dir=tmp_path / "data", root=ROOT,
+                                   collect=lambda *a: (markets(), []), now=lambda: NOW))
+
+    missing = client.post("/api/board/fetch")
+    assert missing.status_code == 502 and str(feed_file) in missing.json()["detail"]
+
+    feed_file.parent.mkdir()
+    feed_file.write_text("<html>blocked</html>")
+    bad = client.post("/api/board/fetch")
+    assert bad.status_code == 502 and "projections feed" in bad.json()["detail"]
+
+    feed_file.write_text(json.dumps(pp_payload()))
+    assert client.post("/api/board/fetch").json()["source"] == "fetched"
+    assert client.post("/api/run").status_code == 200
+
+
+def test_the_default_fetch_goes_to_the_partner_feed(tmp_path, monkeypatch):
+    from ppopt import web
+
+    monkeypatch.delenv("PPOPT_BOARD_FILE", raising=False)
+    seen = []
+    monkeypatch.setattr(web.prizepicks, "fetch", lambda http: seen.append(http) or pp_payload())
+    client = TestClient(create_app(static_dir=tmp_path, data_dir=tmp_path / "data", root=ROOT, now=lambda: NOW))
+    assert client.post("/api/board/fetch").status_code == 200
+    assert len(seen) == 1 and seen[0].progress is None, "the board fetch must not count as a sportsbook request"
+
+
+def test_a_network_error_on_the_default_fetch_is_a_fetch_failure(tmp_path, monkeypatch):
+    from ppopt import web
+
+    monkeypatch.delenv("PPOPT_BOARD_FILE", raising=False)
+
+    def broken(http):
+        raise ConnectionError("connection reset by peer")
+
+    monkeypatch.setattr(web.prizepicks, "fetch", broken)
+    client = TestClient(create_app(static_dir=tmp_path, data_dir=tmp_path / "data", root=ROOT, now=lambda: NOW))
+    r = client.post("/api/board/fetch")
+    assert r.status_code == 502 and "connection reset by peer" in r.json()["detail"]
+
+
+def test_options_name_the_app_feed_for_saving_a_board_by_hand(tmp_path):
+    from ppopt.sources import prizepicks
+
+    assert engine_app(tmp_path).get("/api/options").json()["board_app_url"] == prizepicks.APP_URL

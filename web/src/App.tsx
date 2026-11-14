@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
-import { getBoard, getOptions, putBoard, runReport, type BoardInfo, type Options, type Report } from './api'
+import { fetchBoard, getBoard, getOptions, putBoard, runReport, type BoardInfo, type Options, type Report } from './api'
 import { BoardPanel } from './BoardPanel'
+import { minutesSince, STALE_MINUTES } from './format'
 import { ReportView } from './ReportView'
 import { PromoPanel } from './PromoPanel'
 import { advance, type Shown } from './progress'
@@ -59,6 +60,8 @@ function App() {
   const engine = useEngineStatus()
   const [board, setBoard] = useState<BoardInfo | null | undefined>(undefined)
   const [uploading, setUploading] = useState(false)
+  const [fetching, setFetching] = useState(false)
+  const [fetchError, setFetchError] = useState<string | null>(null)
   const [running, setRunning] = useState(false)
   const [report, setReport] = useState<Report | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -73,9 +76,23 @@ function App() {
   useEffect(() => applyTheme(theme), [theme])
 
   useEffect(() => {
+    // Every run fetches its own board; this one fills the promo-leg picker when there's no usable board yet.
+    const fetchNow = async () => {
+      setFetching(true)
+      try {
+        setBoard(await fetchBoard())
+      } catch (e) {
+        setFetchError(message(e))
+      } finally {
+        setFetching(false)
+      }
+    }
     getBoard()
-      .then(setBoard)
-      .catch(() => setBoard(null))
+      .catch(() => null)
+      .then((saved) => {
+        setBoard(saved)
+        if (!saved || minutesSince(saved.saved_at) > STALE_MINUTES) void fetchNow()
+      })
     getOptions()
       .then((o) => {
         setOptions(o)
@@ -97,6 +114,7 @@ function App() {
     setError(null)
     try {
       setBoard(await putBoard(file))
+      setFetchError(null) // the upload is the fallback for it
       setReport(null) // a report from the old board no longer matches
       setPromotion((p) => ({ ...p, legs: [] })) // promo legs were picked from the old board
     } catch (e) {
@@ -110,6 +128,7 @@ function App() {
     if (!request || typeof request === 'string') return
     setRunning(true)
     setError(null)
+    setFetchError(null) // the run fetches again, and its report says if it had to fall back
     setProgress(null)
     try {
       const next = await runReport(request, (p) => setProgress((prev) => advance(prev, p)))
@@ -120,6 +139,10 @@ function App() {
       notifier.notify({ ok: false, error: message(e) })
     } finally {
       setRunning(false)
+      // The run saved the board it fetched.
+      getBoard()
+        .then(setBoard)
+        .catch(() => {})
     }
   }
 
@@ -147,7 +170,15 @@ function App() {
         />
       </header>
 
-      <BoardPanel board={board} uploading={uploading} locked={uploading || running} onFile={upload} />
+      <BoardPanel
+        board={board}
+        fetching={fetching}
+        fetchError={fetchError}
+        uploading={uploading}
+        locked={fetching || uploading || running}
+        appUrl={options?.board_app_url ?? null}
+        onFile={upload}
+      />
 
       {options && settings && (
         <>
@@ -166,7 +197,7 @@ function App() {
         <button
           type="button"
           className="primary"
-          disabled={!board || !request || !!problem || running || uploading}
+          disabled={!request || !!problem || running || uploading}
           onClick={run}
         >
           {running ? 'Running…' : 'Run'}

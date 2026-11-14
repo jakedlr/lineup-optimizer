@@ -25,22 +25,11 @@ class FetchError(RuntimeError):
     """A request failed, was blocked, or did not return JSON."""
 
 
-def scrapling_fetch(url: str, browser: bool = False) -> tuple[int, bytes, dict]:
-    """Fetch with Scrapling: TLS-impersonating HTTP, or a stealth browser when browser=True.
-    Returns status, body and response headers."""
-    headers = {"Accept": "application/json"}
-    if browser:
-        from scrapling.fetchers import StealthyFetcher
-
-        page = StealthyFetcher.fetch(url, headless=True, network_idle=True)
-        body = page.body
-        if body.lstrip()[:1] == b"<":
-            # Browsers may wrap JSON in a <pre>; take its text.
-            body = (page.css("pre::text").get() or "").encode()
-        return page.status, body, dict(page.headers or {})
+def scrapling_fetch(url: str) -> tuple[int, bytes, dict]:
+    """Fetch over TLS-impersonating HTTP with Scrapling's Fetcher. Returns status, body and response headers."""
     from scrapling.fetchers import Fetcher
 
-    page = Fetcher.get(url, impersonate="chrome", headers=headers, timeout=30)
+    page = Fetcher.get(url, impersonate="chrome", headers={"Accept": "application/json"}, timeout=30)
     return page.status, page.body, dict(page.headers or {})
 
 
@@ -227,15 +216,17 @@ class Http:
     def _cache_path(self, url: str) -> Path:
         return self.cache_dir / (hashlib.sha256(url.encode()).hexdigest()[:32] + ".json")
 
-    def get_json(self, url: str, browser: bool = False):
-        return self._get_json(url, browser)[0]
+    def get_json(self, url: str, cache: bool = True):
+        """The JSON at `url`. With cache=False it is always fetched live and never written to the odds cache
+        (for responses that aren't odds, such as the board)."""
+        return self._get_json(url, cache=cache)[0]
 
-    def _get_json(self, url: str, browser: bool, book: str = "") -> tuple[object, bool]:
+    def _get_json(self, url: str, book: str = "", cache: bool = True) -> tuple[object, bool]:
         """The response, and whether it was fetched live."""
         if self._stopped.is_set():
             raise RunCancelled()
         path = self._cache_path(url)
-        if self.use_cache and path.exists() and time.time() - path.stat().st_mtime < self.ttl:
+        if cache and self.use_cache and path.exists() and time.time() - path.stat().st_mtime < self.ttl:
             data = json.loads(path.read_text())
             with self._lock:
                 self._by_book.setdefault(book, Counter())["cached"] += 1
@@ -248,15 +239,18 @@ class Http:
         # Each book is paced on its own; a request made by no book is paced with others to its host.
         pacer = self._pacer(book or urlsplit(url).netloc)
         with pacer:
-            status, body, *rest = self.fetch(url, browser=browser)
+            status, body, *rest = self.fetch(url)
         if status in PUSHED_BACK and book:
-            status, body = self._back_off(url, browser, book, pacer, status, rest[0] if rest else {})
+            status, body = self._back_off(url, book, pacer, status, rest[0] if rest else {})
         if status != 200:
             raise FetchError(f"HTTP {status} from {url}")
         try:
             data = json.loads(body)
         except ValueError as e:
             raise FetchError(f"non-JSON response from {url}") from e
+        if not cache:
+            self._tick(book)
+            return data, True
 
         self.cache_dir.mkdir(parents=True, exist_ok=True)
         # Write aside, then rename: another run reading this response never sees half of it.
@@ -269,7 +263,7 @@ class Http:
         self._tick(book)
         return data, True
 
-    def _back_off(self, url, browser, book, pacer, status, headers) -> tuple[int, bytes]:
+    def _back_off(self, url, book, pacer, status, headers) -> tuple[int, bytes]:
         """The book pushed back: hold all its requests for the wait it asked for (or one pause), slow it to one
         request at a time, then retry this request once, in turn like any other. Only a 429 is a rate limit."""
         if status == RATE_LIMITED:
@@ -284,7 +278,7 @@ class Http:
             with self._lock:
                 self._live_requests += 1
                 self._by_book[book]["live"] += 1
-            retry, body, *_ = self.fetch(url, browser=browser)
+            retry, body, *_ = self.fetch(url)
         if retry == RATE_LIMITED:
             raise FetchError(f"rate-limited: HTTP {retry} from {url}, again after backing off")
         if retry == REFUSED:
@@ -303,8 +297,8 @@ class BookHttp:
         self.http, self.book = http, book
         self.progress = http.progress
 
-    def get_json(self, url: str, browser: bool = False):
-        return self.http._get_json(url, browser, self.book)[0]
+    def get_json(self, url: str):
+        return self.http._get_json(url, self.book)[0]
 
     def get_many(self, urls: list[str]) -> list:
         """Every URL's response, in order, fetched as fast as the book's pacing allows. The first failure stops

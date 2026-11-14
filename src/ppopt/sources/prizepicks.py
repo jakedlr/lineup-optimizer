@@ -4,14 +4,26 @@ from datetime import datetime
 
 from ..matching import Config
 from ..models import PPLine, PromoLeg
-from .http import Http, in_window, parse_time
+from ..progress import RunCancelled
+from .http import FetchError, Http, in_window, parse_time
 
-URL = "https://api.prizepicks.com/projections?per_page=1000&single_stat=true&game_mode=pickem"
+_QUERY = "projections?per_page=1000&single_stat=true&game_mode=pickem"
+URL = f"https://partner-api.prizepicks.com/{_QUERY}"  # the partner feed: the whole board, plain HTTP
+APP_URL = f"https://api.prizepicks.com/{_QUERY}"  # the app's feed, behind DataDome: only a logged-in browser gets it
 
 
 def fetch(http: Http) -> dict:
-    """Fetch the board. PrizePicks sits behind DataDome, so this uses a stealth browser."""
-    return http.get_json(URL, browser=True)
+    """The board, fresh from the partner feed (never from the odds cache).
+    Raises FetchError if the request fails (network errors included) or the answer isn't a projections feed."""
+    try:
+        payload = http.get_json(URL, cache=False)
+    except (FetchError, RunCancelled):
+        raise
+    except Exception as e:  # noqa: BLE001 - a dropped connection or timeout is just a failed fetch
+        raise FetchError(f"{e} ({URL})") from e
+    if not isinstance(payload, dict) or not isinstance(payload.get("data"), list):
+        raise FetchError(f"not a PrizePicks projections feed: {URL}")
+    return payload
 
 
 def _teams(projection: dict, included: dict, cfg: Config, sport: str) -> frozenset[str] | None:

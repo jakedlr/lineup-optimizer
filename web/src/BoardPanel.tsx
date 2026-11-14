@@ -4,12 +4,15 @@ import { ago, minutesSince, STALE_MINUTES } from './format'
 
 interface Props {
   board: BoardInfo | null | undefined // undefined while loading
+  fetching: boolean // fetching a board from PrizePicks
+  fetchError: string | null // why the last fetch failed
   uploading: boolean
-  locked: boolean // while uploading or running: a new board mid-run would be reported on with the old one's results
+  locked: boolean // while fetching, uploading or running: a new board mid-run would be reported on with the old one's results
+  appUrl: string | null // the PrizePicks app's feed, for saving a board by hand
   onFile: (file: File) => void
 }
 
-/** Re-render periodically so "saved N min ago" stays true. */
+/** Re-render periodically so "fetched N min ago" stays true. */
 function useNow(intervalMs = 30_000) {
   const [now, setNow] = useState(() => Date.now())
   useEffect(() => {
@@ -20,13 +23,16 @@ function useNow(intervalMs = 30_000) {
 }
 
 const PRIZEPICKS = 'https://app.prizepicks.com'
-const FEED = 'https://api.prizepicks.com/projections?per_page=1000&single_stat=true&game_mode=pickem'
+const SOURCE: Record<BoardInfo['source'], string> = { fetched: 'Fetched', uploaded: 'Uploaded' }
 
-function HowToGetABoard({ open }: { open: boolean }) {
+const sentence = (text: string) => text.charAt(0).toUpperCase() + text.slice(1)
+
+function HowToGetABoard({ appUrl }: { appUrl: string | null }) {
   return (
-    // keyed on `open` so it re-opens when the board goes stale, but stays wherever the user put it otherwise
-    <details className="howto" open={open} key={String(open)}>
-      <summary>How to get a board</summary>
+    <>
+      <p className="muted small">
+        Runs still try PrizePicks first, and use an uploaded board only while the fetch keeps failing. To save one:
+      </p>
       <ol>
         <li>
           Log in at{' '}
@@ -37,9 +43,13 @@ function HowToGetABoard({ open }: { open: boolean }) {
         </li>
         <li>
           In the same browser, open{' '}
-          <a href={FEED} target="_blank" rel="noreferrer" className="break">
-            {FEED.replace('https://', '')}
-          </a>{' '}
+          {appUrl ? (
+            <a href={appUrl} target="_blank" rel="noreferrer" className="break">
+              {appUrl.replace('https://', '')}
+            </a>
+          ) : (
+            "the app's projections feed"
+          )}{' '}
           and complete the "verify you're human" check if one appears.
         </li>
         <li>
@@ -50,13 +60,13 @@ function HowToGetABoard({ open }: { open: boolean }) {
       <p className="muted small">
         If the page won't load: open DevTools (<kbd>F12</kbd>) on app.prizepicks.com, go to Network, filter for{' '}
         <code>projections</code>, refresh, then right-click the request → Copy → Copy response, and paste it into a
-        .json file. Lines move during the day, so save a fresh board before each session.
+        .json file.
       </p>
-    </details>
+    </>
   )
 }
 
-export function BoardPanel({ board, uploading, locked, onFile }: Props) {
+export function BoardPanel({ board, fetching, fetchError, uploading, locked, appUrl, onFile }: Props) {
   const now = useNow()
   const input = useRef<HTMLInputElement>(null)
   const [dragging, setDragging] = useState(false)
@@ -70,6 +80,9 @@ export function BoardPanel({ board, uploading, locked, onFile }: Props) {
   }
 
   const age = board ? minutesSince(board.saved_at, now) : 0
+  const stale = !!board && age > STALE_MINUTES
+  // Open only when there's no usable board, and not while a fetch might still bring one.
+  const fallbackOpen = !fetching && (board === null || stale)
 
   return (
     <section
@@ -87,25 +100,41 @@ export function BoardPanel({ board, uploading, locked, onFile }: Props) {
         {board === undefined ? (
           <p className="muted">Loading board…</p>
         ) : board === null ? (
-          <p>
-            <strong>No board yet.</strong> <span className="muted">Drop your saved PrizePicks projections JSON here.</span>
-          </p>
+          fetching ? (
+            <p className="muted">Fetching board…</p>
+          ) : (
+            <p>
+              <strong>No board yet.</strong>
+            </p>
+          )
         ) : (
           <>
             <p>
-              <strong>Board saved {ago(age)}</strong>{' '}
+              <strong>
+                {SOURCE[board.source] ?? 'Saved'} {ago(age)}
+              </strong>{' '}
               <span className="muted">· {board.projections.toLocaleString('en-US')} lines</span>
             </p>
-            {age > STALE_MINUTES && (
-              <p className="warn">Over {STALE_MINUTES} minutes old, so PrizePicks lines may have moved. Re-save it from your browser.</p>
+            {fetching ? (
+              <p className="muted">Fetching board…</p>
+            ) : (
+              stale && <p className="warn">Over {STALE_MINUTES} minutes old, so PrizePicks lines may have moved.</p>
             )}
           </>
         )}
+        {fetchError && !fetching && <p className="warn">{sentence(fetchError)}</p>}
       </div>
 
-      <button type="button" className="secondary" disabled={locked} onClick={() => input.current?.click()}>
-        {uploading ? 'Uploading…' : board ? 'Replace board' : 'Choose file'}
-      </button>
+      {board !== undefined && (
+        // keyed on its default so it re-opens when the board stops being usable, but stays wherever the user put it otherwise
+        <details className="howto" open={fallbackOpen} key={String(fallbackOpen)}>
+          <summary>Board fetch failing? Upload one instead</summary>
+          <HowToGetABoard appUrl={appUrl} />
+          <button type="button" className="secondary" disabled={locked} onClick={() => input.current?.click()}>
+            {uploading ? 'Uploading…' : board ? 'Replace board' : 'Choose file'}
+          </button>
+        </details>
+      )}
       <input
         ref={input}
         type="file"
@@ -119,8 +148,6 @@ export function BoardPanel({ board, uploading, locked, onFile }: Props) {
           e.target.value = ''
         }}
       />
-
-      {board !== undefined && <HowToGetABoard open={board === null || age > STALE_MINUTES} />}
     </section>
   )
 }

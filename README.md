@@ -1,8 +1,8 @@
 # PrizePicks EV Optimizer
 
 Finds the PrizePicks picks with the best expected value (EV) by comparing them against what the
-big sportsbooks think will happen, then builds the best lineups from them. Drop your PrizePicks
-board on the page, press **Run**, and read the best slips. A command-line version does the same.
+big sportsbooks think will happen, then builds the best lineups from them. Press **Run** and read
+the best slips: it fetches the PrizePicks board and the odds itself. A command-line version does the same.
 
 > **Disclaimer.** This project is for educational and informational purposes only. Nothing it
 > outputs is financial, betting or any other kind of advice, and its probabilities are estimates
@@ -31,17 +31,17 @@ connection, so it can't be hosted for you.
 
 ## Using the app
 
-1. **Save a board.** PrizePicks blocks automated requests, so the board comes from your own logged-in
-   browser. The page shows the steps and links under *How to get a board* (also below).
-2. **Drop it on the page,** or use *Choose file*. The page shows how old the board is and warns after
-   30 minutes, because lines move during the day.
-3. **Pick your settings.** Leagues and stake are on the page. *Advanced* has hours ahead, the devig
+1. **The board fetches itself.** Opening the page fetches the PrizePicks board if there's none yet or
+   it's over 30 minutes old, and every run fetches a fresh one first. The page shows where the board
+   came from and when. If the fetch fails, the run uses the last saved board and says so, and
+   *Board fetch failing? Upload one instead* lets you drop in one saved from your browser (below).
+2. **Pick your settings.** Leagues and stake are on the page. *Advanced* has hours ahead, the devig
    method (worst case of the four by default), which slip the edge is measured against, how many legs to
-   list, and *Fresh odds* to skip the 5-minute odds cache for one run.
-4. **Choose a promotion,** if you have one: a bonus (free) entry, a payout boost, or promo legs picked
+   list, and *Fresh odds* to skip the 1-minute odds cache for one run.
+3. **Choose a promotion,** if you have one: a bonus (free) entry, a payout boost, or promo legs picked
    from the board (search a player, choose the stat, set Over/Under and the discounted line). Promo
    lines already in the feed, such as tacos, are included unless you untick them.
-5. **Run.** A progress bar shows the requests to the sportsbooks as they go (usually under a minute,
+4. **Run.** A progress bar shows the board fetch and the requests to the sportsbooks as they go (usually under a minute,
    instant when the odds are cached). Then the report: **Best Slips**, **Top Legs** and anything
    **Unpriced**, with any warnings above them.
 
@@ -73,8 +73,10 @@ such as tacos.
 
 ## Getting the PrizePicks board
 
-PrizePicks is protected by anti-bot software (DataDome) that blocks automated requests, including
-the stealth browser in testing. The reliable route is to save the board from your own browser:
+The app and the CLI fetch the board themselves from PrizePicks' partner feed
+(`partner-api.prizepicks.com`), which serves the same lines as the website without its anti-bot
+protection ([ADR 0002](docs/adr/0002-board-from-partner-feed.md)). That endpoint is undocumented and
+could close, so saving the board from your own browser stays as the fallback:
 
 1. Log in at <https://app.prizepicks.com>.
 2. In the same browser, open
@@ -89,7 +91,7 @@ the stealth browser in testing. The reliable route is to save the board from you
    filter for `projections`, refresh, then right-click the request → **Copy → Copy response**
    and paste it into that file.
 
-Lines move during the day, so re-save before each session. Both the app and the CLI warn when the
+Lines move during the day, so a saved board goes stale: both the app and the CLI warn when the
 board is more than 30 minutes old.
 
 ## Reading the report
@@ -123,7 +125,8 @@ The CLI prints the same report in the terminal. It needs no Docker.
   `python -m ppopt.cli` with `src` on `PYTHONPATH` instead.
 - **A US network location where FanDuel and DraftKings load normally** (no VPN). Both block some
   regions. Odds are read from their New Jersey hosts by default (`"state"` in `books.json`).
-- **A browser logged into PrizePicks**, for saving the board (see above).
+- **A browser logged into PrizePicks**, only if the board fetch fails and you need to save one by hand
+  (see above).
 
 #### Install
 
@@ -135,21 +138,15 @@ python3 -m venv .venv
 .venv/bin/python -m pytest            # optional: check everything works
 ```
 
-Optional: install the stealth browser, which is only used to *try* fetching PrizePicks directly:
-
-```bash
-sudo .venv/bin/python -m playwright install-deps chromium
-.venv/bin/scrapling install
-```
-
 ### Usage
 
 ```bash
-./getOdds --pp-file samples/projections.json
+./getOdds
 ```
 
-If you leave out `--pp-file`, it tries to fetch PrizePicks directly and explains what to do if
-that's blocked.
+It fetches the PrizePicks board itself, from PrizePicks' partner feed. If that fails, it says why
+and how to save the board from your browser instead; then pass it with
+`./getOdds --pp-file samples/projections.json`.
 
 #### Options
 
@@ -157,7 +154,7 @@ that's blocked.
 
 | Option | Default | Meaning |
 |---|---|---|
-| `--pp-file PATH` | – | PrizePicks board saved from your browser |
+| `--pp-file PATH` | – | Use a board saved from your browser instead of fetching one (the fallback) |
 | `--sports LIST` | `NFL,NBA,NHL,MLB` | Comma-separated leagues |
 | `--hours N` | `24` | Only games starting within the next N hours |
 | `--no-cache` | off | Ignore cached odds (cached for 1 minute in `.cache/`) and fetch fresh |
@@ -216,9 +213,9 @@ that's blocked.
 | Piece | Why it was chosen |
 |---|---|
 | **Python 3.11+** | Readable, ubiquitous, and the standard library covers all of the maths (no NumPy/SciPy needed). |
-| **[Scrapling](https://github.com/D4Vinci/Scrapling)** | Fetches the sportsbooks' internal JSON feeds with browser-like TLS fingerprints, which plain `requests` gets blocked on. It also provides a stealth browser for sites with heavier bot protection. |
+| **[Scrapling](https://github.com/D4Vinci/Scrapling)** | Fetches the sportsbooks' internal JSON feeds with browser-like TLS fingerprints, which plain `requests` gets blocked on. |
 | **Sportsbooks' internal JSON feeds** (FanDuel, DraftKings) | Free and detailed, and far more stable than scraping web pages. FanDuel's prop prices are widely seen as sharp. Using two books adds a cross-check. A paid odds API was considered and set aside on cost. |
-| **PrizePicks projections feed** | The same JSON the PrizePicks website uses. It includes line types (standard/goblin/demon), allowed sides, and promo lines. |
+| **PrizePicks partner feed** | The same projections JSON the PrizePicks website uses (line types, allowed sides, promo lines), served from PrizePicks' partner endpoint, which isn't behind the website feed's bot protection ([ADR 0002](docs/adr/0002-board-from-partner-feed.md)). |
 | **argparse** | Standard-library CLI parsing, with built-in support for mutually exclusive options (used for promotions). |
 | **pytest** | Simple tests. All maths was written test-first, and the scrapers are tested against saved real responses in `tests/fixtures/`, so the suite runs offline. |
 | **FastAPI + React (Vite)** | The app: a thin HTTP layer over the same engine as the CLI, and a single page that streams run progress. Shipped as one Docker image ([ADR 0001](docs/adr/0001-web-app-single-container.md)). |
@@ -295,7 +292,7 @@ Agent skills from these repos were used to plan, design and build this project w
 
 ```bash
 make test     # Python (pytest) and web (Vitest) unit tests
-make e2e      # Playwright against a separate container on port 8001 with canned odds
+make e2e      # Playwright against a separate container on port 8001 with canned odds and a canned board
 make up       # rebuild and restart the app on port 8000
 ```
 

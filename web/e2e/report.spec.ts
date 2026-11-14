@@ -1,43 +1,20 @@
-import { readFileSync } from 'node:fs'
 import { expect, test } from '@playwright/test'
 
-// Runs against the e2e container (`make e2e`), whose sportsbook odds come from tests/fixtures/markets.json.
-const FIXTURE = new URL('../../tests/fixtures/pp_projections.json', import.meta.url)
+// Runs against the e2e container (`make e2e`): sportsbook odds come from tests/fixtures/markets.json and the partner
+// feed serves the fixture board (e2e/board.ts).
 
-/** The fixture board with every game moved to two hours from now, so it falls inside the run window. */
-function freshBoard(): Buffer {
-  const board = JSON.parse(readFileSync(FIXTURE, 'utf8'))
-  const start = new Date(Date.now() + 2 * 3600_000).toISOString()
-  for (const p of board.data) {
-    p.attributes.start_time = start
-    p.attributes.end_time = start
-  }
-  return Buffer.from(JSON.stringify(board))
-}
+test('the board comes from the partner feed, and a run fetches it again and reports on it', async ({ page, request }) => {
+  const fetched = await request.post('/api/board/fetch')
+  expect(fetched.status()).toBe(200)
+  expect(await fetched.json()).toMatchObject({ source: 'fetched', projections: 11 })
 
-test('drop a board, run with defaults, see the report', async ({ page, request }) => {
   await page.goto('/')
-  const run = page.getByRole('button', { name: 'Run', exact: true })
+  const panel = page.getByRole('region', { name: 'Board' })
+  await expect(panel.getByText(/Fetched (just now|1 min ago)/)).toBeVisible()
+  await expect(panel.getByText('11 lines')).toBeVisible()
+  await expect(panel.locator('details')).not.toHaveAttribute('open') // the upload fallback stays tucked away
 
-  const before = await request.get('/api/board')
-  if (before.status() === 404) {
-    await expect(page.getByText('No board yet.')).toBeVisible()
-    await expect(run).toBeDisabled()
-  }
-
-  await page.getByLabel('Choose board file').setInputFiles({
-    name: 'projections.json',
-    mimeType: 'application/json',
-    buffer: freshBoard(),
-  })
-  await expect(page.getByText('Board saved just now')).toBeVisible()
-  await expect(page.getByText('11 lines')).toBeVisible()
-
-  // The upload persisted to the volume: a reload still shows it.
-  await page.reload()
-  await expect(page.getByText(/Board saved (just now|1 min ago)/)).toBeVisible()
-
-  await run.click()
+  await page.getByRole('button', { name: 'Run', exact: true }).click()
 
   const slips = page.getByRole('region', { name: 'Best Slips' })
   await expect(slips.getByRole('heading', { name: 'Power 2' })).toBeVisible()
@@ -48,4 +25,6 @@ test('drop a board, run with defaults, see the report', async ({ page, request }
   await expect(legs.getByRole('cell', { name: 'CHI vs NE' }).first()).toBeVisible()
 
   await expect(page.getByRole('region', { name: 'Unpriced' })).toBeVisible()
+  await expect(page.getByText(/couldn't fetch the board/i)).toHaveCount(0)
+  await expect(panel.getByText('Fetched just now')).toBeVisible()
 })

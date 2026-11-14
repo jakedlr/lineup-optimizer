@@ -57,6 +57,8 @@ export interface Report {
 export interface BoardInfo {
   saved_at: string
   projections: number
+  /** Where the board came from: PrizePicks' partner feed, or a file uploaded as the fallback. */
+  source: 'fetched' | 'uploaded'
 }
 
 export interface Options {
@@ -64,6 +66,8 @@ export interface Options {
   devig: string[]
   ref_slips: string[]
   defaults: { sports: string[]; hours: number; stake: number; devig: string; ref_slip: string | null }
+  /** The PrizePicks app's feed, for saving a board by hand when the fetch fails. */
+  board_app_url: string
 }
 
 export interface BoardLine {
@@ -109,6 +113,11 @@ export async function getBoard(): Promise<BoardInfo | null> {
   const res = await fetch('/api/board')
   if (res.status === 404) return null
   return json(res)
+}
+
+/** Fetch the board from PrizePicks' partner feed and save it. Fails with the reason when the feed can't be read. */
+export async function fetchBoard(): Promise<BoardInfo> {
+  return json(await fetch('/api/board/fetch', { method: 'POST' }))
 }
 
 export async function putBoard(file: File): Promise<BoardInfo> {

@@ -6,7 +6,7 @@ import { options, report, routes } from './test/fixtures'
 import type { Report } from './api'
 import { fakeNotification } from './test/fakeNotification'
 
-const board = () => Response.json({ saved_at: new Date().toISOString(), projections: 11 })
+const board = () => Response.json({ saved_at: new Date().toISOString(), projections: 11, source: 'fetched' })
 
 function stub(run: () => Response | Promise<Response>) {
   vi.stubGlobal(

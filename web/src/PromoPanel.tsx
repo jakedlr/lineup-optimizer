@@ -9,7 +9,7 @@ interface Props {
   onChange: (next: Promotion) => void
   sports: string[]
   hours: number | null
-  boardKey: string | null // changes when a new board is uploaded
+  boardKey: string | null // changes whenever a new board is saved
 }
 
 const MAX_RESULTS = 8
@@ -70,7 +70,7 @@ function LegPicker({ sports, hours, boardKey, onAdd }: Omit<Props, 'promotion' |
     setQuery('')
   }
 
-  if (!boardKey) return <p className="muted small">Upload a board to pick promo legs from it.</p>
+  if (!boardKey) return <p className="muted small">No board to pick promo legs from yet.</p>
   if (failed) return <p className="warn">Couldn't read lines from the board: {failed}</p>
 
   return (

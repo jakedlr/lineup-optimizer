@@ -6,6 +6,8 @@ Paths come from the environment so the same code runs from a checkout and from t
   PPOPT_WEB_DIST  built SPA
   PPOPT_ODDS_FILE optional JSON list of book markets used instead of live FanDuel/DraftKings
                   (offline runs and the e2e suite)
+  PPOPT_BOARD_FILE optional projections JSON read instead of PrizePicks' partner feed, at each fetch
+                  (the e2e suite: a missing or broken file is a failed fetch)
 """
 
 import json
@@ -29,12 +31,46 @@ from .pricing import PRICING_METHODS
 from .payouts import load_payouts
 from .progress import Progress, RunCancelled
 from .sources import prizepicks
-from .sources.http import Http
+from .sources.http import FetchError, Http
 
 REPO = Path(__file__).resolve().parents[2]
 DEFAULT_STATIC = REPO / "web" / "dist"
 BOARD = "board.json"
 BOARD_META = "board.meta.json"
+
+
+def is_feed(payload) -> bool:
+    """Whether this looks like a PrizePicks projections feed."""
+    return isinstance(payload, dict) and isinstance(payload.get("data"), list)
+
+
+def board_from_file(path: Path):
+    """A board fetcher that reads a projections file instead of the partner feed, fresh at each fetch."""
+
+    def fetch() -> dict:
+        try:
+            raw = Path(path).read_bytes()
+        except OSError as e:
+            raise FetchError(f"no board file at {path} ({e.strerror or e})") from e
+        try:
+            payload = json.loads(raw)
+        except ValueError:
+            payload = None
+        if not is_feed(payload):
+            raise FetchError(f"not a PrizePicks projections feed: {path}")
+        return payload
+
+    return fetch
+
+
+def _ago(minutes: float) -> str:
+    m = int(minutes)
+    if m < 1:
+        return "less than a minute ago"
+    if m < 120:
+        return f"{m} minute{'' if m == 1 else 's'} ago"
+    hours = m // 60
+    return f"{hours} hours ago" if hours < 48 else f"{hours // 24} days ago"
 
 
 def markets_from_file(path: Path):
@@ -133,23 +169,39 @@ def stream_run(work):
         progress.cancel()
 
 
-def create_app(static_dir=None, data_dir=None, root=None, collect=None, now=None) -> FastAPI:
+def create_app(static_dir=None, data_dir=None, root=None, collect=None, now=None, fetch_board=None) -> FastAPI:
+    """`collect` stands in for the sportsbooks and `fetch_board` (no arguments, returns the projections feed or
+    raises FetchError) for PrizePicks' partner feed."""
     static_dir = Path(static_dir or os.environ.get("PPOPT_WEB_DIST") or DEFAULT_STATIC)
     data_dir = Path(data_dir or os.environ.get("PPOPT_DATA") or REPO / "data")
     root = Path(root or os.environ.get("PPOPT_ROOT") or cli.ROOT)
     if collect is None and os.environ.get("PPOPT_ODDS_FILE"):
         collect = markets_from_file(os.environ["PPOPT_ODDS_FILE"])
+    if fetch_board is None and os.environ.get("PPOPT_BOARD_FILE"):
+        fetch_board = board_from_file(os.environ["PPOPT_BOARD_FILE"])
+    if fetch_board is None:
+        def fetch_board() -> dict:
+            # Its own Http, with no run progress: the board isn't a sportsbook request.
+            try:
+                return prizepicks.fetch(Http(data_dir / "cache"))
+            except FetchError:
+                raise
+            except Exception as e:  # noqa: BLE001 - a network error (reset, timeout, DNS) is a failed fetch too
+                raise FetchError(str(e) or type(e).__name__) from e
     now = now or cli.utcnow
 
     board_path, meta_path = data_dir / BOARD, data_dir / BOARD_META
     app = FastAPI(title="PrizePicks EV Optimizer")
     cache: dict = {}  # {"board": (mtime_ns, payload)}, swapped whole so a reader never sees half of it
     cache_lock = threading.Lock()
+    # Held by whatever writes the board (an upload, a fetch, a run's fetch) from start to finish, so two writers
+    # can't interleave. Always taken before cache_lock, never inside it.
+    write_lock = threading.Lock()
 
     def load_board() -> dict:
         """The saved board, parsed once per upload (real boards run to tens of MB)."""
         if not board_path.is_file():
-            raise HTTPException(409, "upload a board first")
+            raise HTTPException(409, "no board yet: fetch or upload one")
         with cache_lock:
             mtime = board_path.stat().st_mtime_ns
             cached = cache.get("board")
@@ -160,10 +212,53 @@ def create_app(static_dir=None, data_dir=None, root=None, collect=None, now=None
     def board_info() -> dict | None:
         if not board_path.is_file() or not meta_path.is_file():
             return None
-        with cache_lock:  # an upload rewrites the meta and swaps the board under this lock
+        with cache_lock:  # a save rewrites the meta and swaps the board under this lock
             meta = json.loads(meta_path.read_text())
             saved = datetime.fromtimestamp(board_path.stat().st_mtime, timezone.utc)
-        return {"saved_at": saved.isoformat(), "projections": meta["projections"]}
+        # Boards saved before the source was recorded were all uploads.
+        return {"saved_at": saved.isoformat(), "projections": meta["projections"],
+                "source": meta.get("source", "uploaded")}
+
+    def save_board(raw: bytes, payload: dict, source: str, filename: str | None = None) -> None:
+        """Make this the board. Call under write_lock."""
+        data_dir.mkdir(parents=True, exist_ok=True)
+        # Written aside, then swapped in with its meta: a reader never sees half a board or a mismatched meta.
+        with tempfile.NamedTemporaryFile(dir=data_dir, prefix="board.", suffix=".tmp", delete=False) as f:
+            f.write(raw)
+        tmp = Path(f.name)
+        with cache_lock:
+            meta_path.write_text(json.dumps({"projections": len(payload["data"]), "source": source,
+                                             "filename": filename}))
+            tmp.replace(board_path)
+            cache["board"] = (board_path.stat().st_mtime_ns, payload)
+
+    def fetch_and_save() -> dict:
+        """A fresh board from the partner feed, saved as the board. Call under write_lock. Raises FetchError."""
+        payload = fetch_board()
+        if not is_feed(payload):
+            raise FetchError("the answer wasn't a PrizePicks projections feed")
+        save_board(json.dumps(payload).encode(), payload, "fetched")
+        return payload
+
+    def board_for_run() -> tuple[dict, str | None]:
+        """The board a run prices: a fresh fetch, or when that fails the saved board and a warning saying so.
+        Raises UserError when there's neither."""
+        with write_lock:
+            try:
+                return fetch_and_save(), None
+            except FetchError as e:
+                reason = str(e)
+            info = board_info()
+            if info is None:
+                raise cli.UserError(f"couldn't fetch the board from PrizePicks' partner feed ({reason}), and there's "
+                                    "no saved board to fall back on: upload one")
+            payload = load_board()
+        age = (now().timestamp() - datetime.fromisoformat(info["saved_at"]).timestamp()) / 60
+        warning = (f"couldn't fetch the board from PrizePicks' partner feed ({reason}); this run used the saved "
+                   f"board, {info['source']} {_ago(age)}")
+        if age > cli.STALE_MINUTES:
+            warning += ", so PrizePicks lines may have moved"
+        return payload, warning
 
     @app.get("/api/health")
     def health() -> dict:
@@ -179,14 +274,25 @@ def create_app(static_dir=None, data_dir=None, root=None, collect=None, now=None
             "ref_slips": [f"{t}{n}" for t in table for n in sorted(table[t])],
             "defaults": {"sports": defaults.sports, "hours": defaults.hours, "stake": defaults.stake,
                          "devig": defaults.devig, "ref_slip": None},
+            "board_app_url": prizepicks.APP_URL,  # where to save a board by hand when the fetch fails
         }
 
     @app.get("/api/board")
     def get_board() -> dict:
         info = board_info()
         if info is None:
-            raise HTTPException(404, "no board uploaded yet")
+            raise HTTPException(404, "no board yet")
         return info
+
+    @app.post("/api/board/fetch")
+    def fetch_board_now() -> dict:
+        """Fetch the board from the partner feed and save it (the page does on opening, when it has none)."""
+        with write_lock:
+            try:
+                fetch_and_save()
+            except FetchError as e:
+                raise HTTPException(502, f"couldn't fetch the board from PrizePicks' partner feed: {e}") from e
+        return board_info()
 
     @app.get("/api/board/lines")
     def board_lines(sports: Annotated[str | None, Query()] = None,
@@ -214,33 +320,25 @@ def create_app(static_dir=None, data_dir=None, root=None, collect=None, now=None
             payload = json.loads(raw)
         except ValueError:
             payload = None
-        if not isinstance(payload, dict) or not isinstance(payload.get("data"), list):
+        if not is_feed(payload):
             raise HTTPException(422, "that file isn't a PrizePicks projections feed (expected a JSON object with a \"data\" list)")
-
-        data_dir.mkdir(parents=True, exist_ok=True)
-        # Each upload gets its own temp file, so two saving at once can't move each other's half-written board.
-        with tempfile.NamedTemporaryFile(dir=data_dir, prefix="board.", suffix=".tmp", delete=False) as f:
-            f.write(raw)
-        tmp = Path(f.name)
-        with cache_lock:
-            meta_path.write_text(json.dumps({"projections": len(payload["data"]), "filename": file.filename}))
-            tmp.replace(board_path)
-            cache["board"] = (board_path.stat().st_mtime_ns, payload)
+        with write_lock:
+            save_board(raw, payload, "uploaded", file.filename)
         return board_info()
 
     @app.post("/api/run", response_model=None)
     def run(request: Request, settings: Annotated[RunSettings | None, Body()] = None):
-        if not board_path.is_file():
-            raise HTTPException(409, "upload a board before running")
-        payload = load_board()
         args = (settings or RunSettings()).apply(cli.parse_args([]))
 
         def report(progress: Progress | None = None) -> dict:
+            if progress:
+                progress.step("Fetching the PrizePicks board")
+            # The run keeps the board it fetched (or fell back to): a later save can't change what it reports on.
+            payload, fallback = board_for_run()
             http = Http(data_dir / "cache", use_cache=not args.no_cache, progress=progress)
             result = cli.report_for(args, root, payload, http, now(), collect=collect)
-            age = (now().timestamp() - board_path.stat().st_mtime) / 60
-            if age > cli.STALE_MINUTES:
-                result["warnings"].insert(0, f"board is {age:.0f} minutes old; PrizePicks lines may have moved")
+            if fallback:
+                result["warnings"].insert(0, fallback)
             return result
 
         if "application/x-ndjson" not in request.headers.get("accept", ""):

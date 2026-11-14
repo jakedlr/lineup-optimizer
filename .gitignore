@@ -16,3 +16,5 @@ config/*
 !config/README.md
 .taste-skill/*
 !.taste-skill/direction.json
+web/e2e/.feed/*
+!web/e2e/.feed/.gitkeep

@@ -77,4 +77,5 @@ export const options: Options = {
   devig: ['worst', 'multiplicative', 'additive', 'power', 'shin'],
   ref_slips: ['power2', 'power3', 'power4', 'power5', 'power6', 'flex2', 'flex3', 'flex4', 'flex5', 'flex6'],
   defaults: { sports: ['NFL', 'NBA', 'NHL', 'MLB'], hours: 24, stake: 10, devig: 'worst', ref_slip: null },
+  board_app_url: 'https://api.prizepicks.com/projections?per_page=1000&single_stat=true&game_mode=pickem',
 }

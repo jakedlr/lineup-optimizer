@@ -6,6 +6,7 @@ import pytest
 
 from ppopt.matching import Config
 from ppopt.sources import draftkings, fanduel, prizepicks
+from ppopt.progress import RunCancelled
 from ppopt.sources.http import FetchError, Http, parse_time
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -35,7 +36,7 @@ class FakeFetch:
         self.responses = responses
         self.calls = []
 
-    def __call__(self, url, browser=False):
+    def __call__(self, url):
         self.calls.append(url)
         return self.responses[url]
 
@@ -94,7 +95,7 @@ def test_the_slow_pace_pauses_after_a_long_request_too(tmp_path):
 
 def test_http_paces_each_host_on_its_own(tmp_path):
     slept, clock = [], FakeClock()
-    http = Http(tmp_path, fetch=lambda url, browser=False: (200, b"{}"), sleep=slept.append, delay=(1, 1), clock=clock)
+    http = Http(tmp_path, fetch=lambda url: (200, b"{}"), sleep=slept.append, delay=(1, 1), clock=clock)
     for url in ["https://dk.example/a", "https://fd.example/a", "https://dk.example/b", "https://fd.example/b"]:
         http.get_json(url)
     assert slept == [1, 1]  # before each host's second request; a host's first request never waits on another's
@@ -148,7 +149,7 @@ class FakeClock:
 
 
 def slow_fetch(clock, seconds=0.5):
-    def fetch(url, browser=False):
+    def fetch(url):
         clock.sleep(seconds)
         return 200, b"{}"
     return fetch
@@ -176,7 +177,7 @@ def test_http_a_book_answered_from_the_odds_cache_made_no_live_requests(tmp_path
 
 
 def test_http_records_a_book_that_failed(tmp_path):
-    http = Http(tmp_path, fetch=lambda url, browser=False: (403, b"{}"), sleep=lambda s: None)
+    http = Http(tmp_path, fetch=lambda url: (403, b"{}"), sleep=lambda s: None)
     with pytest.raises(FetchError):
         with http.for_book("draftkings") as dk:
             dk.get_json("https://dk.example/a")
@@ -196,6 +197,68 @@ def test_parse_time_formats():
 
 
 # --- prizepicks -------------------------------------------------------------
+
+def test_http_without_the_cache_always_fetches_live_and_leaves_the_cache_alone(tmp_path):
+    fetch = FakeFetch({"u": (200, b'{"a": 1}')})
+    http = Http(tmp_path, fetch=fetch, sleep=lambda s: None)
+    assert http.get_json("u", cache=False) == {"a": 1}
+    assert http.get_json("u", cache=False) == {"a": 1}
+    assert fetch.calls == ["u", "u"]
+    assert list(tmp_path.iterdir()) == []
+
+
+def test_http_without_the_cache_ignores_a_fresh_cached_answer(tmp_path):
+    Http(tmp_path, fetch=FakeFetch({"u": (200, b'{"a": 1}')}), sleep=lambda s: None).get_json("u")
+    fetch = FakeFetch({"u": (200, b'{"a": 2}')})
+    assert Http(tmp_path, fetch=fetch, sleep=lambda s: None).get_json("u", cache=False) == {"a": 2}
+
+
+def _board(body, status=200):
+    fetch = FakeFetch({prizepicks.URL: (status, body)})
+    return fetch, Http("/nonexistent-cache", fetch=fetch, sleep=lambda s: None)
+
+
+def test_prizepicks_fetches_the_partner_feed():
+    assert prizepicks.URL.startswith("https://partner-api.prizepicks.com/projections?")
+    fetch, http = _board(json.dumps(load("pp_projections.json")).encode())
+    assert prizepicks.fetch(http) == load("pp_projections.json")
+    assert fetch.calls == [prizepicks.URL]
+
+
+def test_prizepicks_fetch_bypasses_the_odds_cache():
+    fetch, http = _board(b'{"data": [], "included": []}')
+    prizepicks.fetch(http)
+    prizepicks.fetch(http)
+    assert fetch.calls == [prizepicks.URL, prizepicks.URL]
+
+
+def test_prizepicks_keeps_the_app_feed_url_for_saving_by_hand():
+    assert prizepicks.APP_URL == "https://api.prizepicks.com/projections?per_page=1000&single_stat=true&game_mode=pickem"
+
+
+@pytest.mark.parametrize("body", [b'[]', b'{"errors": ["nope"]}', b'{"data": {}}', b'"data"', b'null'])
+def test_prizepicks_fetch_rejects_anything_but_a_projections_feed(body):
+    with pytest.raises(FetchError, match="not a PrizePicks projections feed"):
+        prizepicks.fetch(_board(body)[1])
+
+
+@pytest.mark.parametrize("status, body, reason", [
+    (200, b"<html>blocked</html>", "non-JSON"),
+    (403, b"{}", "HTTP 403"),
+    (500, b"{}", "HTTP 500"),
+])
+def test_prizepicks_fetch_failures_are_fetch_errors(status, body, reason):
+    with pytest.raises(FetchError, match=reason):
+        prizepicks.fetch(_board(body, status)[1])
+
+
+def test_the_live_fetch_is_plain_http():
+    import inspect
+    from ppopt.sources import http as http_module
+
+    assert list(inspect.signature(http_module.scrapling_fetch).parameters) == ["url"]
+    assert "StealthyFetcher" not in inspect.getsource(http_module)
+
 
 def test_prizepicks_parses_standard_lines(cfg):
     lines, promos = prizepicks.parse_projections(load("pp_projections.json"), cfg, ["NFL", "NBA"], NOW, 24)
@@ -311,7 +374,7 @@ class Network:
         self.seconds, self.status = seconds, status or (lambda url, n: (200, {}))
         self.lock, self.in_flight, self.peak, self.starts = threading.Lock(), 0, 0, []
 
-    def __call__(self, url, browser=False):
+    def __call__(self, url):
         with self.lock:
             self.in_flight += 1
             self.peak = max(self.peak, self.in_flight)
@@ -468,3 +531,18 @@ def test_a_slowed_book_stays_slowed_when_handed_a_view_again(tmp_path):
     with http.for_book("draftkings", pacing) as dk:
         dk.get_many(URLS[1:])
     assert net.peak == 1
+
+
+def test_a_network_error_fetching_the_board_is_a_fetch_failure(tmp_path):
+    def fetch(url):
+        raise ConnectionResetError("connection reset by peer")
+
+    with pytest.raises(FetchError, match="connection reset by peer"):
+        prizepicks.fetch(Http(tmp_path, fetch=fetch, sleep=lambda s: None))
+
+
+def test_a_cancelled_run_is_not_a_board_fetch_failure(tmp_path):
+    http = Http(tmp_path, fetch=lambda url: (200, b'{"data": []}'), sleep=lambda s: None)
+    http.stop()
+    with pytest.raises(RunCancelled):
+        prizepicks.fetch(http)

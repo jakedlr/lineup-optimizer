@@ -14,6 +14,10 @@ architecture is in `docs/adr/0001-web-app-single-container.md`.
 | 4 | Progress and polish | ~~Streamed run steps~~ (done in Sprint 3); motion and interaction pass (Emil Kowalski skills); taste-skill review; dark mode; mobile reflow; config override mount; README leads with the app |
 | 6 | Faster fetching, same politeness | Runs time themselves per book; a run fetches only what the board can use; books fetch in parallel, each paced on its own; a recorded live run beats the 208 s baseline |
 | 7 | Concurrent requests per book | Pacing per book in `books.json`; a rate-limited book backs off and says so; a full slate runs fresh in under 30 s |
+| 8 | Board from the partner feed | Every run fetches the board itself; a manual run falls back to the saved board when the fetch fails; the CLI fetches by default; no stealth browser |
+| 9 | Auto runs | Settings live on the server; auto runs on the quarter hour survive restarts; a failed board fetch switches them off; the page shows the latest run's report |
+| 10 | ntfy alerts | Topic setup (own or random, check, test); medium and high alert tiers with adjustable edge and leg count; repeats drop to priority 1; a failed board fetch alerts at priority 4 |
+| 11 | UX/UI pass | Review against the laws of UX with taste-skill and Emil Kowalski's skills, keeping achromatic-ledger; major changes signed off from before/after screenshots |
 
 ## Sprint 0: Tooling and walking skeleton
 
@@ -316,3 +320,46 @@ each other still share answers. Terms are in `GLOSSARY.md` (*Odds cache*).
 - [x] `GLOSSARY.md`, `DESIGN.md` and the README say one minute
 
 **Review:** done 2026-11-12.
+
+
+## Sprint 8: Board from the partner feed
+
+**Goal:** no more saving the board by hand. PrizePicks' partner feed
+(`partner-api.prizepicks.com/projections`) serves the same board as the app's feed without DataDome; a probe on
+2026-11-13 returned all 29,142 projections in one 1.6 MB page in 1.5 s, with or without browser headers, and the
+engine's parser read it unchanged. Its only missing fields are `discount_name` and `discount_percentage` (feed promos
+still parse, labelled "promo"). Decision: `docs/adr/0002-board-from-partner-feed.md`; terms in `GLOSSARY.md`
+(*Board*, *Partner feed*).
+
+**Done criteria**
+- [x] The engine fetches the board from the partner feed over plain HTTP; a block, a non-JSON body or anything that
+      isn't a projections feed is a fetch failure with a clear reason
+- [x] The stealth browser is gone (`StealthyFetcher`, the `browser` flag)
+- [x] CLI: `./getOdds` fetches the board by default; `--pp-file` still overrides; a failed fetch says how to save one
+- [x] Web: every run fetches a fresh board first (a progress step) and saves it as the board; when the fetch fails the
+      run uses the saved board with a warning saying why and how old it is, or fails asking for an upload when there
+      is none
+- [x] The page says where the board came from and when (fetched or uploaded); the upload is presented as the fallback;
+      the page fetches a board on opening when there is none or it is stale, so the promo-leg picker has lines
+- [x] e2e: a canned partner feed stands in for PrizePicks; specs cover a fetched run and the fallback to an upload
+- [x] README, ADR 0001 and `DESIGN.md` no longer say the board must be saved by hand
+
+**Notes**
+- `prizepicks.fetch` asks for the board with `Http.get_json(url, cache=False)`: never from or into the odds cache,
+  still counted as a live request. A dropped connection or timeout is a `FetchError` too; a cancelled run is not.
+- `prizepicks.APP_URL` is the website's feed, for the manual fallback steps; `GET /api/options` serves it as
+  `board_app_url`.
+- `scrapling[fetchers]` stays: Scrapling's plain `Fetcher` won't import without it. The browser binaries
+  (`scrapling install`, Playwright deps) are no longer needed.
+- Web: every run's first progress step fetches and saves the board, then prices that copy. A failed fetch falls back
+  to the saved board with one warning naming the reason, the board's source and age (it replaces the separate
+  stale-board warning); with no saved board the run fails asking for an upload. `POST /api/board/fetch` fetches now
+  (502 with the reason on failure); the page calls it on opening when there's no board or it's stale.
+- Board meta records `source` (`fetched`/`uploaded`; older boards read as uploaded). One write lock covers every
+  board write (upload, fetch, a run's fetch) for the whole fetch-and-save, so they never interleave.
+- `PPOPT_BOARD_FILE` stands in for the partner feed, as `PPOPT_ODDS_FILE` does for the books. e2e mounts
+  `web/e2e/.feed/` read-only and runs three Playwright projects in order: `feed-down` (the fallback specs, feed file
+  removed), `feed-up` (writes the shifted fixture board as the feed), then every other spec in parallel.
+- Live, 2026-11-14 07:54 UTC, rebuilt app: `POST /api/board/fetch` saved 30,253 projections in 3.6 s; a fresh
+  NBA/NHL/NFL run took 14.1 s (DraftKings 8 requests, FanDuel 46), 217 legs, no warnings.
+

@@ -1,21 +1,7 @@
-import { readFileSync } from 'node:fs'
 import { expect, test } from '@playwright/test'
-
-const FIXTURE = new URL('../../tests/fixtures/pp_projections.json', import.meta.url)
-
-function freshBoard(): Buffer {
-  const board = JSON.parse(readFileSync(FIXTURE, 'utf8'))
-  const start = new Date(Date.now() + 2 * 3600_000).toISOString()
-  for (const p of board.data) p.attributes.start_time = p.attributes.end_time = start
-  return Buffer.from(JSON.stringify(board))
-}
 
 test('settings change the run, filters work without re-running, settings are remembered', async ({ page }) => {
   await page.goto('/')
-  await page.getByLabel('Choose board file').setInputFiles({
-    name: 'projections.json', mimeType: 'application/json', buffer: freshBoard(),
-  })
-  await expect(page.getByText('Board saved just now')).toBeVisible()
 
   await page.getByRole('button', { name: 'NHL' }).click()
   await page.getByRole('button', { name: 'MLB' }).click()

@@ -9,3 +9,4 @@ samples
 test-results
 playwright-report
 *.egg-info
+web/e2e/.feed

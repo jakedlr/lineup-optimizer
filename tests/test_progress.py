@@ -88,7 +88,7 @@ def test_finishing_reports_the_final_step():
 
 def test_http_ticks_progress_on_live_and_cached_requests(tmp_path):
     seen, p = events()
-    fetch = lambda url, browser=False: (200, b'{"a": 1}')
+    fetch = lambda url: (200, b'{"a": 1}')
     Http(tmp_path, fetch=fetch, sleep=lambda s: None, progress=p).get_json("u")
     Http(tmp_path, fetch=fetch, sleep=lambda s: None, progress=p).get_json("u")  # cache hit
     assert [e["done"] for e in seen] == [1, 2]
@@ -104,7 +104,7 @@ class FakeHttp:
         self.batches.append(list(urls))
         return [self.get_json(url) for url in urls]
 
-    def get_json(self, url, browser=False):
+    def get_json(self, url):
         self.calls.append(url)
         self.progress.tick()
         for needle, name in self.routes:
@@ -149,8 +149,8 @@ class Fixtures(FakeHttp):
         super().__init__(routes, Progress(lambda e: None))
         self.overrides = overrides or {}
 
-    def get_json(self, url, browser=False):
-        data = super().get_json(url, browser)
+    def get_json(self, url):
+        data = super().get_json(url)
         for needle, change in self.overrides.items():
             if needle in url:
                 return change(data)

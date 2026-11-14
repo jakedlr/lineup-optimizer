@@ -1,21 +1,8 @@
-import { readFileSync } from 'node:fs'
 import { expect, test } from '@playwright/test'
-
-const FIXTURE = new URL('../../tests/fixtures/pp_projections.json', import.meta.url)
-
-function freshBoard(): Buffer {
-  const board = JSON.parse(readFileSync(FIXTURE, 'utf8'))
-  const start = new Date(Date.now() + 2 * 3600_000).toISOString()
-  for (const p of board.data) p.attributes.start_time = p.attributes.end_time = start
-  return Buffer.from(JSON.stringify(board))
-}
 
 async function slipLegs(page: import('@playwright/test').Page, width: number) {
   await page.setViewportSize({ width, height: 900 })
   await page.goto('/')
-  await page.getByLabel('Choose board file').setInputFiles({
-    name: 'projections.json', mimeType: 'application/json', buffer: freshBoard(),
-  })
   await page.getByRole('button', { name: 'Run', exact: true }).click()
   const slips = page.getByRole('region', { name: 'Best Slips' })
   await expect(slips.getByRole('article').first()).toBeVisible()
