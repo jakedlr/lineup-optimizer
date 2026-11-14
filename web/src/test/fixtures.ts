@@ -101,7 +101,8 @@ export interface LatestEntry extends RunInfo {
   alert?: AlertOutcome | null
 }
 
-/** The alert settings the server starts with, in this browser's time zone so opening the page changes nothing. */
+/** The alert settings the server starts with, this browser's time zone already chosen, so opening the page changes
+ * nothing. */
 export const alertDefaults = (): AlertsView => ({
   server: 'https://ntfy.sh',
   topic: '',

@@ -14,6 +14,8 @@ export interface TierForm {
 export interface AlertForm {
   server: string
   topic: string
+  /** The IANA time zone alert titles' clock is in; "" while none is chosen (UTC meanwhile). */
+  timezone: string
   medium: TierForm
   high: TierForm
 }
@@ -44,6 +46,24 @@ export function serverProblem(s: string): string | null {
   }
 }
 
+/** A time zone this browser knows by its IANA name, or null. "" is none. */
+export function zoneValue(s: string): string | null {
+  if (!s.trim()) return null
+  try {
+    new Intl.DateTimeFormat('en-US', { timeZone: s })
+    return s
+  } catch {
+    return null
+  }
+}
+
+/** The IANA time zones to choose from, `current` among them; empty where the browser can't list them. */
+export function zoneChoices(current: string): string[] {
+  const list = typeof Intl.supportedValuesOf === 'function' ? Intl.supportedValuesOf('timeZone') : []
+  if (!list.length) return []
+  return current && !list.includes(current) ? [current, ...list].sort() : list
+}
+
 /** An edge threshold in percentage points (0.1-20, in steps of 0.1), or null. */
 export function edgeValue(s: string): number | null {
   const n = Number(s)
@@ -65,12 +85,13 @@ const tierForm = (t: AlertTier): TierForm => ({ enabled: t.enabled, edge: t.edge
 export const fromServer = (v: AlertsView): AlertForm => ({
   server: v.server,
   topic: v.topic,
+  timezone: v.timezone ?? '',
   medium: tierForm(v.medium),
   high: tierForm(v.high),
 })
 
-type Field = 'server' | 'topic' | `${TierName}.${keyof AlertTier}`
-const FIELDS: Field[] = ['server', 'topic', ...TIERS.flatMap(({ name }) => (['enabled', 'edge', 'legs'] as const).map((k) => `${name}.${k}` as const))]
+type Field = 'server' | 'topic' | 'timezone' | `${TierName}.${keyof AlertTier}`
+const FIELDS: Field[] = ['server', 'topic', 'timezone', ...TIERS.flatMap(({ name }) => (['enabled', 'edge', 'legs'] as const).map((k) => `${name}.${k}` as const))]
 
 const split = (f: Field) => f.split('.') as [TierName, keyof AlertTier]
 
@@ -78,6 +99,7 @@ const split = (f: Field) => f.split('.') as [TierName, keyof AlertTier]
 function formValue(form: AlertForm, f: Field): string | number | boolean | undefined {
   if (f === 'server') return serverProblem(form.server) ? undefined : form.server.replace(/\/+$/, '')
   if (f === 'topic') return topicProblem(form.topic) ? undefined : form.topic
+  if (f === 'timezone') return zoneValue(form.timezone) ?? undefined
   const [tier, key] = split(f)
   const t = form[tier]
   if (key === 'enabled') return t.enabled
@@ -85,7 +107,7 @@ function formValue(form: AlertForm, f: Field): string | number | boolean | undef
 }
 
 function heldValue(v: AlertsView, f: Field) {
-  if (f === 'server' || f === 'topic') return v[f]
+  if (f === 'server' || f === 'topic' || f === 'timezone') return v[f]
   const [tier, key] = split(f)
   return v[tier][key]
 }
@@ -96,7 +118,7 @@ export function alertChanges(form: AlertForm, held: AlertsView): AlertsPatch | n
   for (const f of FIELDS) {
     const v = formValue(form, f)
     if (v === undefined || v === heldValue(held, f)) continue
-    if (f === 'server' || f === 'topic') changes[f] = v
+    if (f === 'server' || f === 'topic' || f === 'timezone') changes[f] = v
     else {
       const [tier, key] = split(f)
       changes[tier] = { ...(changes[tier] as object | undefined), [key]: v }
@@ -111,7 +133,8 @@ export function alertChanges(form: AlertForm, held: AlertsView): AlertsPatch | n
  */
 export function mergeAlerts(form: AlertForm, before: AlertsView | null, server: AlertsView): AlertForm {
   const fresh = fromServer(server)
-  const mine = (f: Field) => before !== null && formValue(form, f) !== heldValue(before, f)
+  const none = (f: Field) => f === 'timezone' && !form.timezone && before?.timezone === null // none chosen, none held
+  const mine = (f: Field) => before !== null && formValue(form, f) !== heldValue(before, f) && !none(f)
   const tier = (name: TierName): TierForm => ({
     enabled: mine(`${name}.enabled`) ? form[name].enabled : fresh[name].enabled,
     edge: mine(`${name}.edge`) ? form[name].edge : fresh[name].edge,
@@ -120,6 +143,7 @@ export function mergeAlerts(form: AlertForm, before: AlertsView | null, server: 
   return {
     server: mine('server') ? form.server : fresh.server,
     topic: mine('topic') ? form.topic : fresh.topic,
+    timezone: mine('timezone') ? form.timezone : fresh.timezone,
     medium: tier('medium'),
     high: tier('high'),
   }

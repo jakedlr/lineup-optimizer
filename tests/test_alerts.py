@@ -114,6 +114,29 @@ def test_medium_alone_met_goes_at_3_then_1_when_unchanged():
     assert second.priority == 1 and second.title == "MEDIUM, unchanged · 3 legs ≥ +0.5% · 14:15"
 
 
+def test_a_leg_dropping_out_leaves_the_tier_unchanged():
+    """A game starting takes its leg off the board: nothing new to play, so no loud alert."""
+    _, sets = compose(ran(*HIGH4))
+    fewer = [l for l in HIGH4 if l["player"] != "Matty Beniers"]
+    alert, after = compose(ran(*fewer), previous=sets)
+    assert alert.priority == 1 and alert.title == "HIGH, unchanged · 3 legs ≥ +1.0% · 14:15"
+    assert len(after["high"]) == 3 and set(after["high"]) < set(sets["high"]), "the tier remembers what it has now"
+
+
+def test_a_new_leg_alongside_one_dropping_out_changes_the_tier():
+    _, sets = compose(ran(*HIGH4))
+    swapped = [l for l in HIGH4 if l["player"] != "Matty Beniers"] + [leg("New Leg", "NHL:LA-VGK", 0.02)]
+    alert, _ = compose(ran(*swapped), previous=sets)
+    assert alert.priority == 4 and alert.title == "HIGH · 4 legs ≥ +1.0% · 14:15"
+
+
+def test_a_leg_that_dropped_out_and_comes_back_is_new_again():
+    _, sets = compose(ran(*HIGH4))
+    _, fewer = compose(ran(*[l for l in HIGH4 if l["player"] != "Matty Beniers"]), previous=sets)
+    back, _ = compose(ran(*HIGH4), previous=fewer)
+    assert back.priority == 4
+
+
 def test_a_tier_not_met_forgets_its_legs_so_meeting_it_again_alerts():
     _, sets = compose(ran(*HIGH4))
     _, gone = compose(ran(*HIGH4[:2]), previous=sets)
@@ -156,6 +179,29 @@ def test_no_legs_priced():
     alert, sets = compose(ran())
     assert (alert.priority, alert.title) == (1, "14:15 · no legs priced") and sets == NONE
     assert alert.body
+
+
+# --- what the tiers remember ---------------------------------------------------------------------
+
+def test_the_tiers_memory_names_where_the_alert_went():
+    _, sets = compose(ran(*HIGH4))
+    saved = alerts.memory(sets, "https://ntfy.sh", "pp-1")
+    assert saved == {"server": "https://ntfy.sh", "topic": "pp-1", **sets}
+    assert json.loads(json.dumps(saved)) == saved
+    assert alerts.remembered(saved, "https://ntfy.sh", "pp-1") == sets
+
+
+@pytest.mark.parametrize("server, topic", [("https://ntfy.sh", "pp-2"), ("http://ntfy.lan", "pp-1")])
+def test_the_tiers_memory_of_another_topic_or_server_is_nothing(server, topic):
+    _, sets = compose(ran(*HIGH4))
+    saved = alerts.memory(sets, "https://ntfy.sh", "pp-1")
+    assert alerts.remembered(saved, server, topic) == NONE
+
+
+@pytest.mark.parametrize("stored", [None, [], "x", {"medium": ["a"], "high": ["b"]},
+                                    {"server": "https://ntfy.sh", "topic": "pp-1", "medium": "a", "high": 5}])
+def test_a_tiers_memory_that_does_not_say_where_it_went_or_is_unreadable_is_nothing(stored):
+    assert alerts.remembered(stored, "https://ntfy.sh", "pp-1") == NONE
 
 
 # --- the body ------------------------------------------------------------------------------------

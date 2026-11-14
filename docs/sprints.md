@@ -477,10 +477,9 @@ matters. Terms in `GLOSSARY.md` (*Alert*, *Alert tier*, *Qualifying leg*).
 - `ppopt.alerts` composes an alert from an auto run's outcome as pure functions; `/api/alerts` (GET/PATCH, token
   write-only), `/api/alerts/test`, `/api/alerts/check`. Settings in `alerts.json`, tier memory in
   `alerts_state.json`. `/api/status` carries `alerts_updated_at` and `latest.alert` (`{sent, priority, title,
-  error}`, null for manual runs, no topic, or while sending: it's attached after the run is recorded, so the run's
-  end never waits on ntfy).
+  error}`, null for manual runs or no topic).
 - Tier memory is saved only when an alert is delivered (an undelivered high alert goes again at 4), and a failed run
-  leaves it alone. Titles use the saved time zone (the page saves the browser's; `tzdata` is a dependency) and are
+  leaves it alone. Titles use the chosen time zone (`tzdata` is a dependency) and are
   sent as RFC 2047 encoded words where not ASCII, which ntfy decodes (`server/util.go`). A reserved topic answers 403
   (`server/server_middleware.go`), so *Check* reads 403 as reserved.
 - Seam: `create_app(ntfy_http=...)` at the HTTP level. e2e: `web/e2e/fake-ntfy.py` runs as the `ntfy` service
@@ -491,4 +490,16 @@ matters. Terms in `GLOSSARY.md` (*Alert*, *Alert tier*, *Qualifying leg*).
   with *Advanced*), the token saved by a button and never shown. One hook, `useServerSaved`, now backs both
   settings forms (debounced PATCH of changed fields, other-tab sync, pagehide keepalive).
 - Live, 2026-11-14: `/api/alerts/check` on a fresh random topic against ntfy.sh answered "unused".
+- Review fixes (2026-11-14):
+  - A tier counts as changed only when a qualifying leg appears that wasn't in its last delivered alert; legs
+    dropping out (their games started) go at priority 1. Tier memory names the server and topic it went to, so
+    the first alert anywhere new is loud.
+  - The alert is sent before the auto run counts as finished, so `latest.alert` is there when the run ends; an
+    alert the app fails to compose is kept as not delivered (`priority`/`title` may be null).
+  - The time zone is unset (titles in UTC) until chosen: the page saves the browser's on first load only, and
+    *Server and token* has a *Time zone* field.
+  - The folded summary shows the saved topic and server; *Check* and *Send test* save first, are disabled while
+    the server is invalid, and their result is tied to server and topic. The latest run's alert note shows on load.
+  - `runs.read_saved` loads both settings files; `models.changes_some` is the shared PATCH check; `/api/status`
+    keeps both `updated_at`s in memory.
 

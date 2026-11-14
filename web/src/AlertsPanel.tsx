@@ -1,4 +1,4 @@
-import { useId, useState } from 'react'
+import { useId, useMemo, useState } from 'react'
 import { checkTopic, message, sendTestAlert, type TierName, type TopicState } from './api'
 import {
   barsCrossed,
@@ -10,6 +10,8 @@ import {
   tierSummary,
   TIERS,
   topicProblem,
+  zoneChoices,
+  zoneValue,
   type AlertForm,
   type TierForm,
 } from './alertForm'
@@ -24,8 +26,9 @@ const CHECKED: Record<TopicState, string> = {
   unknown: "Couldn't tell",
 }
 
-/** What came back from Check or Send test, for the topic it was about. */
+/** What came back from Check or Send test, for the server and topic it was about. */
 interface Said {
+  server: string
   topic: string
   text: string
   warn: boolean
@@ -112,8 +115,10 @@ export function AlertsPanel({ alerts }: { alerts: AlertSettings }) {
   const topic = form?.topic ?? ''
   const topicBad = topicProblem(topic)
   const usable = !!topic && !topicBad
-  const serverBad = form ? serverProblem(form.server) : null
-  const shown = (said: Said | null) => (said && said.topic === topic ? said : null)
+  const server = form?.server ?? ''
+  const serverBad = form ? serverProblem(server) : null
+  const ready = usable && !serverBad && busy === null // Check and Send test go through the saved server
+  const shown = (said: Said | null) => (said && said.topic === topic && said.server === server ? said : null)
 
   const random = () => {
     if (!form) return
@@ -121,13 +126,23 @@ export function AlertsPanel({ alerts }: { alerts: AlertSettings }) {
     void flush()
   }
 
+  /** Save what's waiting, so the server goes by what's shown here: the server and token it holds, and the topic. */
+  const saveFirst = async (fields: ('server' | 'topic')[]) => {
+    await flush()
+    const left = unsaved()
+    const lost = fields.find((f) => left?.[f] !== undefined)
+    if (lost) throw new Error(`the ${lost} couldn't be saved`)
+  }
+
   const check = async () => {
     setBusy('check')
+    const about = { server, topic }
     try {
+      await saveFirst(['server']) // the topic as typed is asked about, on the saved server
       const { state, detail } = await checkTopic(topic)
-      setChecked({ topic, text: `${CHECKED[state]}: ${detail}`, warn: state === 'recent' || state === 'reserved' })
+      setChecked({ ...about, text: `${CHECKED[state]}: ${detail}`, warn: state === 'recent' || state === 'reserved' })
     } catch (e) {
-      setChecked({ topic, text: `Couldn't check: ${message(e)}`, warn: true })
+      setChecked({ ...about, text: `Couldn't check: ${message(e)}`, warn: true })
     } finally {
       setBusy(null)
     }
@@ -135,13 +150,13 @@ export function AlertsPanel({ alerts }: { alerts: AlertSettings }) {
 
   const test = async () => {
     setBusy('test')
+    const about = { server, topic }
     try {
-      await flush() // the test goes to the saved topic: this one
-      if (unsaved()?.topic !== undefined) throw new Error("the topic couldn't be saved")
+      await saveFirst(['topic', 'server']) // the test goes to the saved topic on the saved server: these
       await sendTestAlert()
-      setTested({ topic, text: `Test alert sent to ${topic}`, warn: false })
+      setTested({ ...about, text: `Test alert sent to ${topic}`, warn: false })
     } catch (e) {
-      setTested({ topic, text: `Test alert not sent: ${message(e)}`, warn: true })
+      setTested({ ...about, text: `Test alert not sent: ${message(e)}`, warn: true })
     } finally {
       setBusy(null)
     }
@@ -151,11 +166,15 @@ export function AlertsPanel({ alerts }: { alerts: AlertSettings }) {
     if (TOKEN.test(token) && (await setToken(token))) setTokenInput('')
   }
 
-  const summary = !form
+  // Where auto runs' alerts go now: what the server holds, not what's being typed.
+  const summary = !saved
     ? null
-    : form.topic && !topicBad
-      ? `${form.topic} on ${host(saved?.server ?? form.server)}`
+    : saved.topic
+      ? `${saved.topic} on ${host(saved.server)}`
       : 'No topic: auto runs send no alerts'
+  const zone = form?.timezone ?? ''
+  const zones = useMemo(() => zoneChoices(zone), [zone])
+  const zoneBad = form && form.timezone && !zoneValue(form.timezone) ? 'Not a time zone this browser knows, e.g. America/New_York.' : null
 
   return (
     <section className="alerts" aria-labelledby={`${id}-h`}>
@@ -190,10 +209,10 @@ export function AlertsPanel({ alerts }: { alerts: AlertSettings }) {
                 <button type="button" className="secondary" onClick={random}>
                   Random
                 </button>
-                <button type="button" className="secondary" disabled={!usable || busy !== null} onClick={check}>
+                <button type="button" className="secondary" disabled={!ready} onClick={check}>
                   Check
                 </button>
-                <button type="button" className="secondary" disabled={!usable || busy !== null} onClick={test}>
+                <button type="button" className="secondary" disabled={!ready} onClick={test}>
                   Send test
                 </button>
               </div>
@@ -248,6 +267,37 @@ export function AlertsPanel({ alerts }: { alerts: AlertSettings }) {
                   {serverBad && (
                     <p id={`${id}-server-note`} className="warn small">
                       {serverBad}
+                    </p>
+                  )}
+                </div>
+                <div className="field">
+                  <label htmlFor={`${id}-zone`}>Time zone</label>
+                  {zones.length ? (
+                    <select id={`${id}-zone`} value={form.timezone} onChange={(e) => set('timezone', e.target.value)}>
+                      {!form.timezone && <option value="">UTC (none chosen)</option>}
+                      {zones.map((z) => (
+                        <option key={z} value={z}>
+                          {z}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <input
+                      id={`${id}-zone`}
+                      type="text"
+                      autoComplete="off"
+                      autoCapitalize="off"
+                      spellCheck={false}
+                      placeholder="UTC"
+                      value={form.timezone}
+                      aria-invalid={!!zoneBad}
+                      aria-describedby={zoneBad ? `${id}-zone-note` : undefined}
+                      onChange={(e) => set('timezone', e.target.value)}
+                    />
+                  )}
+                  {zoneBad && (
+                    <p id={`${id}-zone-note`} className="warn small">
+                      {zoneBad}
                     </p>
                   )}
                 </div>

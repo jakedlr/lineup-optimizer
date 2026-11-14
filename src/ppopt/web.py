@@ -22,22 +22,20 @@ import time
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from pathlib import Path
-from zoneinfo import ZoneInfo
-
 from typing import Annotated, Literal
 
 from fastapi import Body, FastAPI, HTTPException, Query, Request, UploadFile
 from fastapi.responses import FileResponse, Response, StreamingResponse
-from pydantic import BaseModel, ConfigDict, Field, StrictBool, ValidationError, model_validator
+from pydantic import BaseModel, ConfigDict, Field, StrictBool, model_validator
 
 from . import alerts, cli
 from .alerts import AlertSettings, AlertsPatch, TopicCheck
 from .matching import Config, config_file, game_id, matchup_label
-from .models import BookMarket
+from .models import BookMarket, changes_some
 from .pricing import PRICING_METHODS
 from .payouts import load_payouts
 from .progress import Progress
-from .runs import Busy, Runner, Scheduler, next_mark, read_json, write_aside, write_json
+from .runs import Busy, Runner, Scheduler, next_mark, read_json, read_saved, write_aside, write_json
 from .sources import prizepicks
 from .sources.http import REUSE_SECONDS, FetchError, Http
 
@@ -153,11 +151,7 @@ class SettingsPatch(BaseModel):
 
     @model_validator(mode="after")
     def some_settings(self):
-        if not self.model_fields_set:
-            raise ValueError("change at least one setting")
-        if nulls := sorted(f for f in self.model_fields_set - {"ref_slip"} if getattr(self, f) is None):
-            raise ValueError(f"{', '.join(nulls)} can't be null")
-        return self
+        return changes_some(self, nullable={"ref_slip"})
 
     def changes(self) -> dict:
         return self.model_dump(include=self.model_fields_set)
@@ -215,7 +209,8 @@ def create_app(static_dir=None, data_dir=None, root=None, collect=None, now=None
     Auto runs: `clock` is the schedule's wall clock (epoch seconds), whose thread runs while the app is up (its
     lifespan) unless `schedule` is False; tests drive `app.state.scheduler.tick(epoch)` instead.
     `on_auto_run_end(outcome)` hears how each auto run ended: the latest run as recorded ("report" or "error") and
-    "switched_off", whether it switched auto runs off; it is heard after the run's alert has gone (or failed to).
+    "switched_off", whether it switched auto runs off; it is heard after the run's alert has gone (or failed to),
+    while the run still counts as going.
     `e2e` (default: PPOPT_E2E=1) enables `POST /api/auto/run-now` and `POST /api/alerts/forget`.
 
     Alerts: `ntfy_http(method, url, headers, body, timeout) -> (status, body)` stands in for HTTP to ntfy
@@ -359,24 +354,20 @@ def create_app(static_dir=None, data_dir=None, root=None, collect=None, now=None
 
     settings_path = data_dir / SETTINGS
     settings_lock = threading.Lock()  # held from reading the saved settings to saving them, so changes merge
+    alerts_path, alerts_state_path = data_dir / ALERTS, data_dir / ALERTS_STATE
+    alerts_lock = threading.Lock()  # held from reading the saved alert settings to saving them, so changes merge
 
     def stored_settings() -> tuple[SavedSettings | None, str | None]:
-        """The saved run settings and when they were saved, or (None, None) when never saved (or unreadable: as if
-        never saved). Settings saved before the time was recorded read as saved when their file was written."""
-        stored = read_json(settings_path)
-        if not isinstance(stored, dict):
-            return None, None
-        updated_at = stored.pop("updated_at", None)
-        try:
-            saved = SavedSettings.model_validate(stored)
-        except ValidationError:
-            return None, None
-        if not isinstance(updated_at, str):
-            try:
-                updated_at = datetime.fromtimestamp(settings_path.stat().st_mtime, timezone.utc).isoformat()
-            except OSError:
-                updated_at = None
-        return saved, updated_at
+        """The saved run settings and when they were saved, or (None, None) when never saved (or unreadable)."""
+        return read_saved(settings_path, SavedSettings)
+
+    def stored_alerts() -> tuple[AlertSettings | None, str | None]:
+        """The saved alert settings and when they were saved, or (None, None) when never saved (or unreadable)."""
+        return read_saved(alerts_path, AlertSettings)
+
+    # When the run and alert settings were last saved, for /api/status (polled): read from their files once, then
+    # kept as each is saved, which only this app does.
+    updated = {"settings": stored_settings()[1], "alerts": stored_alerts()[1]}
 
     def saved_settings() -> SavedSettings | None:
         return stored_settings()[0]
@@ -390,6 +381,7 @@ def create_app(static_dir=None, data_dir=None, root=None, collect=None, now=None
         """Save these as the run settings, stamped now. Call under settings_lock."""
         updated_at = now().isoformat()
         write_json(settings_path, {**settings.model_dump(), "updated_at": updated_at})
+        updated["settings"] = updated_at
         return settings_view(settings, updated_at)
 
     @app.get("/api/settings")
@@ -409,20 +401,6 @@ def create_app(static_dir=None, data_dir=None, root=None, collect=None, now=None
             # Each field was checked as it arrived, and the base is valid, so the merge is too.
             return save_settings(SavedSettings(**{**base, **patch.changes()}))
 
-    alerts_path, alerts_state_path = data_dir / ALERTS, data_dir / ALERTS_STATE
-    alerts_lock = threading.Lock()  # held from reading the saved alert settings to saving them, so changes merge
-
-    def stored_alerts() -> tuple[AlertSettings | None, str | None]:
-        """The saved alert settings and when they were saved, or (None, None) when never saved (or unreadable)."""
-        stored = read_json(alerts_path)
-        if not isinstance(stored, dict):
-            return None, None
-        updated_at = stored.pop("updated_at", None)
-        try:
-            return AlertSettings.model_validate(stored), updated_at if isinstance(updated_at, str) else None
-        except ValidationError:
-            return None, None
-
     def alert_settings() -> AlertSettings:
         return stored_alerts()[0] or AlertSettings()
 
@@ -441,6 +419,7 @@ def create_app(static_dir=None, data_dir=None, root=None, collect=None, now=None
             changed = patch.onto(alert_settings())
             updated_at = now().isoformat()
             write_json(alerts_path, {**changed.model_dump(), "updated_at": updated_at})
+            updated["alerts"] = updated_at
         return alerts_view(changed, updated_at)
 
     def topic_needed(settings: AlertSettings) -> None:
@@ -471,30 +450,34 @@ def create_app(static_dir=None, data_dir=None, root=None, collect=None, now=None
     alert_lock = threading.Lock()  # one alert at a time: its tiers' last legs are read, it's sent, then they're saved
 
     def send_alert(outcome: dict) -> None:
-        """Send an auto run's alert, when a topic is set, and keep how that went with the latest run. A tier's legs
-        are remembered only once its alert is delivered: an alert the phone never got isn't a repeat."""
+        """Send an auto run's alert, when a topic is set, and keep how that went with the latest run, whatever
+        happens: an alert the app fails to make or send is kept as not delivered, saying why (with its priority and
+        title when it got that far). A tier's legs are remembered, with where the alert went, only once its alert is
+        delivered: an alert the phone never got isn't a repeat."""
         settings = alert_settings()
         if not settings.topic:
             return
-        at = datetime.fromisoformat(outcome["started_at"]).astimezone(ZoneInfo(settings.timezone))
-        with alert_lock:
-            stored = read_json(alerts_state_path)
-            stored = stored if isinstance(stored, dict) else {}
-            previous = {name: v if isinstance(v := stored.get(name), list) else None for name, _ in alerts.TIERS}
-            alert, sets = alerts.compose(outcome, settings.model_dump(), previous, at)
-            try:
-                alerts.publish(alert, settings.server, settings.topic, settings.token, ntfy_http)
-                error = None
-            except alerts.SendFailed as e:
-                error = str(e)
-                log.warning("alert not delivered: %s", error)
-            if error is None:
+        alert, error = None, None
+        try:
+            at = datetime.fromisoformat(outcome["started_at"]).astimezone(settings.zone)
+            with alert_lock:
+                previous = alerts.remembered(read_json(alerts_state_path), settings.server, settings.topic)
+                alert, sets = alerts.compose(outcome, settings.model_dump(), previous, at)
                 try:
-                    write_json(alerts_state_path, sets)
-                except Exception:  # noqa: BLE001 - the next alert may go at a tier again; nothing worse
-                    log.exception("couldn't save what the alert's tiers were met with")
-        attach_alert(outcome["id"], {"sent": error is None, "priority": alert.priority, "title": alert.title,
-                                     "error": error})
+                    alerts.publish(alert, settings.server, settings.topic, settings.token, ntfy_http)
+                except alerts.SendFailed as e:
+                    error = str(e)
+                    log.warning("alert not delivered: %s", error)
+                if error is None:
+                    try:
+                        write_json(alerts_state_path, alerts.memory(sets, settings.server, settings.topic))
+                    except Exception:  # noqa: BLE001 - the next alert may go at a tier again; nothing worse
+                        log.exception("couldn't save what the alert's tiers were met with")
+        except Exception as e:  # noqa: BLE001 - alerts never get in the way of auto runs
+            log.exception("the auto run's alert failed")
+            error = f"the app failed ({type(e).__name__}: {e})"
+        attach_alert(outcome["id"], {"sent": error is None, "priority": alert and alert.priority,
+                                     "title": alert and alert.title, "error": error})
 
     @app.post("/api/alerts/forget")
     def forget_alerted() -> dict:
@@ -553,7 +536,8 @@ def create_app(static_dir=None, data_dir=None, root=None, collect=None, now=None
             keep(entry)
 
     def attach_alert(run_id: str, alert: dict) -> None:
-        """Add how its alert went to the latest run, unless a later run has taken its place since."""
+        """Add how its alert went to the latest run. The alert is sent while its run still counts as going, so no
+        later run can have taken its place; checked all the same."""
         with latest_lock:
             entry = latest["entry"]
             if entry is not None and entry["id"] == run_id:
@@ -571,8 +555,8 @@ def create_app(static_dir=None, data_dir=None, root=None, collect=None, now=None
             "latest": entry and {"id": entry["id"], "started_by": entry["started_by"],
                                  "started_at": entry["started_at"], "finished_at": entry["finished_at"],
                                  "ok": "report" in entry, "error": entry.get("error"), "alert": entry.get("alert")},
-            "settings_updated_at": stored_settings()[1],
-            "alerts_updated_at": stored_alerts()[1],
+            "settings_updated_at": updated["settings"],
+            "alerts_updated_at": updated["alerts"],
         }
 
     @app.get("/api/board")
@@ -686,13 +670,13 @@ def create_app(static_dir=None, data_dir=None, root=None, collect=None, now=None
                 raise cli.UserError(reason) from e
 
         def ended(entry: dict) -> None:
+            """Heard while the run still counts as going (Runner.start's `on_end`), so its alert is part of it."""
             outcome = {**entry, "switched_off": switched_off}
             try:
                 send_alert(outcome)
-            except Exception:  # noqa: BLE001 - alerts never get in the way of auto runs
-                log.exception("the auto run's alert failed")
-            if on_auto_run_end is not None:
-                on_auto_run_end(outcome)
+            finally:
+                if on_auto_run_end is not None:
+                    on_auto_run_end(outcome)
 
         try:
             runner.start(work, "auto", on_end=ended)

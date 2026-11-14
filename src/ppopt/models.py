@@ -2,6 +2,7 @@
 
 from dataclasses import dataclass, field
 from datetime import datetime
+from typing import Iterable
 
 
 @dataclass(frozen=True)
@@ -86,3 +87,13 @@ class Slip:
     @property
     def size(self) -> int:
         return len(self.legs)
+
+
+def changes_some(patch, nullable: Iterable[str] = ()):
+    """A settings patch's check (a pydantic model's after-validator): it changes at least one setting, and none of
+    them to null but those `nullable`."""
+    if not patch.model_fields_set:
+        raise ValueError("change at least one setting")
+    if nulls := sorted(f for f in patch.model_fields_set - set(nullable) if getattr(patch, f) is None):
+        raise ValueError(f"{', '.join(nulls)} can't be null")
+    return patch

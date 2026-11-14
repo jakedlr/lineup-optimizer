@@ -298,9 +298,10 @@ export interface RecordedRun {
 /** How an auto run's alert went (GLOSSARY: Alert). */
 export interface AlertOutcome {
   sent: boolean
-  priority: number
-  title: string
-  /** Why ntfy refused it or couldn't be reached; null when sent. */
+  /** Null when there was no alert to send (it couldn't be made): `error` says why. */
+  priority: number | null
+  title: string | null
+  /** Why ntfy refused it, couldn't be reached, or there was no alert to send; null when sent. */
   error: string | null
 }
 
@@ -329,8 +330,9 @@ export async function putAuto(enabled: boolean): Promise<AutoState> {
   )
 }
 
-/** The latest finished run, as the server recorded it: its report, or why it failed. */
-export type LatestRun = RecordedRun & (
+/** The latest finished run, as the server recorded it: its report, or why it failed; and how its alert went (null for a
+ * manual run, an auto run with no topic set, and an auto run whose alert is still going). */
+export type LatestRun = RecordedRun & { alert?: AlertOutcome | null } & (
   | { report: Report; error?: undefined }
   | { error: string; report?: undefined }
 )
@@ -356,8 +358,8 @@ export interface AlertsView {
   /** "" is no topic: auto runs send no alerts. */
   topic: string
   token_set: boolean
-  /** The time zone alert titles' clock is in. */
-  timezone: string
+  /** The time zone alert titles' clock is in (IANA); null until one is chosen, UTC meanwhile. */
+  timezone: string | null
   medium: AlertTier
   high: AlertTier
   saved: boolean

@@ -70,6 +70,15 @@ describe('changes to save', () => {
     expect(alertChanges(form, view())).toBeNull()
   })
 
+  it('include a time zone chosen here, but never one that is not a zone, nor none at all', () => {
+    const form = fromServer(view())
+    form.timezone = 'Asia/Tokyo'
+    expect(alertChanges(form, view())).toEqual({ timezone: 'Asia/Tokyo' })
+    form.timezone = 'Mars/Olympus'
+    expect(alertChanges(form, view())).toBeNull()
+    expect(alertChanges(fromServer(view({ timezone: null })), view({ timezone: null }))).toBeNull() // not chosen yet
+  })
+
   it('never include a topic that is not valid yet', () => {
     const form = fromServer(view())
     form.topic = 'half typed/'

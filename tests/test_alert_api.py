@@ -4,6 +4,7 @@ import json
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
+from datetime import datetime, timezone
 from email.header import decode_header, make_header
 
 import pytest
@@ -15,7 +16,7 @@ from tests.test_auto_runs import MARK, auto_run, wait_for
 from tests.test_cli import NOW, markets
 from tests.test_web import ROOT, feed, feed_down
 
-DEFAULTS = {"server": "https://ntfy.sh", "topic": "", "token_set": False, "timezone": "UTC",
+DEFAULTS = {"server": "https://ntfy.sh", "topic": "", "token_set": False, "timezone": None,
             "medium": {"enabled": True, "edge": 0.5, "legs": 3}, "high": {"enabled": True, "edge": 1.0, "legs": 3},
             "saved": False, "updated_at": None}
 
@@ -71,7 +72,7 @@ def test_a_trailing_slash_on_the_server_is_dropped(tmp_path):
     {"server": "https://ntfy .sh"}, {"server": None},
     {"topic": "has space"}, {"topic": "a/b"}, {"topic": "x" * 65}, {"topic": None},
     {"token": "tk abc"}, {"token": "tk\nX-Evil: 1"}, {"token": 5},
-    {"timezone": "Mars/Olympus"}, {"timezone": ""}, {"timezone": "../etc/passwd"},
+    {"timezone": "Mars/Olympus"}, {"timezone": ""}, {"timezone": "../etc/passwd"}, {"timezone": None},
     {"high": {"edge": 0.15}}, {"high": {"edge": 0}}, {"high": {"edge": 20.1}}, {"high": {"edge": True}},
     {"high": {"edge": "1.0"}}, {"high": {"legs": 0}}, {"high": {"legs": 7}}, {"high": {"legs": 3.5}},
     {"high": {"legs": "3"}}, {"high": {"enabled": "yes"}}, {"high": {}}, {"high": None}, {"high": {"x": 1}},
@@ -98,6 +99,42 @@ def test_unreadable_alert_settings_read_as_never_saved(tmp_path):
     (tmp_path / "data").mkdir()
     (tmp_path / "data" / "alerts.json").write_text('{"topic": "a b"}')
     assert make(tmp_path).get("/api/alerts").json() == DEFAULTS
+
+
+def test_the_time_zone_is_unset_until_chosen(tmp_path):
+    client = make(tmp_path)
+    assert client.get("/api/alerts").json()["timezone"] is None
+    assert client.patch("/api/alerts", json={"topic": "abc"}).json()["timezone"] is None, "still unset once saved"
+    assert client.patch("/api/alerts", json={"timezone": "America/Chicago"}).json()["timezone"] == "America/Chicago"
+    assert client.patch("/api/alerts", json={"timezone": None}).status_code == 422, "chosen, it can't be unset"
+    assert make(tmp_path).get("/api/alerts").json()["timezone"] == "America/Chicago"
+
+
+def test_a_time_zone_saved_before_it_could_be_unset_is_kept(tmp_path):
+    (tmp_path / "data").mkdir()
+    (tmp_path / "data" / "alerts.json").write_text(json.dumps({"topic": "abc", "timezone": "UTC",
+                                                              "updated_at": NOW.isoformat()}))
+    assert make(tmp_path).get("/api/alerts").json()["timezone"] == "UTC"
+
+
+def test_alert_settings_saved_without_a_time_read_as_saved_when_the_file_was_written(tmp_path):
+    (tmp_path / "data").mkdir()
+    path = tmp_path / "data" / "alerts.json"
+    path.write_text(json.dumps({"topic": "abc"}))
+    written = datetime.fromtimestamp(path.stat().st_mtime, timezone.utc).isoformat()
+    client = make(tmp_path)
+    assert client.get("/api/alerts").json()["updated_at"] == written
+    assert client.get("/api/status").json()["alerts_updated_at"] == written
+
+
+def test_status_keeps_when_settings_were_saved_without_reading_them_each_poll(tmp_path):
+    client = make(tmp_path)
+    client.patch("/api/alerts", json={"topic": "abc"})
+    client.patch("/api/settings", json={"stake": 25})
+    (tmp_path / "data" / "alerts.json").unlink()
+    (tmp_path / "data" / "settings.json").unlink()
+    status = client.get("/api/status").json()
+    assert (status["alerts_updated_at"], status["settings_updated_at"]) == (NOW.isoformat(), NOW.isoformat())
 
 
 def test_status_says_when_the_alert_settings_were_last_saved(tmp_path):
@@ -233,6 +270,35 @@ def test_an_auto_run_sends_its_alert_and_keeps_how_it_went(tmp_path):
     assert make(tmp_path).get("/api/status").json()["latest"]["alert"] == alert, "kept across a restart"
 
 
+def test_an_alert_title_tells_the_time_in_utc_while_no_time_zone_is_set(tmp_path):
+    client = make(tmp_path)
+    client.patch("/api/alerts", json={"topic": "pp-1", **ONE_LEG})
+    auto_run(client)
+    assert alerted(client)["title"] == "HIGH · 1 leg ≥ +1.0% · 19:00"
+
+
+def next_auto_run(client, tmp_path=None):
+    """Reach the next quarter mark (auto runs already on) and return the new run's alert."""
+    first_id = client.get("/api/status").json()["latest"]["id"]
+    client.put("/api/auto", json={"enabled": True})
+    client.app.state.scheduler.tick(MARK + 1 + 900)
+    wait_for(lambda: client.get("/api/status").json()["latest"]["id"] != first_id)
+    return alerted(client)
+
+
+@pytest.mark.parametrize("move", [{"topic": "pp-2"}, {"server": "http://ntfy.lan"}])
+def test_the_first_alert_somewhere_new_is_never_a_repeat(tmp_path, move):
+    ntfy = Transport()
+    client = make(tmp_path, ntfy)
+    client.patch("/api/alerts", json={"topic": "pp-1", **ONE_LEG})
+    auto_run(client)
+    assert alerted(client)["priority"] == 4
+    client.patch("/api/alerts", json=move)
+    assert next_auto_run(client)["priority"] == 4, "the new topic never heard the first alert"
+    assert json.loads((tmp_path / "data" / "alerts_state.json").read_text())["topic"] == (move.get("topic")
+                                                                                         or "pp-1")
+
+
 def test_the_same_legs_next_time_alert_at_priority_1(tmp_path):
     ntfy = Transport()
     client = make(tmp_path, ntfy)
@@ -314,8 +380,8 @@ def test_the_end_hook_still_hears_each_auto_run(tmp_path):
     assert heard[0]["switched_off"] is False and "report" in heard[0]
 
 
-def test_an_alert_does_not_overwrite_a_later_run(tmp_path):
-    """A manual run finishing while an auto run's alert is still on its way stays the latest, without the alert."""
+def test_an_auto_run_is_going_until_its_alert_is_done(tmp_path):
+    """No run can start (and take the latest's place) while an auto run's alert is still on its way."""
     held, release = threading.Event(), threading.Event()
 
     class Slow(Transport):
@@ -326,15 +392,46 @@ def test_an_alert_does_not_overwrite_a_later_run(tmp_path):
 
     client = make(tmp_path, Slow())
     client.patch("/api/alerts", json={"topic": "pp-1"})
-    auto_run(client)
+    client.put("/api/auto", json={"enabled": True})
+    client.app.state.scheduler.tick(MARK + 1)
     assert held.wait(5)
-    client.post("/api/run")
-    manual_id = client.get("/api/status").json()["latest"]["id"]
+    status = client.get("/api/status").json()
+    assert status["running"]["started_by"] == "auto"
+    r = client.post("/api/run")
+    assert r.status_code == 409 and r.json()["detail"] == "a run is already going (auto run)"
     release.set()
-    time.sleep(0.1)
+    wait_for(lambda: client.get("/api/status").json()["running"] is None)
     latest = client.get("/api/status").json()["latest"]
-    assert latest["id"] == manual_id and latest["alert"] is None
-    assert json.loads((tmp_path / "data" / "latest.json").read_text())["started_by"] == "manual"
+    assert latest["started_by"] == "auto" and latest["alert"]["sent"] is True, "the alert is there once it's over"
+    assert client.post("/api/run").status_code == 200
+
+
+def test_an_alert_the_app_fails_to_make_is_kept_as_not_delivered(tmp_path, monkeypatch, caplog):
+    from ppopt import alerts
+
+    def broken(*a):
+        raise KeyError("legs")
+
+    monkeypatch.setattr(alerts, "compose", broken)
+    ntfy = Transport()
+    client = make(tmp_path, ntfy)
+    client.patch("/api/alerts", json={"topic": "pp-1"})
+    auto_run(client)
+    alert = alerted(client)
+    assert alert == {"sent": False, "priority": None, "title": None, "error": "the app failed (KeyError: 'legs')"}
+    assert ntfy.requests == [] and "the auto run's alert failed" in caplog.text
+    assert client.get("/api/status").json()["running"] is None
+
+
+def test_an_alert_whose_sending_breaks_is_kept_with_what_it_would_have_said(tmp_path, caplog):
+    client = make(tmp_path, Transport(error=ValueError("bad header")))
+    client.patch("/api/alerts", json={"topic": "pp-1", **ONE_LEG})
+    auto_run(client)
+    alert = alerted(client)
+    assert alert == {"sent": False, "priority": 4, "title": "HIGH · 1 leg ≥ +1.0% · 19:00",
+                     "error": "the app failed (ValueError: bad header)"}
+    assert "the auto run's alert failed" in caplog.text
+    assert not (tmp_path / "data" / "alerts_state.json").exists(), "not delivered, so not remembered"
 
 
 # --- forgetting what was alerted (e2e) -------------------------------------------------------------

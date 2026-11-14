@@ -219,6 +219,9 @@ function App() {
       .then((entry) => {
         if (!entry || !same(entry, shown.current)) return
         show(entry, entry.report ? { report: entry.report } : { error: entry.error })
+        const { id, alert } = entry
+        const told = id && alert ? { id, alert } : null
+        if (told) setLatestAlert((was) => (JSON.stringify(was) === JSON.stringify(told) ? was : told))
         if (!quietly) notifier.notify(entry.report ? { ok: true, report: entry.report } : { ok: false, error: entry.error })
       })
       .catch(() => {})
@@ -229,7 +232,9 @@ function App() {
     alerts.sync(answer.alerts_updated_at)
     const { running, latest } = answer
     const told = latest?.id && latest.alert ? { id: latest.id, alert: latest.alert } : null
-    setLatestAlert((was) => (JSON.stringify(was) === JSON.stringify(told) ? was : told))
+    // A look that hasn't heard how the latest run's alert went keeps what the run's report said.
+    const kept = (was: typeof latestAlert) => (told ? JSON.stringify(was) === JSON.stringify(told) : !!was && was.id === latest?.id)
+    setLatestAlert((was) => (kept(was) ? was : told))
     const g = goingRef.current
     if (g && !(g.lost && seq > g.lost.since)) return
     setRefused(null) // whatever refused this page's Run has gone, or is about to be watched

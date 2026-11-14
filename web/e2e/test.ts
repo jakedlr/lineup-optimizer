@@ -31,7 +31,9 @@ export const test = base.extend<{ serverState: void }>({
       expect((await request.put('/api/auto', { data: { enabled: false } })).ok()).toBe(true)
       const { defaults } = await (await request.get('/api/options')).json()
       expect((await request.put('/api/settings', { data: defaults })).ok()).toBe(true)
-      expect((await request.patch('/api/alerts', { data: ALERT_DEFAULTS })).ok()).toBe(true)
+      // None chosen can't be put back: the zone goes back to this machine's, the one the page chose on first opening.
+      const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone
+      expect((await request.patch('/api/alerts', { data: { ...ALERT_DEFAULTS, timezone } })).ok()).toBe(true)
       expect((await request.post('/api/alerts/forget')).ok()).toBe(true)
     },
     { auto: true },

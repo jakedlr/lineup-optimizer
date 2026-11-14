@@ -9,7 +9,7 @@ import { expect, hhmm, test } from './test.ts'
 
 const NTFY = process.env.PPOPT_NTFY_URL ?? 'http://localhost:8002'
 const IN_APP = 'http://ntfy'
-const ZONE = Intl.DateTimeFormat().resolvedOptions().timeZone // the browser's too, so the page leaves it be
+const ZONE = Intl.DateTimeFormat().resolvedOptions().timeZone // the browser's too: the zone the page chose first
 
 interface Published {
   method: string
@@ -141,6 +141,24 @@ test('the panel picks a topic, checks it, and sends a test alert through the sta
   await expect(alerts.locator('details').first()).not.toHaveAttribute('open')
 })
 
+test("the time zone alert titles' clock is in is chosen under Server and token, and kept", async ({ page, request }) => {
+  const held = async () => (await (await request.get('/api/alerts')).json()).timezone
+  await page.goto('/')
+  const alerts = panel(page)
+  await alerts.getByText('Server and token').click()
+  const zone = alerts.getByLabel('Time zone')
+  await expect.poll(held).not.toBeNull() // the first page to open chose this browser's
+  await expect(zone).toHaveValue(await held())
+  const other = ZONE === 'Asia/Tokyo' ? 'Europe/Oslo' : 'Asia/Tokyo'
+  await zone.selectOption(other)
+  await expect.poll(held).toBe(other)
+
+  await page.reload() // opening again doesn't put this browser's back
+  await alerts.getByText('Server and token').click()
+  await expect(zone).toHaveValue(other)
+  expect(await held()).toBe(other)
+})
+
 test('the tiers save as they are changed, and warn when medium is set above high', async ({ page, request }) => {
   await page.goto('/')
   const alerts = panel(page)
@@ -168,7 +186,7 @@ for (const viewport of [{ width: 390, height: 844 }, { width: 1440, height: 900 
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
 
     const box = (await alerts.boundingBox())!
-    for (const el of await alerts.locator('input, button, a, p').all()) {
+    for (const el of await alerts.locator('input, select, button, a, p').all()) {
       if (!(await el.isVisible())) continue
       const b = (await el.boundingBox())!
       expect(b.x).toBeGreaterThanOrEqual(box.x)

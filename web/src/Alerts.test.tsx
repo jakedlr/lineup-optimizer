@@ -264,20 +264,126 @@ describe('Phone alerts panel', () => {
 
   describe("alert titles' clock", () => {
     const here = Intl.DateTimeFormat().resolvedOptions().timeZone
+    const other = here === 'Asia/Tokyo' ? 'Europe/Oslo' : 'Asia/Tokyo'
+    const zone = () => within(panel()).getByLabelText('Time zone')
 
-    it("is set to this browser's time zone when the server has another", async () => {
-      server.state.alerts = { ...server.state.alerts, timezone: here === 'Antarctica/Troll' ? 'UTC' : 'Antarctica/Troll' }
+    it("is set to this browser's time zone the first time, while the server has none", async () => {
+      server.state.alerts = { ...server.state.alerts, timezone: null }
       const fetchMock = stub()
       render(<App />)
       await waitFor(() => expect(alertPatches(fetchMock)).toEqual([{ timezone: here }]))
+      expect(zone()).toHaveValue(here)
     })
 
-    it('is left alone when it matches', async () => {
+    it('is left alone once one is chosen, even when it is not this browser\'s', async () => {
+      server.state.alerts = { ...server.state.alerts, timezone: other }
       const fetchMock = stub()
       render(<App />)
-      await waitFor(() => expect(topic()).toBeInTheDocument())
+      await waitFor(() => expect(zone()).toHaveValue(other))
       await new Promise((r) => setTimeout(r, 50))
       expect(alertPatches(fetchMock)).toEqual([])
+    })
+
+    it('is chosen under Server and token, and saved as the other fields are', async () => {
+      const fetchMock = await opened()
+      await userEvent.click(within(panel()).getByText('Server and token'))
+      expect(zone()).toHaveValue(here)
+      await userEvent.selectOptions(zone(), other)
+      await waitFor(() => expect(alertPatches(fetchMock)).toEqual([{ timezone: other }]))
+      expect(server.state.alerts.timezone).toBe(other)
+    })
+  })
+
+  describe('folded summary', () => {
+    const summary = () => panel().querySelector('.alerts-summary')!
+
+    it('names the saved topic and server, not what is being typed', async () => {
+      const fetchMock = await opened()
+      await userEvent.clear(topic())
+      await userEvent.type(topic(), 'pp new') // not valid: the server keeps pp-abc
+      expect(summary()).toHaveTextContent('pp-abc on ntfy.sh')
+      await userEvent.click(within(panel()).getByText('Server and token'))
+      const url = within(panel()).getByLabelText('Server')
+      await userEvent.clear(url)
+      await userEvent.type(url, 'ntfy.lan')
+      expect(summary()).toHaveTextContent('pp-abc on ntfy.sh')
+
+      await userEvent.clear(topic())
+      await userEvent.type(topic(), 'pp-new')
+      expect(summary()).toHaveTextContent('pp-abc on ntfy.sh') // until it is saved
+      await waitFor(() => expect(alertPatches(fetchMock)).toEqual([{ topic: 'pp-new' }]))
+      await waitFor(() => expect(summary()).toHaveTextContent('pp-new on ntfy.sh'))
+    })
+
+    it('says no alerts go only when the server has no topic', async () => {
+      const fetchMock = stub()
+      render(<App />)
+      await waitFor(() => expect(summary()).toHaveTextContent('No topic: auto runs send no alerts'))
+      await userEvent.type(topic(), 'pp-first')
+      expect(summary()).toHaveTextContent('No topic: auto runs send no alerts')
+      await waitFor(() => expect(alertPatches(fetchMock)).toEqual([{ topic: 'pp-first' }]))
+      await waitFor(() => expect(summary()).toHaveTextContent('pp-first on ntfy.sh'))
+    })
+  })
+
+  describe('Check and Send test go through the saved server', () => {
+    const button = (name: 'Check' | 'Send test') => within(panel()).getByRole('button', { name })
+    const order = (f: ReturnType<typeof stub>) =>
+      f.mock.calls.map(([url, init]) => `${init?.method ?? 'GET'} ${String(url)}`).filter((k) => k.includes('alerts') && k !== 'GET /api/alerts')
+
+    async function typeServer(value: string) {
+      if (!within(panel()).queryByLabelText('Server')) await userEvent.click(within(panel()).getByText('Server and token'))
+      const url = within(panel()).getByLabelText('Server')
+      await userEvent.clear(url)
+      await userEvent.type(url, value)
+    }
+
+    it('Check saves a server still waiting first', async () => {
+      const fetchMock = await opened()
+      await typeServer('http://ntfy.lan:8080')
+      await userEvent.click(button('Check'))
+      expect(await within(panel()).findByText('Looks unused: no recent messages on this topic')).toBeInTheDocument()
+      expect(order(fetchMock)).toEqual(['PATCH /api/alerts', 'POST /api/alerts/check'])
+      expect(alertPatches(fetchMock)).toEqual([{ server: 'http://ntfy.lan:8080' }])
+    })
+
+    it("Check doesn't go to the old server when the new one couldn't be saved", async () => {
+      server.routes['PATCH /api/alerts'] = () => Response.json({ detail: 'disk full' }, { status: 500 })
+      const fetchMock = await opened()
+      await typeServer('http://ntfy.lan:8080')
+      await userEvent.click(button('Check'))
+      expect(await within(panel()).findByText("Couldn't check: the server couldn't be saved")).toBeInTheDocument()
+      expect(sent(fetchMock, 'POST /api/alerts/check')).toEqual([])
+    })
+
+    it("Send test doesn't go to the old server when the new one couldn't be saved", async () => {
+      server.routes['PATCH /api/alerts'] = () => Response.json({ detail: 'disk full' }, { status: 500 })
+      const fetchMock = await opened()
+      await typeServer('http://ntfy.lan:8080')
+      await userEvent.click(button('Send test'))
+      expect(await within(panel()).findByText("Test alert not sent: the server couldn't be saved")).toBeInTheDocument()
+      expect(sent(fetchMock, 'POST /api/alerts/test')).toEqual([])
+    })
+
+    it('are off while the server typed is not valid', async () => {
+      await opened()
+      await typeServer('ntfy.lan')
+      expect(button('Check')).toBeDisabled()
+      expect(button('Send test')).toBeDisabled()
+      await typeServer('https://ntfy.lan')
+      expect(button('Check')).toBeEnabled()
+      expect(button('Send test')).toBeEnabled()
+    })
+
+    it("drop what they said once the server changes: it was about another server", async () => {
+      await opened()
+      await userEvent.click(button('Check'))
+      expect(await within(panel()).findByText('Looks unused: no recent messages on this topic')).toBeInTheDocument()
+      await userEvent.click(button('Send test'))
+      expect(await within(panel()).findByText('Test alert sent to pp-abc')).toBeInTheDocument()
+      await typeServer('https://ntfy.lan')
+      expect(within(panel()).queryByText(/^Looks unused/)).not.toBeInTheDocument()
+      expect(within(panel()).queryByText(/^Test alert sent/)).not.toBeInTheDocument()
     })
   })
 })
@@ -321,6 +427,36 @@ describe("The latest run's alert", () => {
     render(<App />)
     expect(await screen.findByRole('alert')).toHaveTextContent('Auto run · 14:15')
     expect(await screen.findByText('Alert sent · priority 4')).toBeInTheDocument()
+  })
+
+  it('is shown as soon as the run is, from the report the page opens on', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    server.state.latest = { ...runInfo('auto', localTime(14, 15)), finished_at: localTime(14, 16), report, alert: alertSent }
+    const status = server.routes['GET /api/status']
+    stub({
+      'GET /api/status': async (init) => {
+        const answer = await (await status(init)).json()
+        return Response.json({ ...answer, latest: answer.latest && { ...answer.latest, alert: null } }) // not heard yet
+      },
+    })
+    render(<App />)
+    await screen.findByText('Auto run · 14:15')
+    expect(await screen.findByText('Alert sent · priority 4')).toBeInTheDocument()
+    await act(() => vi.advanceTimersByTimeAsync(5000)) // a look that hasn't heard of it doesn't take it away
+    expect(screen.getByText('Alert sent · priority 4')).toBeInTheDocument()
+  })
+
+  it("says why it wasn't delivered when there was no alert to send", async () => {
+    const error = "couldn't compose the alert: KeyError('legs')"
+    server.state.latest = {
+      ...runInfo('auto', localTime(14, 15)),
+      finished_at: localTime(14, 16),
+      report,
+      alert: { sent: false, priority: null, title: null, error },
+    }
+    stub()
+    render(<App />)
+    expect(await screen.findByText(`Alert not delivered: ${error}`)).toHaveClass('warn')
   })
 
   it("is not carried over to a newer run's report", async () => {

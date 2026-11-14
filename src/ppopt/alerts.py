@@ -22,6 +22,8 @@ from zoneinfo import ZoneInfo
 
 from pydantic import AfterValidator, BaseModel, ConfigDict, Field, StrictBool, model_validator
 
+from .models import changes_some
+
 TIMEOUT = 10  # seconds, for each request to ntfy
 TOP = 6  # legs in an alert's body
 TIERS = (("high", 4), ("medium", 3))  # (tier, ntfy priority), the higher tier first
@@ -82,9 +84,13 @@ def compose(outcome: dict, tiers: dict, previous: dict, at: datetime) -> tuple[A
     qualifying legs to remember for the next one. `tiers` is {"medium"|"high": {enabled, edge, legs}}, `previous`
     what the last alert remembered ({tier: identities or None}), `at` the run's start in the user's zone.
 
-    A tier is met when enough games' best legs clear its bar. The high tier, if met with legs that changed since its
-    last alert, goes at priority 4; else medium likewise at 3; else priority 1. Each met tier remembers its legs and
-    a tier not met (or switched off) forgets them, so meeting it again alerts. A failed run changes nothing."""
+    A tier is met when enough games' best legs clear its bar. It has changed when one of those legs wasn't among the
+    ones it remembers: a leg dropping out (its game started) changes nothing, as there's nothing new to play. The
+    high tier, if met and changed, goes at priority 4; else medium likewise at 3; else priority 1.
+
+    Each met tier remembers the legs it has now, not every leg it has alerted for: a leg that dropped out and later
+    comes back counts as new again (its line or price may well have moved meanwhile). A tier not met (or switched
+    off) forgets its legs, so meeting it again alerts. A failed run changes nothing."""
     time = at.strftime("%H:%M")
     if "error" in outcome:
         if outcome.get("switched_off"):
@@ -103,7 +109,7 @@ def compose(outcome: dict, tiers: dict, previous: dict, at: datetime) -> tuple[A
         return f"{n} {'leg' if n == 1 else 'legs'} {bar(tiers[name]['edge'])} · {time}"
 
     met = [(name, priority) for name, priority in TIERS if sets[name] is not None]
-    changed = [(name, priority) for name, priority in met if sets[name] != previous.get(name)]
+    changed = [(name, priority) for name, priority in met if set(sets[name]) - set(previous.get(name) or ())]
     shown = best_per_game(legs)[:TOP]
     body = "\n".join(leg_line(n, leg) for n, leg in enumerate(shown, 1)) or "No legs were priced."
     if changed:
@@ -116,6 +122,20 @@ def compose(outcome: dict, tiers: dict, previous: dict, at: datetime) -> tuple[A
         priority = QUIET
         title = f"{time} · best {pct(shown[0]['edge'])}" if shown else f"{time} · no legs priced"
     return Alert(priority, title, body), sets
+
+
+def memory(sets: dict, server: str, topic: str) -> dict:
+    """What to save once an alert with these tiers' `sets` (compose's) is delivered: the sets, and where it went."""
+    return {"server": server, "topic": topic, **sets}
+
+
+def remembered(stored, server: str, topic: str) -> dict:
+    """Each tier's remembered legs ({tier: identities or None}), from what `memory` saved, for alerts going to
+    `server` and `topic`. What was saved for anywhere else (another topic or server, or a memory that doesn't say
+    where, from before it did) is nothing: the first alert somewhere new is never taken for a repeat."""
+    if not isinstance(stored, dict) or stored.get("server") != server or stored.get("topic") != topic:
+        return {name: None for name, _ in TIERS}
+    return {name: v if isinstance(v := stored.get(name), list) else None for name, _ in TIERS}
 
 
 # --- sending ------------------------------------------------------------------------------------
@@ -278,7 +298,7 @@ class AlertSettings(BaseModel):
     server: Server = "https://ntfy.sh"
     topic: Topic = ""
     token: Token = ""
-    timezone: Zone = "UTC"  # alert titles' clock
+    timezone: Zone | None = None  # alert titles' clock; None until chosen (the page offers the browser's), UTC till then
     medium: Tier = Field(default_factory=lambda: Tier(enabled=True, edge=0.5, legs=3))
     high: Tier = Field(default_factory=lambda: Tier(enabled=True, edge=1.0, legs=3))
 
@@ -286,13 +306,9 @@ class AlertSettings(BaseModel):
         """As the page sees them: never the token, only whether there is one."""
         return {**self.model_dump(exclude={"token"}), "token_set": bool(self.token)}
 
-
-def _some(model: BaseModel) -> BaseModel:
-    if not model.model_fields_set:
-        raise ValueError("change at least one setting")
-    if nulls := sorted(f for f in model.model_fields_set if getattr(model, f) is None):
-        raise ValueError(f"{', '.join(nulls)} can't be null")
-    return model
+    @property
+    def zone(self) -> ZoneInfo:
+        return ZoneInfo(self.timezone or "UTC")
 
 
 class TierPatch(BaseModel):
@@ -302,7 +318,7 @@ class TierPatch(BaseModel):
     edge: Edge | None = None
     legs: Legs | None = None
 
-    some_settings = model_validator(mode="after")(_some)
+    some_settings = model_validator(mode="after")(changes_some)
 
 
 class AlertsPatch(BaseModel):
@@ -318,7 +334,7 @@ class AlertsPatch(BaseModel):
     medium: TierPatch | None = None
     high: TierPatch | None = None
 
-    some_settings = model_validator(mode="after")(_some)
+    some_settings = model_validator(mode="after")(changes_some)
 
     def onto(self, base: AlertSettings) -> AlertSettings:
         merged = base.model_dump()

@@ -449,6 +449,45 @@ def test_the_runner_records_how_each_run_ended():
                      {"id": ids[2], **base, "error": "the engine failed: 'oops'"}]
 
 
+def test_the_end_hook_is_heard_while_the_run_is_still_going():
+    """Whatever a run's end sets off (an auto run's alert) is done before the next run may start, and before
+    anyone watching hears the end."""
+    from ppopt.runs import Busy, Runner
+
+    r = Runner(now=lambda: NOW, record=lambda entry: None)
+    during = {}
+
+    def on_end(entry):
+        during["current"] = r.current and r.current.id
+        during["finished"] = r.current.finished
+        try:
+            r.start(lambda p, a: {"legs": []}, "manual")
+        except Busy:
+            during["busy"] = True
+
+    events = list(r.start(lambda p, a: {"legs": []}, "auto", on_end=on_end, watch=True))
+    assert during == {"current": events[0]["id"], "finished": False, "busy": True}
+    assert events[-1]["type"] == "report" and r.current is None
+
+
+@pytest.mark.filterwarnings("ignore::pytest.PytestUnhandledThreadExceptionWarning")  # SystemExit, on its thread
+@pytest.mark.parametrize("error", [RuntimeError("ntfy is down"), SystemExit(1)])
+def test_a_failing_end_hook_still_ends_and_frees_the_run(error):
+    from ppopt.runs import Runner
+
+    r = Runner(now=lambda: NOW, record=lambda entry: None)
+
+    def on_end(entry):
+        raise error
+
+    events = list(r.start(lambda p, a: {"legs": []}, "auto", on_end=on_end, watch=True))
+    assert events[-1]["type"] == "report"
+    wait_for(lambda: r.current is None)
+    for t in threading.enumerate():
+        if t.name == "auto run":
+            t.join(5)  # so a SystemExit's warning is raised (and ignored) here
+
+
 # --- the schedule ----------------------------------------------------------------------------------
 
 def test_a_quarter_mark_is_acted_on_once_and_only_within_a_minute():

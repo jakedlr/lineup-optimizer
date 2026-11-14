@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { getAlerts, message, patchAlerts, type AlertsPatch, type AlertsView } from './api'
-import { alertChanges, fromServer, mergeAlerts, type AlertForm } from './alertForm'
+import { alertChanges, fromServer, mergeAlerts, zoneValue, type AlertForm } from './alertForm'
 import { useServerSaved } from './useServerSaved'
 
 /** This browser's time zone, the clock alert titles should be in. */
@@ -8,9 +8,9 @@ const here = () => Intl.DateTimeFormat().resolvedOptions().timeZone
 
 /**
  * The alert settings form (GLOSSARY: Alert, Alert tier), kept in step with the server and other tabs as the run
- * settings are (`useServerSaved`). On opening, the server is told this browser's time zone if it has another, so
- * alert titles read in the user's clock. The access token goes on its own (`setToken`, `clearToken`): the server
- * never sends it back, only `token_set`.
+ * settings are (`useServerSaved`). The first time it opens on a server with no time zone chosen, it gives the server
+ * this browser's, so alert titles read in the user's clock; after that the zone is the panel's to change. The access
+ * token goes on its own (`setToken`, `clearToken`): the server never sends it back, only `token_set`.
  */
 export function useAlertSettings() {
   const [loadError, setLoadError] = useState<string | null>(null)
@@ -21,22 +21,28 @@ export function useAlertSettings() {
     changes: alertChanges,
     saveFailed: (e) => `Couldn't save alert settings: ${message(e)}`,
   })
-  const { open, send } = saved
+  const { open, hold, fill, now, send } = saved
 
   useEffect(() => {
     let mounted = true // StrictMode mounts twice in dev: only the kept mount acts on what loads
     getAlerts()
       .then((server) => {
         if (!mounted) return
-        open(fromServer(server), server)
-        const zone = here()
-        if (zone && zone !== server.timezone) void send(() => ({ timezone: zone }), true) // a zone it doesn't know: UTC stands
+        const zone = server.timezone === null ? zoneValue(here()) : null
+        if (!zone) return open(fromServer(server), server)
+        hold(server)
+        fill({ ...fromServer(server), timezone: zone })
+        void send(() => ({ timezone: zone }), true).then((ok) => {
+          // Not taken (a zone the server doesn't know, say): none stays chosen, and UTC stands.
+          const form = now()
+          if (!ok && mounted && form?.timezone === zone) fill({ ...form, timezone: '' })
+        })
       })
       .catch((e) => mounted && setLoadError(`Couldn't load alert settings: ${message(e)}`))
     return () => {
       mounted = false
     }
-  }, [open, send])
+  }, [open, hold, fill, now, send])
 
   const setToken = useCallback((token: string) => send(() => ({ token })), [send])
   const clearToken = useCallback(() => send(() => ({ token: '' })), [send])

@@ -9,9 +9,11 @@ import tempfile
 import threading
 import time
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable, Iterator
+
+from pydantic import BaseModel, ValidationError
 
 from .cli import UserError
 from .progress import Progress, RunCancelled
@@ -34,6 +36,26 @@ def read_json(path: Path):
         return json.loads(Path(path).read_text())
     except (OSError, ValueError):
         return None
+
+
+def read_saved(path: Path, model: type[BaseModel]) -> tuple[BaseModel | None, str | None]:
+    """Settings saved whole at `path` with the time they were saved (`updated_at`): as a `model`, and that time; or
+    (None, None) when there are none, or they can't be read (as if never saved). Settings saved without a time read as
+    saved when their file was written."""
+    stored = read_json(path)
+    if not isinstance(stored, dict):
+        return None, None
+    updated_at = stored.pop("updated_at", None)
+    try:
+        saved = model.model_validate(stored)
+    except ValidationError:
+        return None, None
+    if not isinstance(updated_at, str):
+        try:
+            updated_at = datetime.fromtimestamp(Path(path).stat().st_mtime, timezone.utc).isoformat()
+        except OSError:
+            updated_at = None
+    return saved, updated_at
 
 
 def write_aside(path: Path, data: bytes) -> Path:
@@ -181,8 +203,10 @@ class Runner:
     def start(self, work: Work, started_by: str, on_end: Callable[[dict], None] | None = None,
               watch: bool = False) -> Iterator[dict] | None:
         """Start `work(progress, announce)` on its own thread, or raise Busy. `on_end(entry)` hears how it ended,
-        as recorded (not when cancelled). With `watch`, returns the starter's events: every one from the first,
-        ending with the report or error; closing them early cancels the run."""
+        as recorded (not when cancelled), while the run is still going: what it does (an auto run's alert) is part
+        of the run, done before the next run may start and before anyone watching hears the end. With `watch`,
+        returns the starter's events: every one from the first, ending with the report or error; closing them early
+        cancels the run."""
         with self._lock:
             if self._run is not None:
                 raise Busy(self._run)
@@ -203,27 +227,30 @@ class Runner:
             log.exception("run failed")
             outcome = {"error": f"the engine failed: {e}"}
         entry = None
-        if outcome is not None:
-            entry = {"id": run.id, "started_by": run.started_by, "started_at": run.started_at.isoformat(),
-                     "finished_at": self.now().isoformat(), **outcome}
-            try:
-                self.record(entry)
-            except Exception:  # noqa: BLE001 - the run's result still reaches whoever is watching
-                log.exception("couldn't record the run")
-        # The run is over before anyone hears its end: whoever does may start the next one straight away.
-        with self._lock:
-            self._run = None
-        if entry is None:
-            run.finish({"type": "error", "detail": f"the run was stopped: {run.stopped_because}"})
-        elif "report" in entry:
-            run.finish({"type": "report", "report": entry["report"]})
-        else:
-            run.finish({"type": "error", "detail": entry["error"]})
-        if entry is not None and on_end is not None:
-            try:
-                on_end(entry)
-            except Exception:  # noqa: BLE001
-                log.exception("the run's end hook failed")
+        try:
+            if outcome is not None:
+                entry = {"id": run.id, "started_by": run.started_by, "started_at": run.started_at.isoformat(),
+                         "finished_at": self.now().isoformat(), **outcome}
+                try:
+                    self.record(entry)
+                except Exception:  # noqa: BLE001 - the run's result still reaches whoever is watching
+                    log.exception("couldn't record the run")
+                if on_end is not None:
+                    try:
+                        on_end(entry)
+                    except Exception:  # noqa: BLE001
+                        log.exception("the run's end hook failed")
+        finally:
+            # Whatever happened above, the run is over, and over before anyone hears its end: whoever does may
+            # start the next one straight away.
+            with self._lock:
+                self._run = None
+            if entry is None:
+                run.finish({"type": "error", "detail": f"the run was stopped: {run.stopped_because}"})
+            elif "report" in entry:
+                run.finish({"type": "report", "report": entry["report"]})
+            else:
+                run.finish({"type": "error", "detail": entry["error"]})
 
 
 class Scheduler:

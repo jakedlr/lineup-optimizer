@@ -63,10 +63,10 @@ hard-to-guess topic (anyone who knows a public topic's name can read and post to
 it in the app (*Send test* checks it arrives). Every auto run then pushes its six best legs (one per
 game) to your phone. It's loud only when it matters: **High** (priority 4, default 3+ games with a leg at
 +1.0 pts edge or better) or **Medium** (priority 3, +0.5 pts), each adjustable and switchable; otherwise,
-or when a tier's legs haven't changed since its last alert, it arrives silently at priority 1. A board
+or when a tier has no new leg since its last alert, it arrives silently at priority 1. A board
 fetch that fails, switching auto runs off, alerts at priority 4. *Check* says whether a topic looks
 unused, has recent messages, or is reserved; *Server and token* points at a self-hosted or protected
-topic.
+topic and sets the time zone of alert titles (the browser's, at first).
 
 ## How it works
 
