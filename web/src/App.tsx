@@ -4,13 +4,16 @@ import {
   fetchBoard,
   getBoard,
   getLatest,
+  message,
   putAuto,
   putBoard,
   runReport,
+  RunFailed,
   watchRun,
   type AutoState,
   type BoardInfo,
   type Report,
+  type RunHead,
   type StartedBy,
 } from './api'
 import { AutoRunsSwitch } from './AutoRunsSwitch'
@@ -70,18 +73,36 @@ function SlipMark() {
   )
 }
 
-const message = (e: unknown) => (e instanceof Error ? e.message : String(e))
+/** A run as the server names it. Its id is null only for a run recorded before runs had ids. */
+type RunRef = { id: string | null; started_by: StartedBy; started_at: string }
 
-/** The run going now: this page's own, or one it watches (an auto run, or a run from another page). */
+/** The same run: by id, or for a run from before ids, by when it started. */
+const same = (a: RunRef, b: RunRef | null | undefined) =>
+  !!b && (a.id !== null && b.id !== null ? a.id === b.id : a.started_at === b.started_at)
+
+/** Runs go one at a time, so the server's start times order them. */
+const after = (a: RunRef, b: RunRef) => Date.parse(a.started_at) > Date.parse(b.started_at)
+
+/**
+ * The run going now as this page follows it: its own (`run` is null until the server names it), or one it watches
+ * (an auto run, or a run from another page). `lost` is set when its stream ended before the run's end arrived: the
+ * first look at the server asked after `lost.since` says what became of it. `over`: the server said none is going,
+ * so it isn't watched again, even while a look still names it.
+ */
 interface Going {
   own: boolean
-  startedBy: StartedBy
-  startedAt: string
+  run: RunHead | null
+  lost?: { since: number; over: boolean }
 }
 
+type Outcome = { report: Report } | { error: string; stopped?: boolean }
+
 /** Why Run is held while a run this page didn't start is going. */
-const heldFor = (g: Going) =>
-  `${g.startedBy === 'auto' ? 'Auto run' : 'Run from another page'} going (started ${clock(g.startedAt)})…`
+const heldFor = (run: RunHead) =>
+  `${run.started_by === 'auto' ? 'Auto run' : 'Run from another page'} going (started ${clock(run.started_at)})…`
+
+/** What the page says of its own run when the server stopped it after this page's stream to it dropped. */
+const STOPPED = 'the run was stopped: this page lost its connection to it'
 
 function App() {
   const engine = useEngineStatus()
@@ -94,7 +115,7 @@ function App() {
   const [failure, setFailure] = useState<{ error: string; label: string } | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [refused, setRefused] = useState<string | null>(null)
-  const { options, settings, change, loadError, saveError } = useRunSettings()
+  const { options, settings, change, sync: syncSettings, loadError, saveError } = useRunSettings()
   const [noCache, setNoCache] = useState(false)
   const [promotion, setPromotion] = useState<Promotion>(NO_PROMOTION)
   const [progress, setProgress] = useState<Shown | null>(null)
@@ -106,14 +127,9 @@ function App() {
   // What the page knows of the server's runs, kept in refs so a status answer is judged against the latest.
   const goingRef = useRef<Going | null>(null)
   const watching = useRef<AbortController | null>(null)
-  const watched = useRef<string | null>(null) // started_at of the last run watched: never attached to twice
-  const watchedEnd = useRef<string | null>(null) // ... once its end has been shown
-  const knownLatest = useRef<string | null | undefined>(undefined) // the latest run's started_at; undefined until opened
-  const openingFailed = useRef(false)
-  const ownEnded = useRef(false) // this page's run ended: the next latest run recorded may be it
-  const quietThrough = useRef(0) // status answers asked at or before this were asked before a run here ended
+  const shown = useRef<RunRef | null | undefined>(undefined) // the newest run whose end is shown; undefined until opened
   const autoBusy = useRef(false)
-  const autoQuietThrough = useRef(0) // ... or before the switch last changed
+  const autoQuietThrough = useRef(0) // status answers asked at or before this were asked before the switch changed
 
   useEffect(() => applyTheme(theme), [theme])
 
@@ -123,13 +139,13 @@ function App() {
   }
 
   /** Show how a run ended, marked with how and when it started. */
-  const show = useCallback((startedBy: StartedBy, startedAt: string, outcome: { report?: Report; error?: string }) => {
-    const label = runLabel(startedBy, startedAt)
-    if (outcome.report) {
+  const show = useCallback((run: Omit<RunRef, 'id'>, outcome: Outcome) => {
+    const label = runLabel(run.started_by, run.started_at)
+    if ('report' in outcome) {
       setReport({ report: outcome.report, label })
       setFailure(null)
     } else {
-      setFailure({ error: outcome.error ?? 'The run failed.', label })
+      setFailure({ error: outcome.error, label })
     }
   }, [])
 
@@ -141,65 +157,96 @@ function App() {
   const onStatus = useRef<StatusHandler>(() => {})
   const status = useServerStatus(onStatus)
 
-  /** Watch a run this page didn't start, from where it is now to its end, as if it were this page's own. */
-  const attach = (startedBy: StartedBy, startedAt: string) => {
-    watched.current = startedAt
+  /** A run followed here has ended: show it, raise the run notification (not for a stopped run), and look again. */
+  const end = (run: RunRef | null, outcome: Outcome) => {
+    watching.current = null
+    if (run) shown.current = run
+    show(run ?? { started_by: 'manual', started_at: new Date().toISOString() }, outcome)
+    if ('report' in outcome) notifier.notify({ ok: true, report: outcome.report })
+    else if (!outcome.stopped) notifier.notify({ ok: false, error: outcome.error })
+    begin(null)
+    void refreshBoard() // the run saved the board it fetched
+    status.look()
+  }
+
+  /**
+   * The run's stream ended before the run did: hold Run, and let the next look say what became of it. A dropped stream
+   * waits for the next poll (no retrying in a tight loop while the network is down); a run the server says is `over`
+   * is looked for at once.
+   */
+  const lose = (over: boolean) => {
+    watching.current = null
+    begin({ ...goingRef.current!, lost: { since: status.asked(), over } })
+    if (over) status.look()
+  }
+
+  /** Watch a run from where it is now to its end: one this page didn't start, or its own after its stream dropped. */
+  const attach = (run: RunHead, own: boolean) => {
     const ctrl = new AbortController()
     watching.current = ctrl
-    begin({ own: false, startedBy, startedAt })
+    begin({ own, run })
     setProgress(null)
     setRefused(null)
-    watchRun((p) => setProgress((prev) => advance(prev, p)), setBoard, ctrl.signal)
+    let watched = run
+    const onRun = (h: RunHead) => {
+      watched = h
+      begin({ own: own && h.id === run.id, run: h }) // a run that began since the look is someone else's
+    }
+    watchRun({ onRun, onProgress: (p) => setProgress((prev) => advance(prev, p)), onBoard: setBoard }, ctrl.signal)
       .then((next) => {
-        if (ctrl.signal.aborted || !next) return // none going any more: the next look finds how it ended
-        watchedEnd.current = startedAt
-        show(startedBy, startedAt, { report: next })
-        notifier.notify({ ok: true, report: next })
+        if (ctrl.signal.aborted) return
+        if (next) end(watched, { report: next })
+        else lose(true) // none going any more: the next look finds how it ended
       })
       .catch((e) => {
         if (ctrl.signal.aborted) return
-        watchedEnd.current = startedAt
-        show(startedBy, startedAt, { error: message(e) })
-        notifier.notify({ ok: false, error: message(e) })
-      })
-      .finally(() => {
-        if (ctrl.signal.aborted) return
-        watching.current = null
-        quietThrough.current = status.asked()
-        begin(null)
-        void refreshBoard()
-        status.look()
+        if (e instanceof RunFailed) end(watched, { error: e.message, stopped: e.stopped })
+        else lose(false)
       })
   }
 
-  const handleStatus: StatusHandler = (answer, seq) => {
-    if (!autoBusy.current && seq > autoQuietThrough.current) setAuto(answer.auto)
-    if (goingRef.current || seq <= quietThrough.current) return
-
-    const running = answer.running
-    if (running && running.started_at !== watched.current) {
-      attach(running.started_by, running.started_at)
-      return
-    }
-
-    // A run recorded since this page last looked: this page's own, or one that started and ended between looks.
-    const latest = answer.latest?.started_at ?? null
-    if (knownLatest.current === undefined) {
-      if (openingFailed.current) knownLatest.current = latest
-      return
-    }
-    const mine = ownEnded.current
-    ownEnded.current = false
-    if (latest === knownLatest.current) return
-    knownLatest.current = latest
-    if (mine || latest === null || latest === watchedEnd.current) return
+  /** Show the latest run the server recorded, unless a newer one has been shown since it was asked for. */
+  const showLatest = (quietly: boolean) =>
     getLatest()
       .then((entry) => {
-        if (!entry || goingRef.current || entry.started_at !== knownLatest.current) return
-        show(entry.started_by, entry.started_at, entry)
-        notifier.notify(entry.report ? { ok: true, report: entry.report } : { ok: false, error: entry.error })
+        if (!entry || !same(entry, shown.current)) return
+        show(entry, entry.report ? { report: entry.report } : { error: entry.error })
+        if (!quietly) notifier.notify(entry.report ? { ok: true, report: entry.report } : { ok: false, error: entry.error })
       })
       .catch(() => {})
+
+  const handleStatus: StatusHandler = (answer, seq) => {
+    if (!autoBusy.current && seq > autoQuietThrough.current) setAuto(answer.auto)
+    syncSettings(answer.settings_updated_at)
+    const { running, latest } = answer
+    const g = goingRef.current
+    if (g && !(g.lost && seq > g.lost.since)) return
+    setRefused(null) // whatever refused this page's Run has gone, or is about to be watched
+
+    if (g?.run) {
+      // Its stream dropped: still going (watch it again), recorded (shown below as news), or stopped by the server.
+      if (running && same(running, g.run)) {
+        if (!g.lost!.over) attach(running, g.own) // else it's winding up: the next look will say how it ended
+        return
+      }
+      begin(null)
+      if (g.own && !(latest && same(latest, g.run))) {
+        shown.current = g.run
+        show(g.run, { error: STOPPED })
+      }
+    }
+
+    if (shown.current === undefined) {
+      // Opening: the latest run is old news, shown without a notification.
+      shown.current = latest
+      if (latest) void showLatest(true)
+    }
+    const isNew = (r: RunRef) => !shown.current || after(r, shown.current)
+    if (running && isNew(running)) attach(running, false)
+    else if (latest && isNew(latest)) {
+      shown.current = latest
+      void showLatest(false)
+    }
   }
   useEffect(() => {
     onStatus.current = handleStatus
@@ -230,24 +277,14 @@ function App() {
         setBoard(saved)
         if (!saved || minutesSince(saved.saved_at) > STALE_MINUTES) void fetchNow()
       })
-    // The latest run's report (or failure), from whenever it ran: an auto run while the page was closed, say.
-    getLatest()
-      .then((entry) => {
-        if (!live) return
-        knownLatest.current = entry?.started_at ?? null
-        if (entry && !goingRef.current) show(entry.started_by, entry.started_at, entry)
-      })
-      .catch(() => {
-        openingFailed.current = true
-      })
     return () => {
       live = false
     }
-  }, [show])
+  }, [])
 
   const request = settings ? toRun(settings, noCache, promotion) : null
   const problem = typeof request === 'string' ? request : null
-  const held = going && !going.own ? heldFor(going) : null
+  const held = going && !going.own && going.run ? heldFor(going.run) : null
   // A run fetches the board too; starting one mid-fetch would hit the partner feed right behind this one (HTTP 429).
   const blocked = problem ?? held ?? (fetching ? 'Fetching the board…' : null) ?? refused
 
@@ -269,32 +306,34 @@ function App() {
 
   const run = async () => {
     if (!request || typeof request === 'string' || fetching || goingRef.current) return
-    const startedAt = new Date().toISOString()
-    begin({ own: true, startedBy: 'manual', startedAt })
+    let named: RunHead | null = null // the server names the run as it starts it
+    begin({ own: true, run: null })
     setError(null)
     setFailure(null)
     setRefused(null)
     setFetchError(null) // the run fetches again, and its report says if it had to fall back
     setProgress(null)
-    let wasRefused = false
+    const onRun = (h: RunHead) => {
+      named = h
+      begin({ own: true, run: h })
+    }
     try {
-      const next = await runReport(request, (p) => setProgress((prev) => advance(prev, p)), setBoard)
-      show('manual', startedAt, { report: next })
-      notifier.notify({ ok: true, report: next })
+      const next = await runReport(request, { onRun, onProgress: (p) => setProgress((prev) => advance(prev, p)), onBoard: setBoard })
+      end(named, { report: next })
     } catch (e) {
-      if (e instanceof ApiError && e.status === 409) {
-        wasRefused = true // another run got there first: watch it instead
-        setRefused(message(e))
-      } else {
-        show('manual', startedAt, { error: message(e) })
-        notifier.notify({ ok: false, error: message(e) })
+      if (named && e instanceof RunFailed) end(named, { error: e.message, stopped: e.stopped })
+      else if (named) lose(false) // the run may go on without this page
+      else {
+        // The server never started a run: refused (another got there first: the next look watches it), or the request
+        // failed before it could.
+        begin(null)
+        if (e instanceof ApiError && e.status === 409) setRefused(message(e))
+        else {
+          setError(message(e))
+          notifier.notify({ ok: false, error: message(e) })
+        }
+        status.look()
       }
-    } finally {
-      quietThrough.current = status.asked()
-      ownEnded.current = !wasRefused
-      begin(null)
-      if (!wasRefused) void refreshBoard() // the run saved the board it fetched
-      status.look()
     }
   }
 

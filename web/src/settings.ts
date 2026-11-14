@@ -121,6 +121,55 @@ export function toSaved(s: Settings): SavedSettings | null {
   return { sports: s.sports, stake, hours, devig: s.devig, ref_slip: s.refSlip || null }
 }
 
+type RunKey = keyof SavedSettings
+const RUN_FIELDS: RunKey[] = ['sports', 'stake', 'hours', 'devig', 'ref_slip']
+
+/** The form's value for one run setting, or undefined while it isn't valid (half-typed, or no league). */
+function formValue(s: Settings, k: RunKey): SavedSettings[RunKey] | undefined {
+  switch (k) {
+    case 'sports':
+      return s.sports.length ? s.sports : undefined
+    case 'stake':
+      return positive(s.stake) ?? undefined
+    case 'hours':
+      return positive(s.hours) ?? undefined
+    case 'devig':
+      return s.devig
+    case 'ref_slip':
+      return s.refSlip || null
+  }
+}
+
+const same = (a: unknown, b: unknown) =>
+  Array.isArray(a) && Array.isArray(b) ? [...a].sort().join() === [...b].sort().join() : a === b
+
+/** The run settings in the form that differ from what the server holds: valid ones only, as a PATCH sends them. */
+export function runChanges(s: Settings, held: SavedSettings): Partial<SavedSettings> {
+  const changes: Partial<Record<RunKey, unknown>> = {}
+  for (const k of RUN_FIELDS) {
+    const v = formValue(s, k)
+    if (v !== undefined && !same(v, held[k])) changes[k] = v
+  }
+  return changes as Partial<SavedSettings>
+}
+
+/**
+ * `s` with the run settings the server now holds, except those edited here away from `before` (what it held when this
+ * page last heard): an edit made here wins for that setting only. With no `before`, all come from the server.
+ */
+export function mergeServer(s: Settings, before: SavedSettings | null, server: SavedSettings, o: Options): Settings {
+  const fresh = fromServer(server, o, s)
+  const mine = (k: RunKey) => before !== null && !same(formValue(s, k), before[k])
+  return {
+    ...fresh,
+    sports: mine('sports') ? s.sports : fresh.sports,
+    stake: mine('stake') ? s.stake : fresh.stake,
+    hours: mine('hours') ? s.hours : fresh.hours,
+    devig: mine('devig') ? s.devig : fresh.devig,
+    refSlip: mine('ref_slip') ? s.refSlip : fresh.refSlip,
+  }
+}
+
 /** One promotion per run, as on the CLI. Lives only in memory: never remembered. */
 export interface Promotion {
   kind: 'none' | 'bonus' | 'boost' | 'legs'

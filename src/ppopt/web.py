@@ -14,8 +14,8 @@ Paths come from the environment so the same code runs from a checkout and from t
 """
 
 import json
+import logging
 import os
-import tempfile
 import threading
 import time
 from contextlib import asynccontextmanager
@@ -34,10 +34,11 @@ from .models import BookMarket
 from .pricing import PRICING_METHODS
 from .payouts import load_payouts
 from .progress import Progress
-from .runs import Busy, Runner, Scheduler, next_mark, read_json, write_json
+from .runs import Busy, Runner, Scheduler, next_mark, read_json, write_aside, write_json
 from .sources import prizepicks
 from .sources.http import REUSE_SECONDS, FetchError, Http
 
+log = logging.getLogger(__name__)
 REPO = Path(__file__).resolve().parents[2]
 DEFAULT_STATIC = REPO / "web" / "dist"
 BOARD = "board.json"
@@ -131,6 +132,30 @@ class SavedSettings(BaseModel):
     hours: Hours
     devig: Devig
     ref_slip: RefSlip | None = None
+
+
+class SettingsPatch(BaseModel):
+    """Some of the run settings, changed on top of the saved ones (or the defaults). At least one; only the
+    reference slip may be null (no reference slip)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    sports: Sports | None = None
+    stake: Stake | None = None
+    hours: Hours | None = None
+    devig: Devig | None = None
+    ref_slip: RefSlip | None = None
+
+    @model_validator(mode="after")
+    def some_settings(self):
+        if not self.model_fields_set:
+            raise ValueError("change at least one setting")
+        if nulls := sorted(f for f in self.model_fields_set - {"ref_slip"} if getattr(self, f) is None):
+            raise ValueError(f"{', '.join(nulls)} can't be null")
+        return self
+
+    def changes(self) -> dict:
+        return self.model_dump(include=self.model_fields_set)
 
 
 class AutoSwitch(BaseModel):
@@ -248,11 +273,8 @@ def create_app(static_dir=None, data_dir=None, root=None, collect=None, now=None
 
     def save_board(raw: bytes, payload: dict, source: str, filename: str | None = None) -> None:
         """Make this the board. Call under write_lock."""
-        data_dir.mkdir(parents=True, exist_ok=True)
         # Written aside, then swapped in with its meta: a reader never sees half a board or a mismatched meta.
-        with tempfile.NamedTemporaryFile(dir=data_dir, prefix="board.", suffix=".tmp", delete=False) as f:
-            f.write(raw)
-        tmp = Path(f.name)
+        tmp = write_aside(board_path, raw)
         with cache_lock:
             meta_path.write_text(json.dumps({"projections": len(payload["data"]), "source": source,
                                              "filename": filename}))
@@ -326,21 +348,57 @@ def create_app(static_dir=None, data_dir=None, root=None, collect=None, now=None
             "board_app_url": prizepicks.APP_URL,  # where to save a board by hand when the fetch fails
         }
 
-    def saved_settings() -> SavedSettings | None:
+    settings_path = data_dir / SETTINGS
+    settings_lock = threading.Lock()  # held from reading the saved settings to saving them, so changes merge
+
+    def stored_settings() -> tuple[SavedSettings | None, str | None]:
+        """The saved run settings and when they were saved, or (None, None) when never saved (or unreadable: as if
+        never saved). Settings saved before the time was recorded read as saved when their file was written."""
+        stored = read_json(settings_path)
+        if not isinstance(stored, dict):
+            return None, None
+        updated_at = stored.pop("updated_at", None)
         try:
-            return SavedSettings.model_validate(read_json(data_dir / SETTINGS))
-        except ValidationError:  # never saved, or unreadable: as if never saved
-            return None
+            saved = SavedSettings.model_validate(stored)
+        except ValidationError:
+            return None, None
+        if not isinstance(updated_at, str):
+            try:
+                updated_at = datetime.fromtimestamp(settings_path.stat().st_mtime, timezone.utc).isoformat()
+            except OSError:
+                updated_at = None
+        return saved, updated_at
+
+    def saved_settings() -> SavedSettings | None:
+        return stored_settings()[0]
+
+    def settings_view(saved: SavedSettings | None, updated_at: str | None) -> dict:
+        if saved is None:
+            return {**default_settings(), "saved": False, "updated_at": None}
+        return {**saved.model_dump(), "saved": True, "updated_at": updated_at}
+
+    def save_settings(settings: SavedSettings) -> dict:
+        """Save these as the run settings, stamped now. Call under settings_lock."""
+        updated_at = now().isoformat()
+        write_json(settings_path, {**settings.model_dump(), "updated_at": updated_at})
+        return settings_view(settings, updated_at)
 
     @app.get("/api/settings")
     def get_settings() -> dict:
-        saved = saved_settings()
-        return {**saved.model_dump(), "saved": True} if saved else {**default_settings(), "saved": False}
+        return settings_view(*stored_settings())
 
     @app.put("/api/settings")
     def put_settings(settings: SavedSettings) -> dict:
-        write_json(data_dir / SETTINGS, settings.model_dump())
-        return {**settings.model_dump(), "saved": True}
+        with settings_lock:
+            return save_settings(settings)
+
+    @app.patch("/api/settings")
+    def patch_settings(patch: SettingsPatch) -> dict:
+        """Change some of the run settings, keeping the rest as saved (or the defaults, when never saved)."""
+        with settings_lock:
+            base = (saved_settings() or SavedSettings(**default_settings())).model_dump()
+            # Each field was checked as it arrived, and the base is valid, so the merge is too.
+            return save_settings(SavedSettings(**{**base, **patch.changes()}))
 
     # Auto runs on or off, and why they were switched off when a run did it. Saved on every change.
     stored = read_json(data_dir / AUTO)
@@ -368,14 +426,20 @@ def create_app(static_dir=None, data_dir=None, root=None, collect=None, now=None
         set_auto(switch.enabled)  # switching on clears why they were last switched off
         return auto_status()
 
-    # The latest finished run, as recorded (kept in memory too: a report runs to hundreds of KB).
+    # The latest finished run, as recorded (kept in memory too: a report runs to hundreds of KB). A run recorded
+    # before runs had ids has none.
     stored = read_json(data_dir / LATEST)
-    latest = {"entry": stored if isinstance(stored, dict) and {"started_by", "started_at", "finished_at"} <= set(stored)
-              else None}
+    latest = {"entry": {"id": None, **stored}
+              if isinstance(stored, dict) and {"started_by", "started_at", "finished_at"} <= set(stored) else None}
 
     def record(entry: dict) -> None:
-        write_json(data_dir / LATEST, entry)
+        """Keep this run as the latest, then save it. A failed save is logged: the page still sees the run until the
+        app restarts."""
         latest["entry"] = entry
+        try:
+            write_json(data_dir / LATEST, entry)
+        except Exception:  # noqa: BLE001 - the run already ended; only its keeping across a restart is lost
+            log.exception("couldn't save the latest run")
 
     runner = app.state.runner = Runner(now, record)
 
@@ -384,10 +448,12 @@ def create_app(static_dir=None, data_dir=None, root=None, collect=None, now=None
         going, entry = runner.current, latest["entry"]
         return {
             "auto": auto_status(),
-            "running": going and {"started_by": going.started_by, "started_at": going.started_at.isoformat()},
-            "latest": entry and {"started_by": entry["started_by"], "started_at": entry["started_at"],
-                                 "finished_at": entry["finished_at"], "ok": "report" in entry,
-                                 "error": entry.get("error")},
+            "running": going and {"id": going.id, "started_by": going.started_by,
+                                  "started_at": going.started_at.isoformat()},
+            "latest": entry and {"id": entry["id"], "started_by": entry["started_by"],
+                                 "started_at": entry["started_at"], "finished_at": entry["finished_at"],
+                                 "ok": "report" in entry, "error": entry.get("error")},
+            "settings_updated_at": stored_settings()[1],
         }
 
     @app.get("/api/board")

@@ -77,7 +77,7 @@ test('run settings changed on the page come back from the server, not from this 
   await page.getByLabel('Devig method').selectOption('shin')
   await expect
     .poll(async () => (await request.get('/api/settings')).json())
-    .toEqual({ sports: ['NFL', 'NBA', 'NHL'], stake: 15, hours: 24, devig: 'shin', ref_slip: null, saved: true })
+    .toMatchObject({ sports: ['NFL', 'NBA', 'NHL'], stake: 15, hours: 24, devig: 'shin', ref_slip: null, saved: true })
 
   await page.evaluate(() => localStorage.clear())
   await page.reload()

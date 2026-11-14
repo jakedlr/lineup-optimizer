@@ -375,7 +375,7 @@ def test_problems_found_before_running_are_still_plain_http_errors(tmp_path):
 def test_a_streamed_run_with_no_feed_and_no_board_ends_in_an_error_asking_for_an_upload(tmp_path):
     client = engine_app(tmp_path, fetch_board=feed_down())
     _, events = stream(client)
-    assert events[0]["step"] == "Fetching the PrizePicks board"
+    assert events[0]["type"] == "run" and events[1]["step"] == "Fetching the PrizePicks board"
     assert events[-1]["type"] == "error"
     assert "HTTP 503 from the partner feed" in events[-1]["detail"] and "upload" in events[-1]["detail"]
 
@@ -396,7 +396,8 @@ def test_a_streamed_run_announces_the_fetched_board_as_soon_as_it_is_saved(tmp_p
     board = events[at[0]]["board"]
     assert board == client.get("/api/board").json() and board["source"] == "fetched"
     # Straight after the board step: before any sportsbook request is planned.
-    assert [e["step"] for e in events[:at[0]]] == ["Fetching the PrizePicks board"]
+    assert events[0]["type"] == "run"
+    assert [e["step"] for e in events[1:at[0]]] == ["Fetching the PrizePicks board"]
 
 
 def test_a_streamed_fallback_run_announces_no_board(tmp_path):
@@ -784,7 +785,8 @@ def test_a_streamed_run_announces_the_board_it_reuses(tmp_path):
     _, events = stream(client)
     at = [i for i, e in enumerate(events) if e["type"] == "board"]
     assert len(at) == 1 and events[at[0]]["board"] == client.get("/api/board").json()
-    assert [e["step"] for e in events[:at[0]]] == ["Fetching the PrizePicks board"]
+    assert events[0]["type"] == "run"
+    assert [e["step"] for e in events[1:at[0]]] == ["Fetching the PrizePicks board"]
     assert events[-1]["type"] == "report" and events[-1]["report"]["warnings"] == [] and len(calls) == 1
 
 

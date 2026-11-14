@@ -33,16 +33,18 @@ SETTINGS = {"sports": ["NBA", "NHL"], "stake": 20.0, "hours": 12.0, "devig": "sh
 def test_settings_are_the_cli_defaults_until_saved(tmp_path):
     assert make(tmp_path).get("/api/settings").json() == {
         "sports": ["NFL", "NBA", "NHL", "MLB"], "stake": 10.0, "hours": 24, "devig": "worst", "ref_slip": None,
-        "saved": False}
+        "saved": False, "updated_at": None}
 
 
 def test_saved_settings_come_back_and_survive_a_restart(tmp_path):
     client = make(tmp_path)
     r = client.put("/api/settings", json=SETTINGS)
-    assert r.status_code == 200 and r.json() == {**SETTINGS, "saved": True}
-    assert client.get("/api/settings").json() == {**SETTINGS, "saved": True}
-    assert make(tmp_path).get("/api/settings").json() == {**SETTINGS, "saved": True}
-    assert json.loads((tmp_path / "data" / "settings.json").read_text()) == SETTINGS
+    saved = {**SETTINGS, "saved": True, "updated_at": NOW.isoformat()}
+    assert r.status_code == 200 and r.json() == saved
+    assert client.get("/api/settings").json() == saved
+    assert make(tmp_path).get("/api/settings").json() == saved
+    assert json.loads((tmp_path / "data" / "settings.json").read_text()) == {**SETTINGS,
+                                                                            "updated_at": NOW.isoformat()}
     assert not list((tmp_path / "data").glob("*.tmp"))
 
 
@@ -77,7 +79,8 @@ def test_unreadable_saved_settings_read_as_never_saved(tmp_path):
 
 def test_auto_runs_start_off_with_nothing_run_yet(tmp_path):
     assert make(tmp_path).get("/api/status").json() == {
-        "auto": {"enabled": False, "next_run_at": None, "off_reason": None}, "running": None, "latest": None}
+        "auto": {"enabled": False, "next_run_at": None, "off_reason": None}, "running": None, "latest": None,
+        "settings_updated_at": None}
 
 
 def test_switching_auto_runs_on_names_the_next_quarter_mark(tmp_path):
@@ -189,12 +192,13 @@ def test_status_says_which_run_is_going_and_then_how_it_ended(tmp_path):
     client = make(tmp_path, fetch_board=fetch)
     first = pool.submit(client.post, "/api/run")
     assert asked.wait(5)
-    assert client.get("/api/status").json()["running"] == {"started_by": "manual", "started_at": NOW.isoformat()}
+    running = client.get("/api/status").json()["running"]
+    assert running == {"id": running["id"], "started_by": "manual", "started_at": NOW.isoformat()}
     release.set()
     first.result(5)
     status = client.get("/api/status").json()
     assert status["running"] is None
-    assert status["latest"] == {"started_by": "manual", "started_at": NOW.isoformat(),
+    assert status["latest"] == {"id": running["id"], "started_by": "manual", "started_at": NOW.isoformat(),
                                 "finished_at": NOW.isoformat(), "ok": True, "error": None}
 
 
@@ -207,7 +211,9 @@ def test_no_latest_report_before_any_run_has_finished(tmp_path):
 def test_a_manual_run_is_kept_as_the_latest_and_survives_a_restart(tmp_path):
     client = make(tmp_path)
     report = client.post("/api/run").json()
-    latest = {"started_by": "manual", "started_at": NOW.isoformat(), "finished_at": NOW.isoformat(),
+    assert "id" not in report and "started_by" not in report, "a plain run's response is just the report"
+    run_id = client.get("/api/status").json()["latest"]["id"]
+    latest = {"id": run_id, "started_by": "manual", "started_at": NOW.isoformat(), "finished_at": NOW.isoformat(),
               "report": report}
     assert client.get("/api/report/latest").json() == latest
     assert make(tmp_path).get("/api/report/latest").json() == latest
@@ -227,8 +233,8 @@ def test_a_failed_run_is_kept_as_the_latest_with_its_error(tmp_path):
     latest = client.get("/api/report/latest").json()
     assert latest["error"] == detail and "report" not in latest and latest["started_by"] == "manual"
     assert client.get("/api/status").json()["latest"] == {
-        "started_by": "manual", "started_at": NOW.isoformat(), "finished_at": NOW.isoformat(), "ok": False,
-        "error": detail}
+        "id": latest["id"], "started_by": "manual", "started_at": NOW.isoformat(), "finished_at": NOW.isoformat(),
+        "ok": False, "error": detail}
 
 
 def test_a_cancelled_run_is_not_kept(tmp_path, monkeypatch):
@@ -268,9 +274,10 @@ def test_a_page_joining_a_run_hears_where_it_is_then_the_rest(tmp_path):
     for w in watchers:
         r, events = w.result(5)
         assert r.status_code == 200 and r.headers["content-type"].startswith("application/x-ndjson")
-        assert events[0]["type"] == "progress" and {"done", "total", "step"} <= set(events[0])
-        assert events[1] == {"type": "board", "board": client.get("/api/board").json()}
-        assert all(e["type"] == "progress" for e in events[2:-1])
+        assert events[0] == own[0] and own[0]["type"] == "run"
+        assert events[1]["type"] == "progress" and {"done", "total", "step"} <= set(events[1])
+        assert events[2] == {"type": "board", "board": client.get("/api/board").json()}
+        assert all(e["type"] == "progress" for e in events[3:-1])
         assert events[-1] == own[-1] and own[-1]["type"] == "report"
     assert client.get("/api/run/live").status_code == 204
 
@@ -293,6 +300,7 @@ def test_the_snapshot_is_where_the_run_is_now(tmp_path):
     r.start(work, "auto")
     wait_for(lambda: r.current is not None and r.current.snapshot()[0]["done"] == 1)
     events = r.current.watch()
+    assert next(events)["type"] == "run"
     assert next(events) == {"type": "progress", "done": 1, "total": 4, "step": "Fetching the PrizePicks board"}
     assert next(events) == {"type": "board", "board": {"projections": 3}}
     gate.set()
@@ -308,6 +316,7 @@ def test_a_page_joining_before_the_first_step_still_hears_a_progress_snapshot():
     r = Runner(now=lambda: NOW, record=lambda entry: None)
     r.start(lambda progress, announce: gate.wait(5) and {"legs": []}, "auto")
     events = r.current.watch()
+    assert next(events)["type"] == "run"
     assert next(events) == {"type": "progress", "done": 0, "total": 0, "step": ""}
     gate.set()
     assert next(events)["type"] == "report"
@@ -322,7 +331,8 @@ def test_a_page_joining_as_the_run_ends_still_hears_the_end():
     run = r.current
     gate.set()
     wait_for(lambda: r.current is None)
-    assert list(run.watch()) == [{"type": "progress", "done": 0, "total": 0, "step": "Pricing"},
+    assert list(run.watch()) == [{"type": "run", "id": run.id, "started_by": "auto", "started_at": NOW.isoformat()},
+                                 {"type": "progress", "done": 0, "total": 0, "step": "Pricing"},
                                  {"type": "report", "report": {"legs": []}}]
 
 
@@ -365,6 +375,7 @@ def test_closing_the_starters_events_cancels_the_run():
 
     r = Runner(now=lambda: NOW, record=ended.append)
     events = r.start(work, "manual", watch=True)
+    assert next(events)["type"] == "run"
     assert next(events)["type"] == "progress"
     events.close()  # what Starlette does when the client goes away
     assert finished.wait(2), "the worker kept running after the stream closed"
@@ -382,7 +393,11 @@ def test_the_starter_hears_every_event_from_the_first():
         progress.step("two")
         return {"legs": []}
 
-    assert list(r.start(work, "manual", watch=True)) == [
+    events = list(r.start(work, "manual", watch=True))
+    run_id = events[0].get("id")
+    assert isinstance(run_id, str) and run_id
+    assert events == [
+        {"type": "run", "id": run_id, "started_by": "manual", "started_at": NOW.isoformat()},
         {"type": "progress", "done": 0, "total": 0, "step": "one"},
         {"type": "progress", "done": 0, "total": 0, "step": "two"},
         {"type": "report", "report": {"legs": []}}]
@@ -422,11 +437,15 @@ def test_the_runner_records_how_each_run_ended():
     def breaks(progress, announce):
         raise KeyError("oops")
 
+    ids = []
     for work in (lambda p, a: {"legs": []}, fails, breaks):
-        list(r.start(work, "auto", watch=True))
+        events = list(r.start(work, "auto", watch=True))
+        ids.append(events[0]["id"])
+    assert len(set(ids)) == 3, "each run has its own id"
     base = {"started_by": "auto", "started_at": NOW.isoformat(), "finished_at": NOW.isoformat()}
-    assert ended == [{**base, "report": {"legs": []}}, {**base, "error": "no games in the window"},
-                     {**base, "error": "the engine failed: 'oops'"}]
+    assert ended == [{"id": ids[0], **base, "report": {"legs": []}},
+                     {"id": ids[1], **base, "error": "no games in the window"},
+                     {"id": ids[2], **base, "error": "the engine failed: 'oops'"}]
 
 
 # --- the schedule ----------------------------------------------------------------------------------
@@ -606,7 +625,8 @@ def test_a_manual_run_while_an_auto_run_is_going_is_409_naming_it(tmp_path):
     assert asked.wait(5)
     r = client.post("/api/run")
     assert r.status_code == 409 and r.json()["detail"] == "a run is already going (auto run)"
-    assert client.get("/api/status").json()["running"] == {"started_by": "auto", "started_at": NOW.isoformat()}
+    running = client.get("/api/status").json()["running"]
+    assert running == {"id": running["id"], "started_by": "auto", "started_at": NOW.isoformat()}
     release.set()
     wait_for(lambda: client.get("/api/status").json()["running"] is None)
 
@@ -621,8 +641,10 @@ def test_a_page_can_watch_an_auto_run(tmp_path):
     wait_for(lambda: runner(client).current.watchers == 1)
     release.set()
     r, events = watching.result(5)
-    assert events[0]["type"] == "progress" and events[1]["type"] == "board"
-    assert events[-1] == {"type": "report", "report": client.get("/api/report/latest").json()["report"]}
+    latest = client.get("/api/report/latest").json()
+    assert events[0] == {"type": "run", "id": latest["id"], "started_by": "auto", "started_at": NOW.isoformat()}
+    assert events[1]["type"] == "progress" and events[2]["type"] == "board"
+    assert events[-1] == {"type": "report", "report": latest["report"]}
 
 
 def test_an_auto_run_whose_board_fetch_fails_does_not_fall_back_and_switches_auto_runs_off(tmp_path):
@@ -657,18 +679,21 @@ def test_the_auto_run_end_hook_hears_each_outcome(tmp_path):
 
     heard = []
     ok = make(tmp_path / "ok", on_auto_run_end=heard.append)
-    report = auto_run(ok)["report"]
+    ok_run = auto_run(ok)
+    report = ok_run["report"]
     ok.post("/api/run")  # a manual run is not an auto run
     failed = make(tmp_path / "failed", on_auto_run_end=heard.append,
                   collect=lambda *a: ([], ["draftkings unavailable: blocked"]))
-    error = auto_run(failed)["error"]
+    failed_run = auto_run(failed)
+    error = failed_run["error"]
     off = make(tmp_path / "off", on_auto_run_end=heard.append, fetch_board=feed_down())
-    reason = auto_run(off)["error"]
+    off_run = auto_run(off)
+    reason = off_run["error"]
     wait_for(lambda: len(heard) == 3)
     base = {"started_by": "auto", "started_at": NOW.isoformat(), "finished_at": NOW.isoformat()}
-    assert heard == [{**base, "report": report, "switched_off": False},
-                     {**base, "error": error, "switched_off": False},
-                     {**base, "error": reason, "switched_off": True}]
+    assert heard == [{"id": ok_run["id"], **base, "report": report, "switched_off": False},
+                     {"id": failed_run["id"], **base, "error": error, "switched_off": False},
+                     {"id": off_run["id"], **base, "error": reason, "switched_off": True}]
 
 
 def test_a_failing_hook_does_not_break_the_run(tmp_path):
@@ -711,5 +736,173 @@ def test_unreadable_auto_and_latest_files_read_as_nothing_saved(tmp_path, junk):
         (tmp_path / "data" / name).write_text(junk)
     client = make(tmp_path)
     assert client.get("/api/status").json() == {
-        "auto": {"enabled": False, "next_run_at": None, "off_reason": None}, "running": None, "latest": None}
+        "auto": {"enabled": False, "next_run_at": None, "off_reason": None}, "running": None, "latest": None,
+        "settings_updated_at": None}
     assert client.get("/api/report/latest").status_code == 404
+
+
+# --- Sprint 9 review fixes -------------------------------------------------------------------------
+
+def test_a_streamed_run_names_its_id_first_and_the_id_is_kept_with_the_latest_run(tmp_path):
+    client = make(tmp_path)
+    _, events = stream(client)
+    first = events[0]
+    assert first == {"type": "run", "id": first["id"], "started_by": "manual", "started_at": NOW.isoformat()}
+    assert isinstance(first["id"], str) and first["id"]
+    assert events[1]["type"] == "progress" and events[-1]["type"] == "report"
+    assert client.get("/api/status").json()["latest"]["id"] == first["id"]
+    assert client.get("/api/report/latest").json()["id"] == first["id"]
+    assert make(tmp_path).get("/api/report/latest").json()["id"] == first["id"], "survives a restart"
+    assert json.loads((tmp_path / "data" / "latest.json").read_text())["id"] == first["id"]
+    _, again = stream(client)
+    assert again[0]["id"] != first["id"], "each run has its own id"
+
+
+def test_the_run_going_is_named_by_the_same_id_in_status_and_both_streams(tmp_path):
+    collect, asked, release = held_books()
+    client = make(tmp_path, collect=collect)
+    started = pool.submit(stream, client)
+    assert asked.wait(5)
+    running = client.get("/api/status").json()["running"]
+    watching = pool.submit(live, client)
+    wait_for(lambda: runner(client).current.watchers == 2)
+    release.set()
+    _, own = started.result(5)
+    _, seen = watching.result(5)
+    head = {"type": "run", "id": running["id"], "started_by": "manual", "started_at": NOW.isoformat()}
+    assert own[0] == head and seen[0] == head
+    assert client.get("/api/report/latest").json()["id"] == running["id"]
+
+
+def test_a_latest_run_saved_before_runs_had_ids_still_loads_with_no_id(tmp_path):
+    (tmp_path / "data").mkdir()
+    old = {"started_by": "auto", "started_at": NOW.isoformat(), "finished_at": NOW.isoformat(), "report": {"x": 1}}
+    (tmp_path / "data" / "latest.json").write_text(json.dumps(old))
+    client = make(tmp_path)
+    assert client.get("/api/report/latest").json() == {"id": None, **old}
+    assert client.get("/api/status").json()["latest"] == {
+        "id": None, "started_by": "auto", "started_at": NOW.isoformat(), "finished_at": NOW.isoformat(),
+        "ok": True, "error": None}
+
+
+def test_the_latest_run_is_still_shown_when_saving_it_fails(tmp_path, monkeypatch, caplog):
+    from ppopt import web
+
+    real = web.write_json
+
+    def write_json(path, data):
+        if path.name == "latest.json":
+            raise OSError(28, "No space left on device")
+        return real(path, data)
+
+    monkeypatch.setattr(web, "write_json", write_json)
+    client = make(tmp_path)
+    report = client.post("/api/run").json()
+    assert client.get("/api/report/latest").json()["report"] == report
+    assert client.get("/api/status").json()["latest"]["ok"] is True
+    assert "latest" in caplog.text and "No space left on device" in caplog.text
+
+
+def test_writing_json_that_cannot_be_written_leaves_the_old_file_and_no_temp_file(tmp_path):
+    from ppopt.runs import read_json, write_json
+
+    path = tmp_path / "latest.json"
+    write_json(path, {"a": 1})
+    with pytest.raises(TypeError):
+        write_json(path, {"a": object()})
+    assert read_json(path) == {"a": 1}
+    assert not list(tmp_path.glob("*.tmp"))
+
+
+def test_a_write_aside_that_fails_leaves_no_temp_file(tmp_path):
+    from ppopt.runs import write_aside
+
+    with pytest.raises(TypeError):
+        write_aside(tmp_path / "board.json", "not bytes")
+    assert list(tmp_path.iterdir()) == []
+    tmp = write_aside(tmp_path / "board.json", b"{}")
+    assert tmp.parent == tmp_path and tmp.suffix == ".tmp" and tmp.read_bytes() == b"{}"
+    assert not (tmp_path / "board.json").exists(), "written aside, not yet swapped in"
+
+
+# Settings changed elsewhere (another tab): when they were saved, and saving part of them.
+
+def test_status_says_when_the_settings_were_last_saved(tmp_path):
+    client = make(tmp_path)
+    assert client.get("/api/status").json()["settings_updated_at"] is None
+    client.put("/api/settings", json=SETTINGS)
+    assert client.get("/api/status").json()["settings_updated_at"] == NOW.isoformat()
+    assert make(tmp_path).get("/api/status").json()["settings_updated_at"] == NOW.isoformat()
+
+
+def test_settings_saved_before_they_had_a_time_read_as_saved_when_the_file_was_written(tmp_path):
+    (tmp_path / "data").mkdir()
+    path = tmp_path / "data" / "settings.json"
+    path.write_text(json.dumps(SETTINGS))
+    written = datetime.fromtimestamp(path.stat().st_mtime, timezone.utc).isoformat()
+    client = make(tmp_path)
+    assert client.get("/api/settings").json() == {**SETTINGS, "saved": True, "updated_at": written}
+    assert client.get("/api/status").json()["settings_updated_at"] == written
+
+
+def test_patching_settings_merges_onto_the_defaults_when_none_are_saved(tmp_path):
+    client = make(tmp_path)
+    r = client.patch("/api/settings", json={"stake": 25})
+    assert r.status_code == 200
+    expected = {"sports": ["NFL", "NBA", "NHL", "MLB"], "stake": 25.0, "hours": 24, "devig": "worst",
+                "ref_slip": None, "saved": True, "updated_at": NOW.isoformat()}
+    assert r.json() == expected
+    assert client.get("/api/settings").json() == expected
+    assert client.get("/api/status").json()["settings_updated_at"] == NOW.isoformat()
+
+
+def test_patching_settings_merges_onto_the_saved_ones(tmp_path):
+    client = make(tmp_path)
+    client.put("/api/settings", json=SETTINGS)
+    r = client.patch("/api/settings", json={"devig": "power", "sports": ["MLB"]})
+    expected = {**SETTINGS, "devig": "power", "sports": ["MLB"], "saved": True, "updated_at": NOW.isoformat()}
+    assert r.status_code == 200 and r.json() == expected
+    assert make(tmp_path).get("/api/settings").json() == expected
+
+
+def test_patching_the_reference_slip_to_null_clears_it(tmp_path):
+    client = make(tmp_path)
+    client.put("/api/settings", json=SETTINGS)
+    assert client.patch("/api/settings", json={"ref_slip": None}).json()["ref_slip"] is None
+
+
+@pytest.mark.parametrize("body", [
+    {}, {"sports": []}, {"sports": ["XFL"]}, {"stake": 0}, {"hours": -1}, {"devig": "magic"}, {"ref_slip": "power9"},
+    {"surprise": 1}, {"stake": 5, "saved": True}, {"updated_at": "2026-01-01T00:00:00+00:00"}, {"no_cache": True},
+    {"sports": None}, {"stake": None}, {"hours": None}, {"devig": None},
+])
+def test_bad_patches_are_422_and_change_nothing(tmp_path, body):
+    client = make(tmp_path)
+    client.put("/api/settings", json=SETTINGS)
+    assert client.patch("/api/settings", json=body).status_code == 422, body
+    assert client.get("/api/settings").json() == {**SETTINGS, "saved": True, "updated_at": NOW.isoformat()}
+
+
+def test_patches_at_once_keep_each_others_fields(tmp_path, monkeypatch):
+    from ppopt import web
+
+    real, barrier = web.read_json, threading.Barrier(4, timeout=0.5)
+
+    def slow_read(path):
+        got = real(path)
+        if path.name == "settings.json":
+            try:  # line every PATCH up between reading and writing, as a lost update needs
+                barrier.wait()
+            except threading.BrokenBarrierError:
+                pass
+        return got
+
+    monkeypatch.setattr(web, "read_json", slow_read)
+    client = make(tmp_path)
+    client.put("/api/settings", json=SETTINGS)
+    barrier.reset()
+    changes = [{"stake": 30}, {"hours": 6}, {"devig": "additive"}, {"ref_slip": "power3"}]
+    assert all(r.status_code == 200 for r in pool.map(lambda c: client.patch("/api/settings", json=c), changes))
+    got = client.get("/api/settings").json()
+    assert {k: got[k] for k in ("stake", "hours", "devig", "ref_slip")} == {
+        "stake": 30.0, "hours": 6.0, "devig": "additive", "ref_slip": "power3"}

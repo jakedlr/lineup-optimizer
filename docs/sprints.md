@@ -431,3 +431,21 @@ Sprint 10 can alert a phone. Decision: `docs/adr/0003-server-side-auto-runs.md`;
 - Found at the end: the 409 detail named the other run's start time in the container's zone (UTC); it now names
   only the kind of run, and the page shows the time from `/api/status`. Fresh odds' hint still said "5-minute cache".
 
+**Review:** done 2026-11-14. A real auto run fired at 09:30:00 UTC with no page open: 317 legs in 17 s, no
+warnings, next run 09:45.
+`/code-review` found ten issues, all fixed test-first:
+- Runs have ids (`uuid4().hex`): in `/api/status` (`running.id`, `latest.id`), `/api/report/latest` and
+  `latest.json` (null for runs recorded before ids), and both streams open with
+  `{"type":"run",id,started_by,started_at}`. The page knows runs by id instead of six ordering refs; its own run's
+  mark uses the server's `started_at`, and a POST that never started a run can't claim the next recorded one.
+- A dropped stream is not a failed run: the next status poll decides (watched again, shown from latest, or "the run
+  was stopped", with no notification). A stopped run never notifies.
+- A 409 no longer holds Run once no run is going.
+- Settings: `PATCH /api/settings` merges a subset under a lock; responses carry `updated_at` and `/api/status`
+  `settings_updated_at`. The page sends only changed fields, reloads when another tab saved, keeps its own unsaved
+  edits, and sends a pending change on `pagehide` at once.
+- The latest run is kept in memory before it's saved, so a failed write can't hide it.
+- One atomic-write helper (`runs.write_aside`) serves the board and the JSON files; one `message` helper on the page.
+- e2e: Playwright defaults to :8001 and `e2e/test.ts` refuses :8000 (its reset would switch the real app's auto
+  runs off); `holdFeed` releases a board of any size (`e2e/hold-feed.spec.ts`, ~400 KB through a slow reader).
+

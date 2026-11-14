@@ -87,13 +87,31 @@ export const localTime = (h: number, m: number) => {
   return d.toISOString()
 }
 
-export interface LatestEntry {
+/** A run as the server names it: its id (null for a run recorded before runs had ids), who started it and when. */
+export interface RunInfo {
+  id: string | null
   started_by: 'auto' | 'manual'
   started_at: string
+}
+
+export interface LatestEntry extends RunInfo {
   finished_at: string
   report?: Report
   error?: string
 }
+
+let runs = 0
+/** A run going on the server, with an id of its own. */
+export const runInfo = (started_by: 'auto' | 'manual', started_at: string) => ({ id: `run${++runs}`, started_by, started_at })
+
+/** The event a run's stream opens with: which run it is. */
+export const head = (run: RunInfo) => ({ type: 'run', ...run })
+
+/** A whole streamed run: its head, then its report. */
+export const streamed = (run: RunInfo, r: Report = report) =>
+  new Response([head(run), { type: 'report', report: r }].map((e) => JSON.stringify(e) + '\n').join(''), {
+    headers: { 'Content-Type': 'application/x-ndjson' },
+  })
 
 /** NDJSON run events fed by hand, one chunk at a time. */
 export function controlledRun() {
@@ -105,6 +123,8 @@ export function controlledRun() {
     send: (text: string) => controller.enqueue(enc.encode(text)),
     event: (e: object) => controller.enqueue(enc.encode(JSON.stringify(e) + '\n')),
     close: () => controller.close(),
+    /** The connection drops: the network went, or the laptop slept. */
+    fail: (e: unknown = new TypeError('network error')) => controller.error(e),
   }
 }
 
@@ -113,27 +133,37 @@ export function controlledRun() {
  * go into `routes`; tests change `state` to make things happen elsewhere (another tab, a quarter mark).
  */
 export function fakeServer() {
+  let saves = 0
+  /** When a save happened: later with every save. */
+  const stamp = () => new Date(Date.UTC(2026, 10, 14, 12) + ++saves * 1000).toISOString()
   const state = {
-    settings: { ...options.defaults, saved: false } as Record<string, unknown>,
+    settings: { ...options.defaults, saved: false, updated_at: null } as Record<string, unknown>,
     auto: { enabled: false, next_run_at: null as string | null, off_reason: null as string | null },
-    running: null as { started_by: 'auto' | 'manual'; started_at: string } | null,
+    running: null as RunInfo | null,
     latest: null as LatestEntry | null,
     /** Answers GET /api/run/live while `running` is set; 204 otherwise. */
     live: null as (() => Response) | null,
     nextRunAt: localTime(14, 30),
   }
+  /** Change some run settings, as PATCH /api/settings does (another tab, say). */
+  const patchSettings = (changes: Record<string, unknown>) => {
+    state.settings = { ...state.settings, ...changes, saved: true, updated_at: stamp() }
+    return state.settings
+  }
   const table: Record<string, Route> = {
     'GET /api/settings': () => Response.json(state.settings),
     'PUT /api/settings': (init) => {
-      state.settings = { ...JSON.parse(String(init!.body)), saved: true }
+      state.settings = { ...JSON.parse(String(init!.body)), saved: true, updated_at: stamp() }
       return Response.json(state.settings)
     },
+    'PATCH /api/settings': (init) => Response.json(patchSettings(JSON.parse(String(init!.body)))),
     'GET /api/status': () => {
       const l = state.latest
       return Response.json({
         auto: state.auto,
         running: state.running,
-        latest: l && { started_by: l.started_by, started_at: l.started_at, finished_at: l.finished_at, ok: !!l.report, error: l.error ?? null },
+        latest: l && { id: l.id, started_by: l.started_by, started_at: l.started_at, finished_at: l.finished_at, ok: !!l.report, error: l.error ?? null },
+        settings_updated_at: state.settings.updated_at,
       })
     },
     'GET /api/report/latest': () =>
@@ -145,5 +175,5 @@ export function fakeServer() {
     },
     'GET /api/run/live': () => (state.running && state.live ? state.live() : new Response(null, { status: 204 })),
   }
-  return { state, routes: table }
+  return { state, routes: table, patchSettings }
 }

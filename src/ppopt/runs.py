@@ -3,10 +3,12 @@ started on the quarter hour. Nothing here knows about HTTP or what a run does; `
 
 import json
 import logging
+import os
 import queue
 import tempfile
 import threading
 import time
+import uuid
 from datetime import datetime
 from pathlib import Path
 from typing import Callable, Iterator
@@ -34,14 +36,24 @@ def read_json(path: Path):
         return None
 
 
-def write_json(path: Path, data) -> None:
-    """Save `data` at `path`, written aside and swapped in, so a reader (or a crash) never sees half of it."""
+def write_aside(path: Path, data: bytes) -> Path:
+    """Write `data` to a temporary file beside `path` and return it, for the caller to swap in with
+    `.replace(path)`: a reader (or a crash) never sees half of it. A failed write leaves nothing behind."""
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
-    with tempfile.NamedTemporaryFile("w", dir=path.parent, prefix=f"{path.stem}.", suffix=".tmp",
-                                     delete=False) as f:
-        json.dump(data, f)
-    Path(f.name).replace(path)
+    fd, name = tempfile.mkstemp(dir=path.parent, prefix=f"{path.stem}.", suffix=".tmp")
+    try:
+        with os.fdopen(fd, "wb") as f:
+            f.write(data)
+    except BaseException:
+        Path(name).unlink(missing_ok=True)
+        raise
+    return Path(name)
+
+
+def write_json(path: Path, data) -> None:
+    """Save `data` at `path`, written aside and swapped in."""
+    write_aside(path, json.dumps(data).encode()).replace(path)
 
 
 class Busy(Exception):
@@ -53,12 +65,12 @@ class Busy(Exception):
 
 
 class Run:
-    """One run in flight: who started it and when, its progress, and every event it sends, fanned out to whoever
+    """One run in flight: its id, who started it and when, its progress, and every event it sends, fanned out to whoever
     is watching. A page that starts watching late first hears where the run is now (its latest progress, and the
     board it announced, if it has), then everything after, as the run's starter does."""
 
-    def __init__(self, started_by: str, started_at: datetime):
-        self.started_by, self.started_at = started_by, started_at
+    def __init__(self, id: str, started_by: str, started_at: datetime):
+        self.id, self.started_by, self.started_at = id, started_by, started_at
         self.progress = Progress(lambda e: self.publish({"type": "progress", **e}))
         self.stopped_because = "the page that started it was closed"
         self._lock = threading.Lock()  # guards everything below; taken inside the progress lock, never around it
@@ -96,6 +108,12 @@ class Run:
                 q.put(event)
             self._watchers.clear()
 
+    @property
+    def head(self) -> dict:
+        """The event every watcher hears first: which run this is."""
+        return {"type": "run", "id": self.id, "started_by": self.started_by,
+                "started_at": self.started_at.isoformat()}
+
     def snapshot(self) -> list[dict]:
         with self._lock:
             return self._snapshot()
@@ -105,10 +123,12 @@ class Run:
         return events + [e for e in (self._board, self._final) if e is not None]
 
     def watch(self, snapshot: bool = True, cancel_on_close: bool = False) -> Iterator[dict]:
-        """The run's events from now on, ending with its report or error; with `snapshot`, led by where it is now.
-        Watching starts on the call, not on the first `next`, so nothing sent in between is missed. With
-        `cancel_on_close`, closing the events before the end cancels the run (its starter went away)."""
+        """Which run this is (its `head`), then its events from now on, ending with its report or error; with
+        `snapshot`, led by where it is now. Watching starts on the call, not on the first `next`, so nothing sent
+        in between is missed. With `cancel_on_close`, closing the events before the end cancels the run (its
+        starter went away)."""
         q: queue.SimpleQueue = queue.SimpleQueue()
+        q.put(self.head)
         with self._lock:
             for event in self._snapshot() if snapshot else []:
                 q.put(event)
@@ -145,7 +165,8 @@ Work = Callable[[Progress, Callable[[dict], None]], dict]  # (progress, announce
 
 class Runner:
     """The app's one run at a time. Starting a run while one is going raises Busy, so the run that got there first
-    is the only one; a finished run is handed to `record` (as the latest run) before the next may start."""
+    is the only one; a finished run is handed to `record` (as the latest run) before the next may start. Each run
+    gets an id of its own (uuid4 hex), named in its events, its status and the latest run."""
 
     def __init__(self, now: Callable[[], datetime], record: Callable[[dict], None]):
         self.now, self.record = now, record
@@ -165,7 +186,7 @@ class Runner:
         with self._lock:
             if self._run is not None:
                 raise Busy(self._run)
-            run = self._run = Run(started_by, self.now())
+            run = self._run = Run(uuid.uuid4().hex, started_by, self.now())
         events = run.watch(snapshot=False, cancel_on_close=True) if watch else None
         threading.Thread(target=self._work, args=(run, work, on_end), daemon=True,
                          name=f"{started_by} run").start()
@@ -183,7 +204,7 @@ class Runner:
             outcome = {"error": f"the engine failed: {e}"}
         entry = None
         if outcome is not None:
-            entry = {"started_by": run.started_by, "started_at": run.started_at.isoformat(),
+            entry = {"id": run.id, "started_by": run.started_by, "started_at": run.started_at.isoformat(),
                      "finished_at": self.now().isoformat(), **outcome}
             try:
                 self.record(entry)
