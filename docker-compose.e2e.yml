@@ -2,11 +2,13 @@
 # partner feed, so runs are deterministic and work from anywhere. Used by `make e2e` as a separate project on port 8001.
 # The feed is whatever web/e2e/.feed/projections.json holds when the app fetches: specs write or remove it from the
 # host (no file is a failed fetch). The folder is mounted, not the file, so a spec replacing the file is seen.
+# PPOPT_E2E enables POST /api/auto/run-now, so a spec can start an auto run without waiting for a quarter mark.
 services:
   app:
     environment:
       PPOPT_ODDS_FILE: /fixtures/markets.json
       PPOPT_BOARD_FILE: /feed/projections.json
+      PPOPT_E2E: "1"
     volumes:
       - ./tests/fixtures:/fixtures:ro
       - ./web/e2e/.feed:/feed:ro

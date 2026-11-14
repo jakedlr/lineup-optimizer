@@ -384,3 +384,50 @@ fall back to a seconds-old board and warn as if broken. Ten findings, all fixed 
 - Page: Run is held while the opening fetch is going ("Fetching the board…"); under StrictMode only one opening fetch
   is sent; a flaky Vitest age match (mine, from the board-event change) now pins its clock.
 
+
+## Sprint 9: Auto runs
+
+**Goal:** the app runs itself on the quarter hour while auto runs are on, whether or not the page is open, so
+Sprint 10 can alert a phone. Decision: `docs/adr/0003-server-side-auto-runs.md`; terms in `GLOSSARY.md`
+(*Auto run*, *Run settings*).
+
+**Done criteria**
+- [x] Run settings (leagues, stake, hours, devig, reference slip) live on the server (`GET`/`PUT /api/settings`); the
+      page reads and saves them there, copying a browser's old saved settings across once. View preferences (legs to
+      show, slip filters, browser notifications, theme) stay in the browser. Promotions and Fresh odds are never saved
+- [x] One run at a time: a manual run while another run is going is refused with a reason
+- [x] Auto runs on/off (`PUT /api/auto`), remembered across restarts; while on, a run starts at :00, :15, :30 and :45
+      with the saved run settings (feed promos on, no promotions); a quarter mark that finds a run going is skipped
+- [x] An auto run whose board fetch fails does not fall back: auto runs switch off and the page says why. Any other
+      failure leaves them on
+- [x] The server keeps the latest run's report (or failure) with how and when it started; the page shows it on
+      opening, marked "Auto run · 14:15" or "Run · 14:08"
+- [x] An open page sees an auto run as it happens: Run is held, its progress shows, its report replaces the old one,
+      and it raises the usual run notification
+- [x] e2e: switching auto runs on shows the next quarter mark; a started auto run is watched to its report; a failed
+      board fetch switches auto runs off with the reason
+
+**Notes**
+- `ppopt.runs`: a `Runner` holds the one run slot (manual and auto alike; a second start is `Busy` → 409 "a run is
+  already going (auto run)"). A run ending is recorded as latest (`latest.json`) before the slot clears and before
+  anyone hears the end, so a page hearing a report can start the next run straight away. `Run` fans events out to
+  the starter and any viewers; only the starter's stream cancels a manual run. This replaces `stream_run`.
+- `GET /api/run/live` attaches to the run going: a snapshot (progress, and the board event if sent), then live
+  events to the end; 204 when none. A cancelled or shut-down run ends viewers with "the run was stopped: …".
+- `Scheduler`: acts on each quarter mark (epoch seconds % 900) at most once, only within 60 s of it, and never on
+  marks passed before the app started. It sleeps at most 60 s at a time and stops with the app.
+- Auto runs: saved run settings, feed promos on; the board fetch has no fallback (`board_for_run(fallback=False)`):
+  a failure switches auto runs off with `off_reason`. `on_auto_run_end` is the seam Sprint 10's ntfy alerts use.
+- A plain (non-NDJSON) `POST /api/run` that fails is a 422 even for an engine crash, as the stream already said.
+- Page: run settings load from and save to the server (debounced, valid values only, sent on `pagehide` if
+  pending); a browser's old saved run settings are copied across once. Status is polled every 5 s while visible and
+  30 s while hidden (so a background tab still notifies about auto runs); a run the page didn't start is watched to
+  its end, and a run that started and finished between polls is caught up from `latest`. A 409 attaches instead
+  of failing.
+- e2e: `PPOPT_E2E=1` enables `POST /api/auto/run-now`. Specs run one at a time (`workers: 1`) since only one run
+  goes at once; `e2e/test.ts` switches auto runs off and restores run settings after each test; `holdFeed()`
+  (`e2e/board.ts`) swaps the feed file for a named pipe so a spec can hold a run mid-fetch. This supersedes the
+  Sprint 8 note that other specs run in parallel.
+- Found at the end: the 409 detail named the other run's start time in the container's zone (UTC); it now names
+  only the kind of run, and the page shows the time from `/api/status`. Fresh odds' hint still said "5-minute cache".
+

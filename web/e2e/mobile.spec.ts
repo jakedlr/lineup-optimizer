@@ -1,10 +1,10 @@
-import { expect, test } from '@playwright/test'
+import { expect, run, test } from './test.ts'
 
 test.use({ viewport: { width: 375, height: 800 } })
 
 test('the report fits a phone without sideways scrolling', async ({ page }) => {
   await page.goto('/')
-  await page.getByRole('button', { name: 'Run', exact: true }).click()
+  await run(page)
   await expect(page.getByRole('region', { name: 'Top Legs' })).toBeVisible()
   await page.getByText('Show lines').click()
 

@@ -79,3 +79,71 @@ export const options: Options = {
   defaults: { sports: ['NFL', 'NBA', 'NHL', 'MLB'], hours: 24, stake: 10, devig: 'worst', ref_slip: null },
   board_app_url: 'https://api.prizepicks.com/projections?per_page=1000&single_stat=true&game_mode=pickem',
 }
+
+/** An ISO time for today at this local clock time, so a label reads the same in any time zone. */
+export const localTime = (h: number, m: number) => {
+  const d = new Date()
+  d.setHours(h, m, 0, 0)
+  return d.toISOString()
+}
+
+export interface LatestEntry {
+  started_by: 'auto' | 'manual'
+  started_at: string
+  finished_at: string
+  report?: Report
+  error?: string
+}
+
+/** NDJSON run events fed by hand, one chunk at a time. */
+export function controlledRun() {
+  let controller!: ReadableStreamDefaultController<Uint8Array>
+  const body = new ReadableStream<Uint8Array>({ start: (c) => void (controller = c) })
+  const enc = new TextEncoder()
+  return {
+    response: () => new Response(body, { headers: { 'Content-Type': 'application/x-ndjson' } }),
+    send: (text: string) => controller.enqueue(enc.encode(text)),
+    event: (e: object) => controller.enqueue(enc.encode(JSON.stringify(e) + '\n')),
+    close: () => controller.close(),
+  }
+}
+
+/**
+ * The server's run settings, auto runs, run in progress and latest run, in memory (src/ppopt/web.py). Its routes
+ * go into `routes`; tests change `state` to make things happen elsewhere (another tab, a quarter mark).
+ */
+export function fakeServer() {
+  const state = {
+    settings: { ...options.defaults, saved: false } as Record<string, unknown>,
+    auto: { enabled: false, next_run_at: null as string | null, off_reason: null as string | null },
+    running: null as { started_by: 'auto' | 'manual'; started_at: string } | null,
+    latest: null as LatestEntry | null,
+    /** Answers GET /api/run/live while `running` is set; 204 otherwise. */
+    live: null as (() => Response) | null,
+    nextRunAt: localTime(14, 30),
+  }
+  const table: Record<string, Route> = {
+    'GET /api/settings': () => Response.json(state.settings),
+    'PUT /api/settings': (init) => {
+      state.settings = { ...JSON.parse(String(init!.body)), saved: true }
+      return Response.json(state.settings)
+    },
+    'GET /api/status': () => {
+      const l = state.latest
+      return Response.json({
+        auto: state.auto,
+        running: state.running,
+        latest: l && { started_by: l.started_by, started_at: l.started_at, finished_at: l.finished_at, ok: !!l.report, error: l.error ?? null },
+      })
+    },
+    'GET /api/report/latest': () =>
+      state.latest ? Response.json(state.latest) : Response.json({ detail: 'no run has finished yet' }, { status: 404 }),
+    'PUT /api/auto': (init) => {
+      const { enabled } = JSON.parse(String(init!.body))
+      state.auto = { enabled, next_run_at: enabled ? state.nextRunAt : null, off_reason: null }
+      return Response.json(state.auto)
+    },
+    'GET /api/run/live': () => (state.running && state.live ? state.live() : new Response(null, { status: 204 })),
+  }
+  return { state, routes: table }
+}

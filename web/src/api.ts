@@ -95,7 +95,14 @@ export interface RunSettings {
   feed_promos: boolean
 }
 
-export class ApiError extends Error {}
+export class ApiError extends Error {
+  /** The HTTP status, when the server answered with one (409: another run is going). */
+  status?: number
+  constructor(message: string, status?: number) {
+    super(message)
+    this.status = status
+  }
+}
 
 async function json<T>(res: Response): Promise<T> {
   if (res.ok) return res.json()
@@ -106,7 +113,7 @@ async function json<T>(res: Response): Promise<T> {
   } catch {
     // keep the status line
   }
-  throw new ApiError(detail)
+  throw new ApiError(detail, res.status)
 }
 
 export async function getBoard(): Promise<BoardInfo | null> {
@@ -147,24 +154,9 @@ type RunEvent =
   | { type: 'report'; report: Report }
   | { type: 'error'; detail: string }
 
-/**
- * Run the engine. The server streams NDJSON: progress events, a "board" event once the run has fetched and saved
- * the board, then one "report" or "error".
- * A plain JSON answer (an older server, or an error found before the run started) is handled too.
- */
-export async function runReport(
-  settings: RunSettings,
-  onProgress: (p: RunProgress) => void = () => {},
-  onBoard: (b: BoardInfo) => void = () => {},
-): Promise<Report> {
-  const res = await fetch('/api/run', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Accept: 'application/x-ndjson' },
-    body: JSON.stringify(settings),
-  })
-  if (!res.ok || !res.headers.get('Content-Type')?.includes('ndjson') || !res.body) return json(res)
-
-  const reader = res.body.pipeThrough(new TextDecoderStream()).getReader()
+/** Read a run's NDJSON events to its end: the report, or an ApiError with the reason it failed. */
+async function follow(res: Response, onProgress: (p: RunProgress) => void, onBoard: (b: BoardInfo) => void): Promise<Report> {
+  const reader = res.body!.pipeThrough(new TextDecoderStream()).getReader()
   let buffer = ''
   for (;;) {
     const { value, done } = await reader.read()
@@ -181,4 +173,104 @@ export async function runReport(
     }
     if (done) throw new ApiError('The run ended before the engine sent a report. Check the container logs.')
   }
+}
+
+/**
+ * Run the engine. The server streams NDJSON: progress events, a "board" event once the run has fetched and saved
+ * the board, then one "report" or "error".
+ * A plain JSON answer (an older server, or an error found before the run started) is handled too. While another run
+ * is going the server refuses with 409 (an ApiError with that status).
+ */
+export async function runReport(
+  settings: RunSettings,
+  onProgress: (p: RunProgress) => void = () => {},
+  onBoard: (b: BoardInfo) => void = () => {},
+): Promise<Report> {
+  const res = await fetch('/api/run', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/x-ndjson' },
+    body: JSON.stringify(settings),
+  })
+  if (!res.ok || !res.headers.get('Content-Type')?.includes('ndjson') || !res.body) return json(res)
+  return follow(res, onProgress, onBoard)
+}
+
+/**
+ * Watch the run in progress, whoever started it: where it is now (progress, and its board if it has one), then its
+ * events to the end. Null when no run is going. Aborting stops watching; the run goes on.
+ */
+export async function watchRun(
+  onProgress: (p: RunProgress) => void,
+  onBoard: (b: BoardInfo) => void,
+  signal: AbortSignal,
+): Promise<Report | null> {
+  const res = await fetch('/api/run/live', { headers: { Accept: 'application/x-ndjson' }, signal })
+  if (res.status === 204) return null
+  if (!res.ok || !res.body) return json(res)
+  return follow(res, onProgress, onBoard)
+}
+
+/** The run settings every run starts from (GLOSSARY: Run settings), as the server keeps them. */
+export interface SavedSettings {
+  sports: string[]
+  stake: number
+  hours: number
+  devig: string
+  ref_slip: string | null
+}
+
+export async function getSettings(): Promise<SavedSettings & { saved: boolean }> {
+  return json(await fetch('/api/settings'))
+}
+
+export async function putSettings(settings: SavedSettings, keepalive = false): Promise<SavedSettings> {
+  return json(
+    await fetch('/api/settings', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(settings),
+      keepalive,
+    }),
+  )
+}
+
+export type StartedBy = 'auto' | 'manual'
+
+export interface AutoState {
+  enabled: boolean
+  next_run_at: string | null
+  /** Why a run switched auto runs off (a failed board fetch); cleared when they're switched on or off by hand. */
+  off_reason: string | null
+}
+
+export interface Status {
+  auto: AutoState
+  running: { started_by: StartedBy; started_at: string } | null
+  latest: { started_by: StartedBy; started_at: string; finished_at: string; ok: boolean; error: string | null } | null
+}
+
+export async function getStatus(): Promise<Status> {
+  return json(await fetch('/api/status'))
+}
+
+export async function putAuto(enabled: boolean): Promise<AutoState> {
+  return json(
+    await fetch('/api/auto', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ enabled }),
+    }),
+  )
+}
+
+/** The latest finished run, as the server recorded it: its report, or why it failed. */
+export type LatestRun = { started_by: StartedBy; started_at: string; finished_at: string } & (
+  | { report: Report; error?: undefined }
+  | { error: string; report?: undefined }
+)
+
+export async function getLatest(): Promise<LatestRun | null> {
+  const res = await fetch('/api/report/latest')
+  if (res.status === 404) return null
+  return json(res)
 }

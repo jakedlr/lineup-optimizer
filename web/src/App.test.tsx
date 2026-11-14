@@ -1,9 +1,9 @@
 import { StrictMode } from 'react'
-import { cleanup, render, screen, within } from '@testing-library/react'
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import App from './App'
-import { options, report, routes } from './test/fixtures'
+import { fakeServer, options, report, routes } from './test/fixtures'
 
 const health = () => Response.json({ status: 'ok' })
 const noBoard = () => Response.json({ detail: 'no board yet' }, { status: 404 })
@@ -11,9 +11,15 @@ const feedDown = () =>
   Response.json({ detail: "couldn't fetch the board from PrizePicks' partner feed: HTTP 503 from partner-api" }, { status: 502 })
 const minutesAgo = (m: number) => new Date(Date.now() - m * 60_000).toISOString()
 
+let server: ReturnType<typeof fakeServer>
+beforeEach(() => {
+  server = fakeServer()
+})
+
 function stub(table: Parameters<typeof routes>[0]) {
   const fn = vi.fn(
     routes({
+      ...server.routes,
       'GET /api/health': health,
       'GET /api/options': () => Response.json(options),
       'POST /api/board/fetch': feedDown,
@@ -249,12 +255,13 @@ describe('Run settings', () => {
       .map(([, init]) => JSON.parse(String(init!.body)))
   }
 
-  async function ready() {
+  async function openOn(sport: string) {
     const fetchMock = stub({ ...withBoard, 'POST /api/run': () => Response.json(report) })
     render(<App />)
-    await screen.findByRole('button', { name: 'NBA', pressed: true })
+    await screen.findByRole('button', { name: sport, pressed: true })
     return fetchMock
   }
+  const ready = () => openOn('NBA')
 
   it('sends the defaults from the engine', async () => {
     const fetchMock = await ready()
@@ -309,8 +316,11 @@ describe('Run settings', () => {
     expect(screen.getByRole('button', { name: /^run$/i })).toBeDisabled()
   })
 
-  it('remembers settings across visits, except fresh odds', async () => {
-    await ready()
+  const settingsPuts = (fetchMock: ReturnType<typeof stub>) =>
+    fetchMock.mock.calls.filter(([url, init]) => url === '/api/settings' && init?.method === 'PUT').map(([, init]) => JSON.parse(String(init!.body)))
+
+  it('remembers settings across visits on the server, except fresh odds', async () => {
+    const fetchMock = await ready()
     await userEvent.click(screen.getByRole('button', { name: 'MLB' }))
     const stake = screen.getByLabelText(/stake/i)
     await userEvent.clear(stake)
@@ -318,13 +328,98 @@ describe('Run settings', () => {
     await userEvent.click(screen.getByText(/advanced/i))
     await userEvent.selectOptions(screen.getByLabelText(/devig/i), 'power')
     await userEvent.click(screen.getByLabelText(/fresh odds/i))
+    await waitFor(() => expect(server.state.settings).toMatchObject({ stake: 5, devig: 'power' }))
     cleanup()
+    localStorage.clear() // they came from the server, not this browser
 
     await ready()
     expect(screen.getByRole('button', { name: 'MLB' })).toHaveAttribute('aria-pressed', 'false')
     expect(screen.getByLabelText(/stake/i)).toHaveValue(5)
     expect(screen.getByLabelText(/devig/i)).toHaveValue('power')
     expect(screen.getByLabelText(/fresh odds/i)).not.toBeChecked()
+    expect(settingsPuts(fetchMock).at(-1)).toEqual({
+      sports: ['NFL', 'NBA', 'NHL'], stake: 5, hours: 24, devig: 'power', ref_slip: null,
+    })
+  })
+
+  it('opens on the run settings the server holds, and runs with them', async () => {
+    server.state.settings = { sports: ['NBA'], stake: 7.5, hours: 6, devig: 'shin', ref_slip: 'flex6', saved: true }
+    localStorage.setItem('ppopt.settings.v1', JSON.stringify({ stake: '99', sports: ['NFL'] })) // not this browser's say
+    const fetchMock = await openOn('NBA')
+    expect(screen.getByRole('button', { name: 'NFL' })).toHaveAttribute('aria-pressed', 'false')
+    expect(screen.getByLabelText(/stake/i)).toHaveValue(7.5)
+    await userEvent.click(screen.getByText(/advanced/i))
+    expect(screen.getByLabelText(/hours ahead/i)).toHaveValue(6)
+    expect(screen.getByLabelText(/devig/i)).toHaveValue('shin')
+    expect(screen.getByLabelText(/edge against/i)).toHaveValue('flex6')
+    await userEvent.click(screen.getByRole('button', { name: /^run$/i }))
+    await screen.findByRole('region', { name: /best slips/i })
+    expect(runBodies(fetchMock)[0]).toMatchObject({ sports: ['NBA'], stake: 7.5, hours: 6, devig: 'shin', ref_slip: 'flex6' })
+    expect(settingsPuts(fetchMock)).toEqual([])
+  })
+
+  it('saves a change once typing pauses, and never a value that is not valid yet', async () => {
+    server.state.settings = { ...options.defaults, saved: true }
+    const fetchMock = await ready()
+    const stake = screen.getByLabelText(/stake/i)
+    await userEvent.clear(stake)
+    await new Promise((r) => setTimeout(r, 700))
+    expect(settingsPuts(fetchMock)).toEqual([]) // an empty stake is never sent
+    await userEvent.type(stake, '25')
+    await waitFor(() => expect(settingsPuts(fetchMock)).toHaveLength(1))
+    expect(settingsPuts(fetchMock)[0]).toEqual({ sports: ['NFL', 'NBA', 'NHL', 'MLB'], stake: 25, hours: 24, devig: 'worst', ref_slip: null })
+    await new Promise((r) => setTimeout(r, 700))
+    expect(settingsPuts(fetchMock)).toHaveLength(1) // "2" then "25": one save, after the pause
+  })
+
+  it('keeps view preferences in this browser, not on the server', async () => {
+    server.state.settings = { ...options.defaults, saved: true }
+    const fetchMock = await ready()
+    await userEvent.click(screen.getByText(/advanced/i))
+    const top = screen.getByLabelText(/legs to show/i)
+    await userEvent.clear(top)
+    await userEvent.type(top, '7')
+    await new Promise((r) => setTimeout(r, 700))
+    expect(settingsPuts(fetchMock)).toEqual([])
+    const saved = JSON.parse(localStorage.getItem('ppopt.settings.v1')!)
+    expect(saved).toMatchObject({ top: '7' })
+    expect(saved).not.toHaveProperty('stake')
+    expect(saved).not.toHaveProperty('sports')
+  })
+
+  it('says quietly when a change could not be saved', async () => {
+    server.state.settings = { ...options.defaults, saved: true }
+    server.routes['PUT /api/settings'] = () => Response.json({ detail: 'disk full' }, { status: 500 })
+    await ready()
+    await userEvent.click(screen.getByRole('button', { name: 'MLB' }))
+    expect(await screen.findByText(/couldn't save run settings: disk full/i)).toBeInTheDocument()
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'MLB' })).toHaveAttribute('aria-pressed', 'false') // kept on the page
+  })
+
+  it("copies this browser's old run settings to the server once, then forgets them here", async () => {
+    localStorage.setItem(
+      'ppopt.settings.v1',
+      JSON.stringify({ sports: ['NFL', 'NHL'], stake: '12', hours: '8', devig: 'shin', devigDefault: 'worst', refSlip: 'power3', top: '9', notify: true }),
+    )
+    const fetchMock = await openOn('NFL')
+    await waitFor(() => expect(settingsPuts(fetchMock)).toHaveLength(1))
+    expect(settingsPuts(fetchMock)[0]).toEqual({ sports: ['NFL', 'NHL'], stake: 12, hours: 8, devig: 'shin', ref_slip: 'power3' })
+    expect(screen.getByLabelText(/stake/i)).toHaveValue(12)
+    await waitFor(() => expect(JSON.parse(localStorage.getItem('ppopt.settings.v1')!)).not.toHaveProperty('stake'))
+    expect(JSON.parse(localStorage.getItem('ppopt.settings.v1')!)).toMatchObject({ top: '9', notify: true })
+    cleanup()
+
+    await openOn('NFL')
+    await new Promise((r) => setTimeout(r, 50))
+    expect(settingsPuts(fetchMock)).toHaveLength(1) // the server has them now: never sent again
+  })
+
+  it('copies nothing when this browser never saved run settings', async () => {
+    localStorage.setItem('ppopt.settings.v1', JSON.stringify({ top: '9' }))
+    const fetchMock = await ready()
+    await new Promise((r) => setTimeout(r, 700))
+    expect(settingsPuts(fetchMock)).toEqual([])
   })
 
   it('opens on worst-case devig, with the four methods selectable', async () => {
@@ -337,26 +432,22 @@ describe('Run settings', () => {
     ])
   })
 
-  it('moves a devig saved before worst case was the default onto worst case, once', async () => {
+  it('copies an old devig saved before worst case was the default as worst case', async () => {
     localStorage.setItem('ppopt.settings.v1', JSON.stringify({ devig: 'multiplicative', stake: '7' }))
-    await ready()
+    const fetchMock = await ready()
     expect(screen.getByLabelText(/devig/i)).toHaveValue('worst')
     expect(screen.getByLabelText(/stake/i)).toHaveValue(7)
-
-    await userEvent.click(screen.getByText(/advanced/i))
-    await userEvent.selectOptions(screen.getByLabelText(/devig/i), 'multiplicative')
-    cleanup()
-
-    await ready()
-    expect(screen.getByLabelText(/devig/i)).toHaveValue('multiplicative')
+    await waitFor(() => expect(settingsPuts(fetchMock)).toHaveLength(1))
+    expect(settingsPuts(fetchMock)[0]).toMatchObject({ devig: 'worst', stake: 7 })
   })
 
-  it('ignores remembered settings the engine no longer offers', async () => {
+  it('copies only old settings the engine still offers', async () => {
     localStorage.setItem('ppopt.settings.v1', JSON.stringify({ sports: ['XFL', 'NBA'], devig: 'magic', stake: -3 }))
-    await ready()
+    const fetchMock = await openOn('NBA')
     expect(screen.getByRole('button', { name: 'NFL' })).toHaveAttribute('aria-pressed', 'false')
-    expect(screen.getByRole('button', { name: 'NBA' })).toHaveAttribute('aria-pressed', 'true')
     expect(screen.getByLabelText(/stake/i)).toHaveValue(10)
+    await waitFor(() => expect(settingsPuts(fetchMock)).toHaveLength(1))
+    expect(settingsPuts(fetchMock)[0]).toEqual({ sports: ['NBA'], stake: 10, hours: 24, devig: 'worst', ref_slip: null })
   })
 })
 

@@ -19,11 +19,13 @@ _Avoid_: projections, slate
 
 **Worst-case devig**: The default way legs are priced: each leg is priced under every devig method and keeps the lowest win probability for the side it is played on. It is a property of a leg, not of a single market. On a leg's more likely side it is usually the same as multiplicative.
 
-**Run**: One pricing of the current board against the sportsbooks with the chosen settings, ending in a report or a failure. Every run recalculates; nothing about a run's result is reused. A run asks each sportsbook only for markets that could price a line or promo leg on the board.
+**Run**: One pricing of the current board against the sportsbooks with the chosen settings, ending in a report or a failure. Every run recalculates; nothing about a run's result is reused. A run asks each sportsbook only for markets that could price a line or promo leg on the board. Only one run goes at a time; a run asked for while another is going is refused.
 
 **Odds cache**: Sportsbook responses kept for one minute and reused by later runs. A run whose every sportsbook request is answered from it is a *cached run*; a run that fetched anything live is a *fresh run*. Only a finished fresh run (or any failed run) raises a run notification.
 
 **Pacing**: How fast a run may send requests to one sportsbook: how many at once and how far apart. Each sportsbook is paced on its own. A sportsbook that pushes back is *rate-limited* and falls back to one request at a time, slowly, for the rest of the run. Board requests to the partner feed are paced too: one at a time, across runs, backing off like a sportsbook's.
+
+**Run settings**: The saved choices every run starts from: leagues, stake, hours ahead, devig method and reference slip. Shared by manual and auto runs. Promotions and fresh odds are per run and never part of them.
 
 **Auto run**: A run the app starts by itself on the quarter hour (:00, :15, :30, :45) while *auto runs* are switched on, whether or not the page is open. A failed board fetch switches auto runs off.
 

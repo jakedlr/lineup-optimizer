@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, run, test } from './test.ts'
 
 // Runs against the e2e container (`make e2e`): sportsbook odds come from tests/fixtures/markets.json and the partner
 // feed serves the fixture board (e2e/board.ts).
@@ -14,7 +14,7 @@ test('the board comes from the partner feed, and a run uses it (reused within a 
   await expect(panel.getByText('11 lines')).toBeVisible()
   await expect(panel.locator('details')).not.toHaveAttribute('open') // the upload fallback stays tucked away
 
-  await page.getByRole('button', { name: 'Run', exact: true }).click()
+  await run(page)
 
   const slips = page.getByRole('region', { name: 'Best Slips' })
   await expect(slips.getByRole('heading', { name: 'Power 2' })).toBeVisible()

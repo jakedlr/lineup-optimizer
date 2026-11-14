@@ -7,6 +7,8 @@ type SlipFilter = Pick<Settings, 'slipType' | 'slipSize'>
 
 interface Props extends SlipFilter {
   report: Report
+  /** Which run it came from: "Auto run · 14:15", "Run · 14:08". */
+  label?: string
   top: number
   onFilter: (f: Partial<SlipFilter>) => void
 }
@@ -42,7 +44,7 @@ function LegLine({ leg }: { leg: Leg }) {
   )
 }
 
-function BestSlips({ report, slipType, slipSize, onFilter }: Omit<Props, 'top'>) {
+function BestSlips({ report, slipType, slipSize, onFilter }: Omit<Props, 'top' | 'label'>) {
   const sizes = [...new Set(report.slips.map((s) => s.size))].sort()
   const shown = report.slips.filter(
     (s) => (slipType === 'all' || s.type === slipType) && (slipSize === 'all' || s.size === slipSize),
@@ -198,13 +200,14 @@ function Unpriced({ report }: { report: Report }) {
   )
 }
 
-export function ReportView({ report, top, slipType, slipSize, onFilter }: Props) {
+export function ReportView({ report, label, top, slipType, slipSize, onFilter }: Props) {
   const s = report.settings
   return (
     <div className="report">
       <div className="report-head">
         <p className="muted small">
-          ${s.stake} stake · {s.mode} · devig {s.devig} · {s.sports.join(', ')} · next {s.hours} h
+          {label && <span className="run-mark">{label}</span>}
+          {label && ' · '}${s.stake} stake · {s.mode} · devig {s.devig} · {s.sports.join(', ')} · next {s.hours} h
         </p>
         <button type="button" className="secondary small" onClick={() => download(report)}>
           Download JSON

@@ -409,30 +409,6 @@ def test_a_streamed_fallback_run_announces_no_board(tmp_path):
 
 # --- review fixes --------------------------------------------------------------
 
-def test_closing_the_stream_cancels_the_run():
-    import threading
-
-    from ppopt.progress import RunCancelled
-    from ppopt.web import stream_run
-
-    finished = threading.Event()
-
-    def work(progress, announce):
-        try:
-            while True:
-                progress.tick()  # a request every loop, like a book fetching props
-                threading.Event().wait(0.01)
-        except RunCancelled:
-            finished.set()
-            raise
-
-    lines = stream_run(work)
-    first = json.loads(next(lines))
-    assert first["type"] == "progress"
-    lines.close()  # what Starlette does when the client goes away
-    assert finished.wait(2), "the worker kept running after the stream closed"
-
-
 def test_upload_primes_the_board_cache(tmp_path, monkeypatch):
     client = engine_app(tmp_path)
     upload(client)
@@ -568,7 +544,9 @@ def test_fetches_runs_and_uploads_never_write_the_board_at_once(tmp_path):
     calls = [lambda: client.post("/api/board/fetch"), lambda: client.post("/api/run"), lambda: upload(client)] * 6
     with ThreadPoolExecutor(8) as pool:
         codes = [r.status_code for r in pool.map(lambda call: call(), calls)]
-    assert codes == [200] * len(calls)
+    runs = codes[1::3]
+    assert 200 in runs and set(runs) <= {200, 409}, "one run at a time: the others are refused"
+    assert codes[0::3] + codes[2::3] == [200] * 12
     assert state["peak"] == 1
     assert not list((tmp_path / "data").glob("*.tmp"))
 
@@ -811,21 +789,23 @@ def test_a_streamed_run_announces_the_board_it_reuses(tmp_path):
 
 
 def run_watched_by(client, monkeypatch, progress) -> dict:
-    """POST a streamed run whose client is `progress` (cancel it to have the client leave), worked synchronously.
-    Returns {"report": ...} or {"raised": the exception}, and "announced": the events the run announced."""
-    from ppopt import web
+    """POST a streamed run whose client is `progress` (cancel it to have the client leave). Returns {"report": ...}
+    or {"cancelled": True}, and "announced": the events the run announced."""
+    from ppopt import runs
 
-    outcome = {"announced": []}
+    def given(emit):
+        progress.emit = emit
+        return progress
 
-    def stream_run(work):
-        try:
-            outcome["report"] = work(progress, outcome["announced"].append)
-        except Exception as e:  # noqa: BLE001
-            outcome["raised"] = e
-        yield "{}\n"
-
-    monkeypatch.setattr(web, "stream_run", stream_run)
-    client.post("/api/run", headers=NDJSON)
+    monkeypatch.setattr(runs, "Progress", given)
+    _, events = stream(client)
+    end = events[-1]
+    outcome = {"announced": [e for e in events if e["type"] == "board"]}
+    if end["type"] == "report":
+        outcome["report"] = end["report"]
+    else:
+        assert end["type"] == "error" and end["detail"].startswith("the run was stopped"), end
+        outcome["cancelled"] = True
     return outcome
 
 
@@ -833,7 +813,7 @@ def test_a_run_whose_client_left_while_it_waited_for_the_board_never_asks_for_on
     import threading
     import time
 
-    from ppopt.progress import Progress, RunCancelled
+    from ppopt.progress import Progress
 
     release, calls = threading.Event(), []
 
@@ -855,12 +835,12 @@ def test_a_run_whose_client_left_while_it_waited_for_the_board_never_asks_for_on
     progress.cancel()  # the browser went away while the run waited
     release.set()
     page.join(5), run.join(5)
-    assert isinstance(outcome["raised"], RunCancelled) and len(calls) == 1
+    assert outcome["cancelled"] and len(calls) == 1
     assert outcome["announced"] == []
 
 
 def test_a_run_whose_client_left_during_its_board_request_saves_nothing(tmp_path, monkeypatch):
-    from ppopt.progress import Progress, RunCancelled
+    from ppopt.progress import Progress
 
     progress = Progress(lambda e: None)
 
@@ -870,7 +850,7 @@ def test_a_run_whose_client_left_during_its_board_request_saves_nothing(tmp_path
 
     client = engine_app(tmp_path, fetch_board=feed_)
     outcome = run_watched_by(client, monkeypatch, progress)
-    assert isinstance(outcome["raised"], RunCancelled) and outcome["announced"] == []
+    assert outcome["cancelled"] and outcome["announced"] == []
     assert client.get("/api/board").status_code == 404
 
 
@@ -878,7 +858,7 @@ def test_a_run_whose_client_left_stops_waiting_out_the_partner_feeds_retry_after
     import threading
     import time
 
-    from ppopt.progress import Progress, RunCancelled
+    from ppopt.progress import Progress
 
     client, calls = feed_app(tmp_path, monkeypatch, lambda n: (429, {"Retry-After": "5"}) if n == 1 else (200, {}),
                              sleep=None)  # real, interruptible waits
@@ -886,18 +866,18 @@ def test_a_run_whose_client_left_stops_waiting_out_the_partner_feeds_retry_after
     threading.Timer(0.1, progress.cancel).start()
     began = time.monotonic()
     outcome = run_watched_by(client, monkeypatch, progress)
-    assert isinstance(outcome["raised"], RunCancelled) and len(calls) == 1
+    assert outcome["cancelled"] and len(calls) == 1
     assert time.monotonic() - began < 1, "the run sat out the Retry-After nobody was waiting for"
     began = time.monotonic()
     assert upload(client).status_code == 200 and time.monotonic() - began < 1, "the board is free to write"
 
 
 def test_the_next_run_fetches_the_board_after_a_cancelled_one(tmp_path, monkeypatch):
-    from ppopt.progress import Progress, RunCancelled
+    from ppopt.progress import Progress
 
     client, calls = feed_app(tmp_path, monkeypatch, lambda n: (200, {}))
     cancelled = Progress(lambda e: None)
     cancelled.cancel()
-    assert isinstance(run_watched_by(client, monkeypatch, cancelled)["raised"], RunCancelled)
+    assert run_watched_by(client, monkeypatch, cancelled)["cancelled"]
     outcome = run_watched_by(client, monkeypatch, Progress(lambda e: None))
     assert outcome["report"]["warnings"] == [] and len(calls) == 1

@@ -9,11 +9,13 @@ interface Props {
   onChange: (next: Settings) => void
   noCache: boolean
   onNoCache: (v: boolean) => void
+  /** Why the last change to the run settings didn't reach the server; they still apply on this page. */
+  saveError?: string | null
 }
 
 const refLabel = (r: string) => `${r.startsWith('power') ? 'Power' : 'Flex'} ${r.slice(-1)}`
 
-export function SettingsPanel({ options, settings, onChange, noCache, onNoCache }: Props) {
+export function SettingsPanel({ options, settings, onChange, noCache, onNoCache, saveError }: Props) {
   const set = <K extends keyof Settings>(key: K, value: Settings[K]) => onChange({ ...settings, [key]: value })
 
   const [notifyState, setNotifyState] = useState(systemNotifyState)
@@ -43,9 +45,12 @@ export function SettingsPanel({ options, settings, onChange, noCache, onNoCache 
 
   return (
     <section className="settings" aria-labelledby="settings-h">
-      <h2 id="settings-h" className="label">
-        Run settings
-      </h2>
+      <div className="settings-head">
+        <h2 id="settings-h" className="label">
+          Run settings
+        </h2>
+        {saveError && <p className="warn small">{saveError}</p>}
+      </div>
       <div className="settings-row">
         <div className="leagues">
           <span id="leagues-label">Leagues</span>
@@ -129,7 +134,7 @@ export function SettingsPanel({ options, settings, onChange, noCache, onNoCache 
           <label className="check">
             <input type="checkbox" checked={noCache} onChange={(e) => onNoCache(e.target.checked)} />
             <span>
-              Fresh odds <span className="muted small">(skip the 5-minute cache for this run)</span>
+              Fresh odds <span className="muted small">(skip the 1-minute cache for this run)</span>
             </span>
           </label>
           <div className="check-field">

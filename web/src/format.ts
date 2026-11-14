@@ -28,3 +28,13 @@ export const bookAbbr = (book: string) => BOOK_ABBR[book] ?? book
 /** A slip's name as the report heads it: "Power 2", "Flex 5". */
 export const slipName = (slip: { type: 'power' | 'flex'; size: number }) =>
   `${slip.type === 'power' ? 'Power' : 'Flex'} ${slip.size}`
+
+/** A local 24-hour clock time, "14:15". */
+export function clock(iso: string): string {
+  const d = new Date(iso)
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}` // taste-skill-ignore: a clock time
+}
+
+/** How a report or failure is marked: "Auto run · 14:15", "Run · 14:08". */
+export const runLabel = (startedBy: 'auto' | 'manual', startedAt: string) =>
+  `${startedBy === 'auto' ? 'Auto run' : 'Run'} · ${clock(startedAt)}`

@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './test.ts'
 
 test('container serves the shell and the engine answers', async ({ page, request }) => {
   const health = await request.get('/api/health')

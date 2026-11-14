@@ -2,34 +2,39 @@
 
 Paths come from the environment so the same code runs from a checkout and from the Docker image:
   PPOPT_ROOT      folder holding the engine's config JSON (payouts.json, books.json, ...)
-  PPOPT_DATA      writable folder for the saved board and the odds cache
+  PPOPT_DATA      writable folder for the saved board, the odds cache, the run settings, whether auto runs are on,
+                  and the latest run
   PPOPT_WEB_DIST  built SPA
   PPOPT_ODDS_FILE optional JSON list of book markets used instead of live FanDuel/DraftKings
                   (offline runs and the e2e suite)
   PPOPT_BOARD_FILE optional projections JSON read instead of PrizePicks' partner feed, at each fetch
                   (the e2e suite: a missing or broken file is a failed fetch)
+  PPOPT_E2E       "1" enables POST /api/auto/run-now, which starts an auto run without waiting for a quarter mark
+                  (the e2e suite)
 """
 
 import json
 import os
-import queue
 import tempfile
 import threading
+import time
+from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 
 from typing import Annotated, Literal
 
 from fastapi import Body, FastAPI, HTTPException, Query, Request, UploadFile
-from fastapi.responses import FileResponse, StreamingResponse
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from fastapi.responses import FileResponse, Response, StreamingResponse
+from pydantic import BaseModel, ConfigDict, Field, StrictBool, ValidationError, model_validator
 
 from . import cli
 from .matching import Config, config_file, game_id, matchup_label
 from .models import BookMarket
 from .pricing import PRICING_METHODS
 from .payouts import load_payouts
-from .progress import Progress, RunCancelled
+from .progress import Progress
+from .runs import Busy, Runner, Scheduler, next_mark, read_json, write_json
 from .sources import prizepicks
 from .sources.http import REUSE_SECONDS, FetchError, Http
 
@@ -37,6 +42,22 @@ REPO = Path(__file__).resolve().parents[2]
 DEFAULT_STATIC = REPO / "web" / "dist"
 BOARD = "board.json"
 BOARD_META = "board.meta.json"
+SETTINGS = "settings.json"
+AUTO = "auto.json"
+LATEST = "latest.json"
+
+
+def ndjson(events):
+    """Events as NDJSON lines. Closing the lines closes the events."""
+    try:
+        for event in events:
+            yield json.dumps(event) + "\n"
+    finally:
+        events.close()
+
+
+class BoardFetchFailed(Exception):
+    """A run that may not fall back on the saved board (an auto run) couldn't fetch one; says why."""
 
 
 def board_from_file(path: Path):
@@ -91,16 +112,43 @@ class PromoLegIn(BaseModel):
         return [self.sport, self.matchup, self.player, f"{self.side.title()} {self.line:g} {self.stat_label}"]
 
 
+# The run settings' fields, checked alike wherever they arrive: with a run, or saved for every run.
+Sports = Annotated[list[Literal[tuple(cli.SPORTS)]], Field(min_length=1)]
+Stake = Annotated[float, Field(gt=0)]
+Hours = Annotated[float, Field(gt=0)]
+Devig = Literal[PRICING_METHODS]
+RefSlip = Annotated[str, Field(pattern=r"^(power|flex)[2-6]$")]
+
+
+class SavedSettings(BaseModel):
+    """The run settings every run starts from (GLOSSARY: Run settings), saved whole. Promotions and fresh odds are
+    per run and never part of them."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    sports: Sports
+    stake: Stake
+    hours: Hours
+    devig: Devig
+    ref_slip: RefSlip | None = None
+
+
+class AutoSwitch(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    enabled: StrictBool
+
+
 class RunSettings(BaseModel):
     """What the web app may change about a run. Anything left out takes the CLI default."""
 
     model_config = ConfigDict(extra="forbid")
 
-    sports: list[Literal[tuple(cli.SPORTS)]] | None = Field(None, min_length=1)
-    stake: float | None = Field(None, gt=0)
-    hours: float | None = Field(None, gt=0)
-    devig: Literal[PRICING_METHODS] | None = None
-    ref_slip: str | None = Field(None, pattern=r"^(power|flex)[2-6]$")
+    sports: Sports | None = None
+    stake: Stake | None = None
+    hours: Hours | None = None
+    devig: Devig | None = None
+    ref_slip: RefSlip | None = None
     no_cache: bool = False
     # Promotions: at most one kind per run, as on the CLI.
     bonus: bool = False
@@ -128,41 +176,17 @@ class RunSettings(BaseModel):
         return args
 
 
-def stream_run(work):
-    """Run `work(progress, announce)` on a worker thread and yield NDJSON: progress events (and any event the work
-    announces, such as the board it fetched), then one "report" or "error".
-
-    Closing the generator (Starlette does when the client goes away) cancels the run: the worker stops at its
-    next request (the board's included) instead of scraping for a page nobody is watching.
-    """
-    events: queue.Queue = queue.Queue()
-    progress = Progress(lambda e: events.put({"type": "progress", **e}))
-
-    def worker():
-        try:
-            events.put({"type": "report", "report": work(progress, events.put)})
-        except RunCancelled:
-            pass
-        except cli.UserError as e:
-            events.put({"type": "error", "detail": str(e)})
-        except Exception as e:  # noqa: BLE001 - the stream has started, so this is the only way to say so
-            events.put({"type": "error", "detail": f"the engine failed: {e}"})
-
-    threading.Thread(target=worker, daemon=True).start()
-    try:
-        while True:
-            event = events.get()
-            yield json.dumps(event) + "\n"
-            if event["type"] in ("report", "error"):
-                return
-    finally:
-        progress.cancel()
-
-
-def create_app(static_dir=None, data_dir=None, root=None, collect=None, now=None, fetch_board=None) -> FastAPI:
+def create_app(static_dir=None, data_dir=None, root=None, collect=None, now=None, fetch_board=None,
+               clock=time.time, schedule=True, on_auto_run_end=None, e2e=None) -> FastAPI:
     """`collect` stands in for the sportsbooks and `fetch_board(progress)` for PrizePicks' partner feed: it returns
     the board's raw bytes, unchecked, or raises FetchError. `progress` is the run's (None outside a run), there only
-    so a run whose client has gone stops waiting; it is never ticked."""
+    so a run whose client has gone stops waiting; it is never ticked.
+
+    Auto runs: `clock` is the schedule's wall clock (epoch seconds), whose thread runs while the app is up (its
+    lifespan) unless `schedule` is False; tests drive `app.state.scheduler.tick(epoch)` instead.
+    `on_auto_run_end(outcome)` hears how each auto run ended: the latest run as recorded ("report" or "error") and
+    "switched_off", whether it switched auto runs off. `e2e` (default: PPOPT_E2E=1) enables
+    `POST /api/auto/run-now`."""
     static_dir = Path(static_dir or os.environ.get("PPOPT_WEB_DIST") or DEFAULT_STATIC)
     data_dir = Path(data_dir or os.environ.get("PPOPT_DATA") or REPO / "data")
     root = Path(root or os.environ.get("PPOPT_ROOT") or cli.ROOT)
@@ -180,9 +204,21 @@ def create_app(static_dir=None, data_dir=None, root=None, collect=None, now=None
             with board_http.stops_with(progress):
                 return prizepicks.fetch_raw(board_http)
     now = now or cli.utcnow
+    e2e = os.environ.get("PPOPT_E2E") == "1" if e2e is None else e2e
+
+    @asynccontextmanager
+    async def lifespan(app):
+        if schedule:
+            app.state.scheduler.start()
+        try:
+            yield
+        finally:
+            app.state.scheduler.stop()
+            if (going := runner.current) is not None:
+                going.cancel("the app shut down")
 
     board_path, meta_path = data_dir / BOARD, data_dir / BOARD_META
-    app = FastAPI(title="PrizePicks EV Optimizer")
+    app = FastAPI(title="PrizePicks EV Optimizer", lifespan=lifespan)
     cache: dict = {}  # {"board": (mtime_ns, payload)}, swapped whole so a reader never sees half of it
     cache_lock = threading.Lock()
     # Held by whatever writes the board (an upload, a fetch, a run's fetch) from start to finish, so two writers
@@ -243,18 +279,20 @@ def create_app(static_dir=None, data_dir=None, root=None, collect=None, now=None
         info = board_info()
         return info is not None and info["source"] == "fetched" and 0 <= seconds_old(info) < REUSE_SECONDS
 
-    def board_for_run(progress: Progress | None, fresh: bool = False) -> tuple[dict, str | None]:
+    def board_for_run(progress: Progress, fresh: bool = False, fallback: bool = True) -> tuple[dict, str | None]:
         """The board a run prices: one fetched under a minute ago (unless `fresh`), else a new fetch, or when that
-        fails the saved board and a warning saying so. Raises UserError when there's none of them, and RunCancelled
-        when the run's client has gone."""
+        fails (and `fallback`) the saved board and a warning saying so. Raises UserError when there's none of them,
+        BoardFetchFailed when the fetch failed and there's no `fallback`, and RunCancelled when the run's client has
+        gone."""
         with write_lock:
-            if progress is not None:
-                progress.check()  # it may have waited its turn a while
+            progress.check()  # it may have waited its turn a while
             if not fresh and recently_fetched():
                 return load_board(), None
             try:
                 return fetch_and_save(progress), None
             except FetchError as e:
+                if not fallback:
+                    raise BoardFetchFailed(str(e)) from e
                 reason = str(e)
             info = board_info()
             if info is None:
@@ -272,17 +310,84 @@ def create_app(static_dir=None, data_dir=None, root=None, collect=None, now=None
     def health() -> dict:
         return {"status": "ok"}
 
+    def default_settings() -> dict:
+        """The CLI's defaults, as run settings."""
+        d = cli.parse_args([])
+        return {"sports": d.sports, "stake": d.stake, "hours": d.hours, "devig": d.devig, "ref_slip": None}
+
     @app.get("/api/options")
     def options() -> dict:
-        defaults = cli.parse_args([])
         table = load_payouts(config_file(root, "payouts.json"))
         return {
             "sports": cli.SPORTS,
             "devig": list(PRICING_METHODS),
             "ref_slips": [f"{t}{n}" for t in table for n in sorted(table[t])],
-            "defaults": {"sports": defaults.sports, "hours": defaults.hours, "stake": defaults.stake,
-                         "devig": defaults.devig, "ref_slip": None},
+            "defaults": default_settings(),
             "board_app_url": prizepicks.APP_URL,  # where to save a board by hand when the fetch fails
+        }
+
+    def saved_settings() -> SavedSettings | None:
+        try:
+            return SavedSettings.model_validate(read_json(data_dir / SETTINGS))
+        except ValidationError:  # never saved, or unreadable: as if never saved
+            return None
+
+    @app.get("/api/settings")
+    def get_settings() -> dict:
+        saved = saved_settings()
+        return {**saved.model_dump(), "saved": True} if saved else {**default_settings(), "saved": False}
+
+    @app.put("/api/settings")
+    def put_settings(settings: SavedSettings) -> dict:
+        write_json(data_dir / SETTINGS, settings.model_dump())
+        return {**settings.model_dump(), "saved": True}
+
+    # Auto runs on or off, and why they were switched off when a run did it. Saved on every change.
+    stored = read_json(data_dir / AUTO)
+    stored = stored if isinstance(stored, dict) else {}
+    auto = {"enabled": stored.get("enabled") is True, "off_reason": stored.get("off_reason")}
+    auto_lock = threading.Lock()
+
+    def set_auto(enabled: bool, off_reason: str | None = None) -> None:
+        with auto_lock:
+            auto.update(enabled=enabled, off_reason=off_reason)
+            write_json(data_dir / AUTO, {"enabled": enabled, "off_reason": off_reason})
+
+    def auto_on() -> bool:
+        with auto_lock:
+            return auto["enabled"]
+
+    def auto_status() -> dict:
+        with auto_lock:
+            enabled, off_reason = auto["enabled"], auto["off_reason"]
+        at = datetime.fromtimestamp(next_mark(clock()), timezone.utc).isoformat() if enabled else None
+        return {"enabled": enabled, "next_run_at": at, "off_reason": off_reason}
+
+    @app.put("/api/auto")
+    def put_auto(switch: AutoSwitch) -> dict:
+        set_auto(switch.enabled)  # switching on clears why they were last switched off
+        return auto_status()
+
+    # The latest finished run, as recorded (kept in memory too: a report runs to hundreds of KB).
+    stored = read_json(data_dir / LATEST)
+    latest = {"entry": stored if isinstance(stored, dict) and {"started_by", "started_at", "finished_at"} <= set(stored)
+              else None}
+
+    def record(entry: dict) -> None:
+        write_json(data_dir / LATEST, entry)
+        latest["entry"] = entry
+
+    runner = app.state.runner = Runner(now, record)
+
+    @app.get("/api/status")
+    def status() -> dict:
+        going, entry = runner.current, latest["entry"]
+        return {
+            "auto": auto_status(),
+            "running": going and {"started_by": going.started_by, "started_at": going.started_at.isoformat()},
+            "latest": entry and {"started_by": entry["started_by"], "started_at": entry["started_at"],
+                                 "finished_at": entry["finished_at"], "ok": "report" in entry,
+                                 "error": entry.get("error")},
         }
 
     @app.get("/api/board")
@@ -335,30 +440,100 @@ def create_app(static_dir=None, data_dir=None, root=None, collect=None, now=None
             save_board(raw, payload, "uploaded", file.filename)
         return board_info()
 
-    @app.post("/api/run", response_model=None)
-    def run(request: Request, settings: Annotated[RunSettings | None, Body()] = None):
-        args = (settings or RunSettings()).apply(cli.parse_args([]))
+    def run_work(args, fallback: bool = True):
+        """What a run does, given its settings: price the board (fetched, reused, or with `fallback` the saved one
+        when the fetch fails) against the books. Without `fallback`, a failed fetch raises BoardFetchFailed."""
 
-        def report(progress: Progress | None = None, announce=lambda event: None) -> dict:
-            if progress:
-                progress.step("Fetching the PrizePicks board")
+        def report(progress: Progress, announce) -> dict:
+            progress.step("Fetching the PrizePicks board")
             # The run keeps the board it fetched (or fell back to): a later save can't change what it reports on.
-            payload, fallback = board_for_run(progress, fresh=args.no_cache)  # "Fresh odds" mean a fresh board too
-            if not fallback:  # the page shows the new board now, not when the report lands
+            payload, fallback_warning = board_for_run(progress, fresh=args.no_cache,  # "Fresh odds": a fresh board
+                                                      fallback=fallback)
+            if not fallback_warning:  # the page shows the new board now, not when the report lands
                 announce({"type": "board", "board": board_info()})
             http = Http(data_dir / "cache", use_cache=not args.no_cache, progress=progress)
             result = cli.report_for(args, root, payload, http, now(), collect=collect)
-            if fallback:
-                result["warnings"].insert(0, fallback)
+            if fallback_warning:
+                result["warnings"].insert(0, fallback_warning)
             return result
 
-        if "application/x-ndjson" not in request.headers.get("accept", ""):
-            try:
-                return report()
-            except cli.UserError as e:
-                raise HTTPException(422, str(e)) from e
+        return report
 
-        return StreamingResponse(stream_run(report), media_type="application/x-ndjson")
+    def start(work, started_by: str, **kw):
+        try:
+            return runner.start(work, started_by, **kw)
+        except Busy as e:
+            going = e.run
+            by = "auto run" if going.started_by == "auto" else "manual run"
+            # No clock time: the server's zone isn't the viewer's; the page shows started_at from /api/status.
+            raise HTTPException(409, f"a run is already going ({by})") from e
+
+    @app.post("/api/run", response_model=None)
+    def run(request: Request, settings: Annotated[RunSettings | None, Body()] = None):
+        args = (settings or RunSettings()).apply(cli.parse_args([]))
+        events = start(run_work(args), "manual", watch=True)
+        if "application/x-ndjson" not in request.headers.get("accept", ""):
+            *_, end = events
+            if end["type"] == "error":
+                raise HTTPException(422, end["detail"])
+            return end["report"]
+        # Closing this stream (Starlette does when the client goes away) cancels the run.
+        return StreamingResponse(ndjson(events), media_type="application/x-ndjson")
+
+    def start_auto() -> bool:
+        """Start an auto run, as a quarter mark does: while auto runs are on and no run is going. It prices the
+        saved run settings with feed promos and cached odds, and a failed board fetch switches auto runs off."""
+        if not auto_on():
+            return False
+        saved = saved_settings() or SavedSettings(**default_settings())
+        priced = run_work(RunSettings(**saved.model_dump()).apply(cli.parse_args([])), fallback=False)
+        switched_off = False
+
+        def work(progress, announce):
+            nonlocal switched_off
+            try:
+                return priced(progress, announce)
+            except BoardFetchFailed as e:
+                reason = (f"the board couldn't be fetched from PrizePicks' partner feed ({e}), so auto runs were "
+                          "switched off")
+                set_auto(False, reason)
+                switched_off = True
+                raise cli.UserError(reason) from e
+
+        def ended(entry: dict) -> None:
+            if on_auto_run_end is not None:
+                on_auto_run_end({**entry, "switched_off": switched_off})
+
+        try:
+            runner.start(work, "auto", on_end=ended)
+        except Busy:
+            return False  # this mark is skipped
+        return True
+
+    app.state.scheduler = Scheduler(start_auto, clock)
+
+    @app.post("/api/auto/run-now")
+    def run_auto_now() -> dict:
+        """Start an auto run now, as the next quarter mark would (the e2e suite can't wait for one)."""
+        if not e2e:
+            raise HTTPException(404, "not found")
+        return {"started": start_auto()}
+
+    @app.get("/api/run/live", response_model=None)
+    def run_live():
+        """The run in progress, whoever started it: where it is now, then its events as they happen. Leaving
+        doesn't stop it."""
+        going = runner.current
+        if going is None:
+            return Response(status_code=204)
+        return StreamingResponse(ndjson(going.watch()), media_type="application/x-ndjson")
+
+    @app.get("/api/report/latest")
+    def latest_report() -> dict:
+        entry = latest.get("entry")
+        if entry is None:
+            raise HTTPException(404, "no run has finished yet")
+        return entry
 
     @app.get("/api/{rest:path}", include_in_schema=False)
     def api_not_found(rest: str):

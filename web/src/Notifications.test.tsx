@@ -2,7 +2,7 @@ import { act, cleanup, render, screen, waitFor, within } from '@testing-library/
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import App from './App'
-import { options, report, routes } from './test/fixtures'
+import { fakeServer, options, report, routes } from './test/fixtures'
 import type { Report } from './api'
 import { fakeNotification } from './test/fakeNotification'
 
@@ -13,6 +13,7 @@ function stub(run: () => Response | Promise<Response>) {
     'fetch',
     vi.fn(
       routes({
+        ...fakeServer().routes,
         'GET /api/health': () => Response.json({ status: 'ok' }),
         'GET /api/options': () => Response.json(options),
         'GET /api/board': board,

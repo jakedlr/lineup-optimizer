@@ -46,9 +46,17 @@ connection, so it can't be hosted for you.
    **Unpriced**, with any warnings above them.
 
 The slip type and size filters and the number of legs change the view without running again.
-*Download JSON* saves the whole report. Settings are remembered in your browser; promotions and
-*Fresh odds* are not, since they apply to one entry. The theme follows your system, or pick Light
-or Dark at the top.
+*Download JSON* saves the whole report. Run settings (leagues, stake, hours, devig, reference slip) are
+saved in the app, so every browser and every auto run uses the same ones; the number of legs, the slip
+filters, notifications and the theme are remembered per browser. Promotions and *Fresh odds* are never
+saved, since they apply to one entry. The theme follows your system, or pick Light or Dark at the top.
+
+**Auto runs.** Switch on *Auto runs* next to Run and the app runs by itself at :00, :15, :30 and :45,
+with or without the page open, using the saved run settings (feed promos included, no other
+promotions). It stays on across restarts while the container is up. A quarter hour that finds a run
+already going is skipped. If the board can't be fetched, auto runs switch themselves off and the page
+says why. The page always opens on the latest run's report, labelled *Auto run · 14:15* or
+*Run · 14:08*, and an open page follows an auto run as it happens.
 
 ## How it works
 

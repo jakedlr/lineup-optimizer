@@ -1,10 +1,11 @@
-import type { Options, PromoLeg, RunSettings } from './api'
+import type { Options, PromoLeg, RunSettings, SavedSettings } from './api'
 
 /**
  * Everything the user can set, as typed into the form. Numbers stay strings so a half-typed value
  * ("1.") doesn't fight the input; `toRun` turns them into a request once they're valid.
- * Fresh odds (`no_cache`) is deliberately not part of this: it's a one-off, never remembered.
- * Promotions (Sprint 3) won't be either.
+ * The run settings (sports, stake, hours, devig, refSlip) live on the server, shared with auto runs (`toSaved`,
+ * `fromServer`); the rest are view preferences, kept in this browser (`save`).
+ * Fresh odds (`no_cache`) and promotions are deliberately not part of this: one-offs, never remembered.
  */
 export interface Settings {
   sports: string[]
@@ -48,7 +49,10 @@ export const positive = (s: string) => {
   return s.trim() !== '' && Number.isFinite(n) && n > 0 ? n : null
 }
 
-/** Saved settings, keeping only values the engine still accepts. */
+/**
+ * What this browser saved, keeping only values the engine still accepts. Since Sprint 9 that's only the view
+ * preferences; a browser from before then also has run settings, copied to the server once (`hasOldRunSettings`).
+ */
 export function load(o: Options): Settings {
   const base = defaults(o)
   let saved: Record<string, unknown> = {}
@@ -74,12 +78,47 @@ export function load(o: Options): Settings {
   }
 }
 
-export function save(s: Settings) {
+const RUN_KEYS = ['sports', 'stake', 'hours', 'devig', 'refSlip']
+
+/** Whether this browser still has run settings saved before they moved to the server. */
+export function hasOldRunSettings(): boolean {
   try {
-    localStorage.setItem(KEY, JSON.stringify({ ...s, devigDefault: DEVIG_DEFAULT }))
+    const saved = JSON.parse(localStorage.getItem(KEY) ?? '{}')
+    return !!saved && typeof saved === 'object' && RUN_KEYS.some((k) => k in saved)
   } catch {
-    // private mode or storage full: settings just won't be remembered
+    return false
   }
+}
+
+/** Save the view preferences in this browser (and only them: any old run settings saved here go). */
+export function save(s: Settings) {
+  const { top, slipType, slipSize, notify } = s
+  try {
+    localStorage.setItem(KEY, JSON.stringify({ top, slipType, slipSize, notify }))
+  } catch {
+    // private mode or storage full: preferences just won't be remembered
+  }
+}
+
+/** `base` with the run settings the server holds, keeping only values the engine offers. */
+export function fromServer(saved: SavedSettings, o: Options, base: Settings): Settings {
+  const sports = o.sports.filter((s) => saved.sports.includes(s))
+  return {
+    ...base,
+    sports: sports.length ? sports : base.sports,
+    stake: String(saved.stake),
+    hours: String(saved.hours),
+    devig: o.devig.includes(saved.devig) ? saved.devig : base.devig,
+    refSlip: saved.ref_slip && o.ref_slips.includes(saved.ref_slip) ? saved.ref_slip : '',
+  }
+}
+
+/** The run settings to save on the server, or null while any of them isn't valid (half-typed, or no league). */
+export function toSaved(s: Settings): SavedSettings | null {
+  const stake = positive(s.stake)
+  const hours = positive(s.hours)
+  if (s.sports.length === 0 || stake === null || hours === null) return null
+  return { sports: s.sports, stake, hours, devig: s.devig, ref_slip: s.refSlip || null }
 }
 
 /** One promotion per run, as on the CLI. Lives only in memory: never remembered. */

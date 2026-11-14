@@ -1,4 +1,5 @@
-import { expect, test, type Page } from '@playwright/test'
+import type { Page } from '@playwright/test'
+import { expect, test } from './test.ts'
 
 // Runs against the e2e container (`make e2e`), whose canned odds count as live requests: every run is fresh.
 // Each run fetches its board from the canned partner feed.

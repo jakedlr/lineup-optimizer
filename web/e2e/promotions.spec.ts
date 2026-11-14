@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, run, test } from './test.ts'
 
 // Promo legs are picked from the saved board; the page has one (fetched from the canned partner feed, or uploaded
 // by the fallback specs that ran first).
@@ -17,7 +17,7 @@ test('a promo leg picked from the board is priced into the report', async ({ pag
   await page.getByRole('button', { name: 'Add promo leg' }).click()
   await expect(page.getByRole('list', { name: 'Promo legs' })).toContainText('Joel Embiid · Over 30.5 Pts+Rebs+Asts')
 
-  await page.getByRole('button', { name: 'Run', exact: true }).click()
+  await run(page)
   const legs = page.getByRole('region', { name: 'Top Legs' })
   const row = legs.getByRole('row').filter({ hasText: 'Over 30.5 Pts+Rebs+Asts' })
   await expect(row).toContainText('manual')
@@ -25,7 +25,7 @@ test('a promo leg picked from the board is priced into the report', async ({ pag
 
 test('bonus entry runs Power slips only', async ({ page }) => {
   await page.getByRole('group', { name: 'Promotion' }).getByRole('button', { name: 'Bonus entry' }).click()
-  await page.getByRole('button', { name: 'Run', exact: true }).click()
+  await run(page)
   await expect(page.getByText(/· bonus ·/)).toBeVisible()
   const slips = page.getByRole('region', { name: 'Best Slips' })
   await expect(slips.getByRole('heading', { name: /^Power/ }).first()).toBeVisible()

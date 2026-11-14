@@ -1,9 +1,9 @@
-import { expect, test } from '@playwright/test'
+import { expect, run, test } from './test.ts'
 
 async function slipLegs(page: import('@playwright/test').Page, width: number) {
   await page.setViewportSize({ width, height: 900 })
   await page.goto('/')
-  await page.getByRole('button', { name: 'Run', exact: true }).click()
+  await run(page)
   const slips = page.getByRole('region', { name: 'Best Slips' })
   await expect(slips.getByRole('article').first()).toBeVisible()
 
