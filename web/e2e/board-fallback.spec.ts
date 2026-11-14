@@ -38,6 +38,6 @@ test('with no feed, a run uses the uploaded board and says why', async ({ page }
   await expect(page.getByRole('region', { name: 'Best Slips' }).getByRole('heading', { name: 'Power 2' })).toBeVisible()
   const warnings = page.locator('.warnings li')
   await expect(warnings.first()).toContainText(FAILED)
-  await expect(warnings.first()).toContainText(/this run used the saved board, uploaded (less than a minute|1 minute) ago/)
+  await expect(warnings.first()).toContainText(/this run used the saved board, uploaded (just now|1 min ago)/)
   await expect(panel.getByText(/Uploaded (just now|1 min ago)/)).toBeVisible()
 })

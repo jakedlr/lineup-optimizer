@@ -31,7 +31,7 @@ from .pricing import PRICING_METHODS
 from .payouts import load_payouts
 from .progress import Progress, RunCancelled
 from .sources import prizepicks
-from .sources.http import FetchError, Http
+from .sources.http import REUSE_SECONDS, FetchError, Http
 
 REPO = Path(__file__).resolve().parents[2]
 DEFAULT_STATIC = REPO / "web" / "dist"
@@ -39,38 +39,27 @@ BOARD = "board.json"
 BOARD_META = "board.meta.json"
 
 
-def is_feed(payload) -> bool:
-    """Whether this looks like a PrizePicks projections feed."""
-    return isinstance(payload, dict) and isinstance(payload.get("data"), list)
-
-
 def board_from_file(path: Path):
     """A board fetcher that reads a projections file instead of the partner feed, fresh at each fetch."""
 
-    def fetch() -> dict:
+    def fetch(progress=None) -> bytes:
         try:
-            raw = Path(path).read_bytes()
+            return Path(path).read_bytes()
         except OSError as e:
             raise FetchError(f"no board file at {path} ({e.strerror or e})") from e
-        try:
-            payload = json.loads(raw)
-        except ValueError:
-            payload = None
-        if not is_feed(payload):
-            raise FetchError(f"not a PrizePicks projections feed: {path}")
-        return payload
 
     return fetch
 
 
-def _ago(minutes: float) -> str:
-    m = int(minutes)
+def ago(minutes: float) -> str:
+    """How long ago, in the page's words (web/src/format.ts `ago`): "just now", "45 min ago", "2 h ago", "3 d ago"."""
+    m = max(0, int(minutes // 1))
     if m < 1:
-        return "less than a minute ago"
-    if m < 120:
-        return f"{m} minute{'' if m == 1 else 's'} ago"
+        return "just now"
+    if m < 60:
+        return f"{m} min ago"
     hours = m // 60
-    return f"{hours} hours ago" if hours < 48 else f"{hours // 24} days ago"
+    return f"{hours} h ago" if hours < 24 else f"{hours // 24} d ago"
 
 
 def markets_from_file(path: Path):
@@ -144,7 +133,7 @@ def stream_run(work):
     announces, such as the board it fetched), then one "report" or "error".
 
     Closing the generator (Starlette does when the client goes away) cancels the run: the worker stops at its
-    next sportsbook request instead of scraping for a page nobody is watching.
+    next request (the board's included) instead of scraping for a page nobody is watching.
     """
     events: queue.Queue = queue.Queue()
     progress = Progress(lambda e: events.put({"type": "progress", **e}))
@@ -171,8 +160,9 @@ def stream_run(work):
 
 
 def create_app(static_dir=None, data_dir=None, root=None, collect=None, now=None, fetch_board=None) -> FastAPI:
-    """`collect` stands in for the sportsbooks and `fetch_board` (no arguments, returns the projections feed or
-    raises FetchError) for PrizePicks' partner feed."""
+    """`collect` stands in for the sportsbooks and `fetch_board(progress)` for PrizePicks' partner feed: it returns
+    the board's raw bytes, unchecked, or raises FetchError. `progress` is the run's (None outside a run), there only
+    so a run whose client has gone stops waiting; it is never ticked."""
     static_dir = Path(static_dir or os.environ.get("PPOPT_WEB_DIST") or DEFAULT_STATIC)
     data_dir = Path(data_dir or os.environ.get("PPOPT_DATA") or REPO / "data")
     root = Path(root or os.environ.get("PPOPT_ROOT") or cli.ROOT)
@@ -181,14 +171,14 @@ def create_app(static_dir=None, data_dir=None, root=None, collect=None, now=None
     if fetch_board is None and os.environ.get("PPOPT_BOARD_FILE"):
         fetch_board = board_from_file(os.environ["PPOPT_BOARD_FILE"])
     if fetch_board is None:
-        def fetch_board() -> dict:
-            # Its own Http, with no run progress: the board isn't a sportsbook request.
-            try:
-                return prizepicks.fetch(Http(data_dir / "cache"))
-            except FetchError:
-                raise
-            except Exception as e:  # noqa: BLE001 - a network error (reset, timeout, DNS) is a failed fetch too
-                raise FetchError(str(e) or type(e).__name__) from e
+        # One Http for every board request the app makes, so they're paced across runs, not just within one (and a
+        # push-back holds the next run's request too). No run progress: the board isn't a sportsbook request.
+        # Board requests are made under write_lock, so one run at a time uses it, as stops_with needs.
+        board_http = Http(data_dir / "cache")
+
+        def fetch_board(progress=None) -> bytes:
+            with board_http.stops_with(progress):
+                return prizepicks.fetch_raw(board_http)
     now = now or cli.utcnow
 
     board_path, meta_path = data_dir / BOARD, data_dir / BOARD_META
@@ -233,20 +223,37 @@ def create_app(static_dir=None, data_dir=None, root=None, collect=None, now=None
             tmp.replace(board_path)
             cache["board"] = (board_path.stat().st_mtime_ns, payload)
 
-    def fetch_and_save() -> dict:
-        """A fresh board from the partner feed, saved as the board. Call under write_lock. Raises FetchError."""
-        payload = fetch_board()
-        if not is_feed(payload):
-            raise FetchError("the answer wasn't a PrizePicks projections feed")
-        save_board(json.dumps(payload).encode(), payload, "fetched")
+    def fetch_and_save(progress: Progress | None = None) -> dict:
+        """A fresh board from the partner feed, saved as the board. Call under write_lock. Raises FetchError, or
+        RunCancelled once the run's client has gone: the download in flight can't be stopped, but nothing after it
+        holds the board for a run nobody is watching."""
+        raw = fetch_board(progress)
+        if progress is not None:
+            progress.check()
+        payload = prizepicks.read_feed(raw)
+        save_board(raw, payload, "fetched")
         return payload
 
-    def board_for_run() -> tuple[dict, str | None]:
-        """The board a run prices: a fresh fetch, or when that fails the saved board and a warning saying so.
-        Raises UserError when there's neither."""
+    def seconds_old(info: dict) -> float:
+        return now().timestamp() - datetime.fromisoformat(info["saved_at"]).timestamp()
+
+    def recently_fetched() -> bool:
+        """Whether the saved board was fetched (not uploaded) less than REUSE_SECONDS ago: as good as a new fetch,
+        and kinder to the partner feed. A board saved "in the future" (the clock moved back) isn't trusted."""
+        info = board_info()
+        return info is not None and info["source"] == "fetched" and 0 <= seconds_old(info) < REUSE_SECONDS
+
+    def board_for_run(progress: Progress | None, fresh: bool = False) -> tuple[dict, str | None]:
+        """The board a run prices: one fetched under a minute ago (unless `fresh`), else a new fetch, or when that
+        fails the saved board and a warning saying so. Raises UserError when there's none of them, and RunCancelled
+        when the run's client has gone."""
         with write_lock:
+            if progress is not None:
+                progress.check()  # it may have waited its turn a while
+            if not fresh and recently_fetched():
+                return load_board(), None
             try:
-                return fetch_and_save(), None
+                return fetch_and_save(progress), None
             except FetchError as e:
                 reason = str(e)
             info = board_info()
@@ -254,9 +261,9 @@ def create_app(static_dir=None, data_dir=None, root=None, collect=None, now=None
                 raise cli.UserError(f"couldn't fetch the board from PrizePicks' partner feed ({reason}), and there's "
                                     "no saved board to fall back on: upload one")
             payload = load_board()
-        age = (now().timestamp() - datetime.fromisoformat(info["saved_at"]).timestamp()) / 60
+        age = seconds_old(info) / 60
         warning = (f"couldn't fetch the board from PrizePicks' partner feed ({reason}); this run used the saved "
-                   f"board, {info['source']} {_ago(age)}")
+                   f"board, {info['source']} {ago(age)}")
         if age > cli.STALE_MINUTES:
             warning += ", so PrizePicks lines may have moved"
         return payload, warning
@@ -287,8 +294,11 @@ def create_app(static_dir=None, data_dir=None, root=None, collect=None, now=None
 
     @app.post("/api/board/fetch")
     def fetch_board_now() -> dict:
-        """Fetch the board from the partner feed and save it (the page does on opening, when it has none)."""
+        """Fetch the board from the partner feed and save it (the page does on opening, when it has none or it's
+        stale). A board fetched under a minute ago is returned as it is."""
         with write_lock:
+            if recently_fetched():
+                return board_info()
             try:
                 fetch_and_save()
             except FetchError as e:
@@ -318,11 +328,9 @@ def create_app(static_dir=None, data_dir=None, root=None, collect=None, now=None
         # A plain def: FastAPI runs it on a worker thread, so parsing a big board doesn't stall the server.
         raw = file.file.read()
         try:
-            payload = json.loads(raw)
-        except ValueError:
-            payload = None
-        if not is_feed(payload):
-            raise HTTPException(422, "that file isn't a PrizePicks projections feed (expected a JSON object with a \"data\" list)")
+            payload = prizepicks.read_feed(raw)
+        except FetchError as e:
+            raise HTTPException(422, "that file isn't a PrizePicks projections feed (expected a JSON object with a \"data\" list)") from e
         with write_lock:
             save_board(raw, payload, "uploaded", file.filename)
         return board_info()
@@ -335,7 +343,7 @@ def create_app(static_dir=None, data_dir=None, root=None, collect=None, now=None
             if progress:
                 progress.step("Fetching the PrizePicks board")
             # The run keeps the board it fetched (or fell back to): a later save can't change what it reports on.
-            payload, fallback = board_for_run()
+            payload, fallback = board_for_run(progress, fresh=args.no_cache)  # "Fresh odds" mean a fresh board too
             if not fallback:  # the page shows the new board now, not when the report lands
                 announce({"type": "board", "board": board_info()})
             http = Http(data_dir / "cache", use_cache=not args.no_cache, progress=progress)

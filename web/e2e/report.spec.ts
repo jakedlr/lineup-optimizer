@@ -3,7 +3,7 @@ import { expect, test } from '@playwright/test'
 // Runs against the e2e container (`make e2e`): sportsbook odds come from tests/fixtures/markets.json and the partner
 // feed serves the fixture board (e2e/board.ts).
 
-test('the board comes from the partner feed, and a run fetches it again and reports on it', async ({ page, request }) => {
+test('the board comes from the partner feed, and a run uses it (reused within a minute of the fetch) and reports on it', async ({ page, request }) => {
   const fetched = await request.post('/api/board/fetch')
   expect(fetched.status()).toBe(200)
   expect(await fetched.json()).toMatchObject({ source: 'fetched', projections: 11 })

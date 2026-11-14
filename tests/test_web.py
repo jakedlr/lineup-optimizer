@@ -50,15 +50,15 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def feed(payload=None):
-    """A partner feed that answers with this board (the fixture board by default)."""
-    return lambda: payload or pp_payload()
+    """A partner feed that answers with this board (the fixture board by default), as raw bytes."""
+    return lambda progress=None: json.dumps(payload or pp_payload()).encode()
 
 
 def feed_down(reason="HTTP 503 from the partner feed"):
     """A partner feed that can't be reached."""
     from ppopt.sources.http import FetchError
 
-    def fetch():
+    def fetch(progress=None):
         raise FetchError(reason)
 
     return fetch
@@ -141,8 +141,8 @@ def test_a_failed_fetch_falls_back_to_the_saved_board_with_one_warning_saying_wh
     warnings = r.json()["warnings"]
     first = warnings[0]
     assert "partner feed" in first and "HTTP 503 from the partner feed" in first
-    assert "saved board" in first and "uploaded 45 minutes ago" in first and "may have moved" in first
-    assert not any("minutes" in w for w in warnings[1:]), "the board's age is warned about twice"
+    assert "saved board" in first and "uploaded 45 min ago" in first and "may have moved" in first
+    assert not any("min ago" in w or "minutes" in w for w in warnings[1:]), "the board's age is warned about twice"
     assert client.get("/api/board").json()["source"] == "uploaded"
 
 
@@ -153,7 +153,7 @@ def test_a_fallback_to_a_fresh_saved_board_still_says_the_fetch_failed(tmp_path)
     recent = NOW.timestamp() - 5 * 60
     os.utime(board, (recent, recent))
     first = client.post("/api/run").json()["warnings"][0]
-    assert "partner feed" in first and "uploaded 5 minutes ago" in first
+    assert "partner feed" in first and "uploaded 5 min ago" in first
     assert "may have moved" not in first
 
 
@@ -541,7 +541,7 @@ def test_a_failed_fetch_now_is_502_with_the_reason_and_keeps_the_saved_board(tmp
 
 
 def test_a_fetch_that_answers_with_something_other_than_a_feed_is_a_failure(tmp_path):
-    client = engine_app(tmp_path, fetch_board=lambda: {"hello": 1})
+    client = engine_app(tmp_path, fetch_board=lambda progress=None: b'{"hello": 1}')
     r = client.post("/api/board/fetch")
     assert r.status_code == 502 and "projections feed" in r.json()["detail"]
     assert client.get("/api/board").status_code == 404
@@ -555,14 +555,14 @@ def test_fetches_runs_and_uploads_never_write_the_board_at_once(tmp_path):
 
     lock, state = threading.Lock(), {"now": 0, "peak": 0}
 
-    def slow_feed():
+    def slow_feed(progress=None):
         with lock:
             state["now"] += 1
             state["peak"] = max(state["peak"], state["now"])
         time.sleep(0.02)
         with lock:
             state["now"] -= 1
-        return pp_payload()
+        return json.dumps(pp_payload()).encode()
 
     client = engine_app(tmp_path, fetch_board=slow_feed)
     calls = [lambda: client.post("/api/board/fetch"), lambda: client.post("/api/run"), lambda: upload(client)] * 6
@@ -608,21 +608,24 @@ def test_the_default_fetch_goes_to_the_partner_feed(tmp_path, monkeypatch):
 
     monkeypatch.delenv("PPOPT_BOARD_FILE", raising=False)
     seen = []
-    monkeypatch.setattr(web.prizepicks, "fetch", lambda http: seen.append(http) or pp_payload())
+    raw = json.dumps(pp_payload()).encode()
+    monkeypatch.setattr(web.prizepicks, "fetch_raw", lambda http: seen.append(http) or raw)
     client = TestClient(create_app(static_dir=tmp_path, data_dir=tmp_path / "data", root=ROOT, now=lambda: NOW))
     assert client.post("/api/board/fetch").status_code == 200
     assert len(seen) == 1 and seen[0].progress is None, "the board fetch must not count as a sportsbook request"
 
 
 def test_a_network_error_on_the_default_fetch_is_a_fetch_failure(tmp_path, monkeypatch):
+    import functools
+
     from ppopt import web
 
     monkeypatch.delenv("PPOPT_BOARD_FILE", raising=False)
 
-    def broken(http):
+    def broken(url):
         raise ConnectionError("connection reset by peer")
 
-    monkeypatch.setattr(web.prizepicks, "fetch", broken)
+    monkeypatch.setattr(web, "Http", functools.partial(web.Http, fetch=broken, sleep=lambda s: None))
     client = TestClient(create_app(static_dir=tmp_path, data_dir=tmp_path / "data", root=ROOT, now=lambda: NOW))
     r = client.post("/api/board/fetch")
     assert r.status_code == 502 and "connection reset by peer" in r.json()["detail"]
@@ -632,3 +635,269 @@ def test_options_name_the_app_feed_for_saving_a_board_by_hand(tmp_path):
     from ppopt.sources import prizepicks
 
     assert engine_app(tmp_path).get("/api/options").json()["board_app_url"] == prizepicks.APP_URL
+
+
+# --- Sprint 8 review fixes (server) ----------------------------------------------
+
+@pytest.mark.parametrize("minutes, words", [
+    (0, "just now"), (0.9, "just now"), (1, "1 min ago"), (45, "45 min ago"), (59.9, "59 min ago"),
+    (60, "1 h ago"), (150, "2 h ago"), (1439, "23 h ago"), (1440, "1 d ago"), (4400, "3 d ago"), (-5, "just now"),
+])
+def test_the_board_age_reads_as_the_page_says_it(minutes, words):
+    from ppopt.web import ago
+
+    assert ago(minutes) == words  # web/src/format.ts ago()
+
+
+def test_a_fetched_board_is_saved_byte_for_byte(tmp_path):
+    raw = json.dumps(pp_payload(), indent=1).encode()  # not how json.dumps would write it back
+    client = engine_app(tmp_path, fetch_board=lambda progress=None: raw)
+    assert client.post("/api/board/fetch").status_code == 200
+    assert (tmp_path / "data" / "board.json").read_bytes() == raw
+    client.post("/api/run", json={"no_cache": True})
+    assert (tmp_path / "data" / "board.json").read_bytes() == raw
+
+
+def test_the_board_file_stand_in_is_saved_byte_for_byte(tmp_path, monkeypatch):
+    feed_file = tmp_path / "projections.json"
+    feed_file.write_bytes(raw := json.dumps(pp_payload(), indent=2).encode())
+    monkeypatch.setenv("PPOPT_BOARD_FILE", str(feed_file))
+    client = TestClient(create_app(static_dir=tmp_path, data_dir=tmp_path / "data", root=ROOT,
+                                   collect=lambda *a: (markets(), []), now=lambda: NOW))
+    assert client.post("/api/board/fetch").status_code == 200
+    assert (tmp_path / "data" / "board.json").read_bytes() == raw
+
+
+class Clock:
+    """Time that moves only when something sleeps."""
+
+    def __init__(self):
+        self.now, self.slept = 0.0, []
+
+    def __call__(self):
+        return self.now
+
+    def sleep(self, seconds):
+        self.slept.append(seconds)
+        self.now += seconds
+
+
+def feed_app(tmp_path, monkeypatch, respond, clock=None, sleep=lambda s: None):
+    """An app on the default board fetcher, whose network answers the partner feed with `respond(n)` (status and
+    headers) on its nth request. Returns the client and the list of board requests made."""
+    import functools
+
+    from ppopt import web
+
+    monkeypatch.delenv("PPOPT_BOARD_FILE", raising=False)
+    calls = []
+
+    def network(url):
+        calls.append(url)
+        status, headers = respond(len(calls))
+        return status, json.dumps(pp_payload()).encode(), headers
+
+    kw = {"sleep": clock.sleep, "clock": clock} if clock else {"sleep": sleep}
+    monkeypatch.setattr(web, "Http", functools.partial(web.Http, fetch=network, **kw))
+    client = TestClient(create_app(static_dir=tmp_path, data_dir=tmp_path / "data", root=ROOT,
+                                   collect=lambda *a: (markets(), []), now=lambda: NOW))
+    return client, calls
+
+
+def test_board_requests_are_paced_across_runs(tmp_path, monkeypatch):
+    clock = Clock()
+    client, calls = feed_app(tmp_path, monkeypatch, lambda n: (200, {}), clock)
+    for _ in range(3):
+        assert client.post("/api/run", json={"no_cache": True}).json()["warnings"] == []
+    assert len(calls) == 3
+    assert len(clock.slept) == 2 and all(1 <= s <= 2 for s in clock.slept), "one at a time, 1-2 s apart"
+
+
+@pytest.mark.parametrize("status", [429, 403])
+def test_a_pushed_back_board_request_is_retried_after_the_wait_it_asks_for(tmp_path, monkeypatch, status):
+    clock = Clock()
+    client, calls = feed_app(tmp_path, monkeypatch,
+                             lambda n: (status, {"Retry-After": "3"}) if n == 1 else (200, {}), clock)
+    r = client.post("/api/run")
+    assert r.json()["warnings"] == [], "no fallback: the retry fetched the board"
+    assert len(calls) == 2 and clock.slept[0] >= (3 if status == 429 else 1)
+    assert client.get("/api/board").json()["source"] == "fetched"
+    assert r.json()["timing"]["books"] == {}, "the board request is not a sportsbook in the run's timing"
+
+
+def test_a_board_request_asked_to_wait_too_long_falls_back_saying_so(tmp_path, monkeypatch):
+    client, calls = feed_app(tmp_path, monkeypatch, lambda n: (429, {"Retry-After": "120"}))
+    upload(client)
+    first = client.post("/api/run").json()["warnings"][0]
+    assert "rate-limited" in first and "asked to wait 120s" in first and len(calls) == 1
+
+
+def counting_feed():
+    """A partner feed that counts the requests it answers."""
+    calls = []
+
+    def fetch(progress=None):
+        calls.append(1)
+        return json.dumps(pp_payload()).encode()
+
+    return fetch, calls
+
+
+def age_board(tmp_path, seconds):
+    """Make the saved board `seconds` old, as the app's clock (NOW) sees it."""
+    board = tmp_path / "data" / "board.json"
+    os.utime(board, (NOW.timestamp() - seconds, NOW.timestamp() - seconds))
+
+
+def test_a_fetched_board_is_reused_for_as_long_as_the_odds_cache_keeps_a_response(tmp_path):
+    from ppopt import web
+    from ppopt.sources.http import REUSE_SECONDS, Http
+
+    assert web.REUSE_SECONDS is REUSE_SECONDS and Http(tmp_path).ttl == REUSE_SECONDS == 60
+
+
+@pytest.mark.parametrize("age, fetched_again", [(55, False), (65, True), (-30, True)])
+def test_a_run_within_a_minute_of_a_fetch_prices_that_board_without_fetching_again(tmp_path, age, fetched_again):
+    fetch, calls = counting_feed()
+    client = engine_app(tmp_path, fetch_board=fetch)
+    client.post("/api/board/fetch")
+    age_board(tmp_path, age)  # -30: saved "in the future" (the clock moved back), so its age can't be trusted
+    r = client.post("/api/run")
+    assert r.status_code == 200 and r.json()["warnings"] == []
+    assert len(calls) == (2 if fetched_again else 1)
+    assert client.get("/api/board").json()["source"] == "fetched"
+
+
+def test_fresh_odds_fetch_the_board_even_within_the_minute(tmp_path):
+    fetch, calls = counting_feed()
+    client = engine_app(tmp_path, fetch_board=fetch)
+    client.post("/api/board/fetch")
+    age_board(tmp_path, 5)
+    assert client.post("/api/run", json={"no_cache": True}).json()["warnings"] == []
+    assert len(calls) == 2
+
+
+def test_an_uploaded_board_never_stands_in_for_a_fetch(tmp_path):
+    fetch, calls = counting_feed()
+    client = engine_app(tmp_path, fetch_board=fetch)
+    upload(client)
+    age_board(tmp_path, 5)
+    client.post("/api/run")
+    assert len(calls) == 1 and client.get("/api/board").json()["source"] == "fetched"
+
+
+def test_fetching_now_within_the_minute_returns_the_board_just_fetched(tmp_path):
+    fetch, calls = counting_feed()
+    client = engine_app(tmp_path, fetch_board=fetch)
+    client.post("/api/board/fetch")
+    age_board(tmp_path, 30)
+    before = client.get("/api/board").json()
+    r = client.post("/api/board/fetch")
+    assert r.status_code == 200 and r.json() == before and len(calls) == 1
+
+
+def test_a_streamed_run_announces_the_board_it_reuses(tmp_path):
+    """The reused board is the run's board, so the page hears about it straight after the board step, as it does
+    after a fetch."""
+    fetch, calls = counting_feed()
+    client = engine_app(tmp_path, fetch_board=fetch)
+    client.post("/api/board/fetch")
+    age_board(tmp_path, 10)
+    _, events = stream(client)
+    at = [i for i, e in enumerate(events) if e["type"] == "board"]
+    assert len(at) == 1 and events[at[0]]["board"] == client.get("/api/board").json()
+    assert [e["step"] for e in events[:at[0]]] == ["Fetching the PrizePicks board"]
+    assert events[-1]["type"] == "report" and events[-1]["report"]["warnings"] == [] and len(calls) == 1
+
+
+def run_watched_by(client, monkeypatch, progress) -> dict:
+    """POST a streamed run whose client is `progress` (cancel it to have the client leave), worked synchronously.
+    Returns {"report": ...} or {"raised": the exception}, and "announced": the events the run announced."""
+    from ppopt import web
+
+    outcome = {"announced": []}
+
+    def stream_run(work):
+        try:
+            outcome["report"] = work(progress, outcome["announced"].append)
+        except Exception as e:  # noqa: BLE001
+            outcome["raised"] = e
+        yield "{}\n"
+
+    monkeypatch.setattr(web, "stream_run", stream_run)
+    client.post("/api/run", headers=NDJSON)
+    return outcome
+
+
+def test_a_run_whose_client_left_while_it_waited_for_the_board_never_asks_for_one(tmp_path, monkeypatch):
+    import threading
+    import time
+
+    from ppopt.progress import Progress, RunCancelled
+
+    release, calls = threading.Event(), []
+
+    def feed_(progress=None):
+        calls.append(1)
+        if len(calls) == 1:
+            release.wait(5)  # the page's own fetch, holding the board while the run waits its turn
+        return json.dumps(pp_payload()).encode()
+
+    client = engine_app(tmp_path, fetch_board=feed_)
+    page = threading.Thread(target=lambda: client.post("/api/board/fetch"))
+    page.start()
+    while not calls:
+        time.sleep(0.005)
+    progress, outcome = Progress(lambda e: None), {}
+    run = threading.Thread(target=lambda: outcome.update(run_watched_by(client, monkeypatch, progress)))
+    run.start()
+    time.sleep(0.05)
+    progress.cancel()  # the browser went away while the run waited
+    release.set()
+    page.join(5), run.join(5)
+    assert isinstance(outcome["raised"], RunCancelled) and len(calls) == 1
+    assert outcome["announced"] == []
+
+
+def test_a_run_whose_client_left_during_its_board_request_saves_nothing(tmp_path, monkeypatch):
+    from ppopt.progress import Progress, RunCancelled
+
+    progress = Progress(lambda e: None)
+
+    def feed_(progress_=None):
+        progress.cancel()  # the browser went away while the board downloaded
+        return json.dumps(pp_payload()).encode()
+
+    client = engine_app(tmp_path, fetch_board=feed_)
+    outcome = run_watched_by(client, monkeypatch, progress)
+    assert isinstance(outcome["raised"], RunCancelled) and outcome["announced"] == []
+    assert client.get("/api/board").status_code == 404
+
+
+def test_a_run_whose_client_left_stops_waiting_out_the_partner_feeds_retry_after(tmp_path, monkeypatch):
+    import threading
+    import time
+
+    from ppopt.progress import Progress, RunCancelled
+
+    client, calls = feed_app(tmp_path, monkeypatch, lambda n: (429, {"Retry-After": "5"}) if n == 1 else (200, {}),
+                             sleep=None)  # real, interruptible waits
+    progress = Progress(lambda e: None)
+    threading.Timer(0.1, progress.cancel).start()
+    began = time.monotonic()
+    outcome = run_watched_by(client, monkeypatch, progress)
+    assert isinstance(outcome["raised"], RunCancelled) and len(calls) == 1
+    assert time.monotonic() - began < 1, "the run sat out the Retry-After nobody was waiting for"
+    began = time.monotonic()
+    assert upload(client).status_code == 200 and time.monotonic() - began < 1, "the board is free to write"
+
+
+def test_the_next_run_fetches_the_board_after_a_cancelled_one(tmp_path, monkeypatch):
+    from ppopt.progress import Progress, RunCancelled
+
+    client, calls = feed_app(tmp_path, monkeypatch, lambda n: (200, {}))
+    cancelled = Progress(lambda e: None)
+    cancelled.cancel()
+    assert isinstance(run_watched_by(client, monkeypatch, cancelled)["raised"], RunCancelled)
+    outcome = run_watched_by(client, monkeypatch, Progress(lambda e: None))
+    assert outcome["report"]["warnings"] == [] and len(calls) == 1

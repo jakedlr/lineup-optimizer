@@ -345,8 +345,8 @@ still parse, labelled "promo"). Decision: `docs/adr/0002-board-from-partner-feed
 - [x] README, ADR 0001 and `DESIGN.md` no longer say the board must be saved by hand
 
 **Notes**
-- `prizepicks.fetch` asks for the board with `Http.get_json(url, cache=False)`: never from or into the odds cache,
-  still counted as a live request. A dropped connection or timeout is a `FetchError` too; a cancelled run is not.
+- `prizepicks.fetch_raw` gets the board with `Http.get_bytes`: always live, never from or into the odds cache, and
+  saved exactly as served. A dropped connection or timeout is a `FetchError` too; a cancelled run is not.
 - `prizepicks.APP_URL` is the website's feed, for the manual fallback steps; `GET /api/options` serves it as
   `board_app_url`.
 - `scrapling[fetchers]` stays: Scrapling's plain `Fetcher` won't import without it. The browser binaries
@@ -362,9 +362,25 @@ still parse, labelled "promo"). Decision: `docs/adr/0002-board-from-partner-feed
   removed), `feed-up` (writes the shifted fixture board as the feed), then every other spec in parallel.
 - The board panel updates as soon as a run has saved its board, not when the report lands (asked for at review):
   the run stream sends a `board` event (the board info) straight after the board step when the fetch succeeded;
-  a fallback run sends none. `stream_run` hands the work an `announce` callback and ends only on `report`/`error`.
+  a fallback run sends none; a run reusing a board fetched under a minute ago still sends it. `stream_run` hands the work an `announce` callback and ends only on `report`/`error`.
   Live: the event arrived 2.9 s into a 16.9 s run.
 - Live, 2026-11-14 07:54 UTC, rebuilt app: `POST /api/board/fetch` saved 30,253 projections in 3.6 s; a fresh
   NBA/NHL/NFL run took 14.1 s (DraftKings 8 requests, FanDuel 46), 217 legs, no warnings.
 
 **Review:** done 2026-11-14. Checked live in the app; the board's fetched time now updates mid-run.
+Code review after the review (`/code-review`, prompted by "couldn't fetch the board" warnings): the container log
+showed runs at 08:11:40 and 08:11:46 fetch the board, and one at 08:11:50 get **HTTP 429** from the partner feed,
+fall back to a seconds-old board and warn as if broken. Ten findings, all fixed test-first:
+- A board fetched under a minute ago (`REUSE_SECONDS`, the odds cache's minute) is reused by runs and
+  `POST /api/board/fetch` without fetching; Fresh odds forces a fetch; an uploaded board never counts.
+- One board `Http` per app, so board requests are paced one at a time, 1-2 s apart, across runs. A request made by
+  no book now backs off like a book's (429 or 403: honour `Retry-After` up to 10 s, retry once); this supersedes the
+  Sprint 7 note that requests made by no book are never retried. A 429 holds only that wait; later runs pace normally.
+- A cancelled run checks before sending and before saving, and its pauses end early (`Progress.check`,
+  `Http.stops_with`); an in-flight download can't be aborted.
+- The board is saved as served (no parse-and-dump under the write lock); one feed-shape check
+  (`prizepicks.read_feed`/`is_feed`) serves the CLI, the app's fetch and uploads.
+- The server words a board's age as the page does (`just now`, `45 min ago`, `2 h ago`).
+- Page: Run is held while the opening fetch is going ("Fetching the board…"); under StrictMode only one opening fetch
+  is sent; a flaky Vitest age match (mine, from the board-event change) now pins its clock.
+

@@ -2,6 +2,7 @@
 
 import hashlib
 from collections import Counter
+from contextlib import contextmanager
 from concurrent.futures import ThreadPoolExecutor
 import json
 import os
@@ -127,11 +128,14 @@ def retry_after(headers: dict) -> float | None:
         return None
 
 
+REUSE_SECONDS = 60  # how long a response is reused (an odds-cache answer, the app's fetched board): lines move fast
+
+
 class Http:
     def __init__(
         self,
         cache_dir: str | Path,
-        ttl: float = 60,  # seconds an odds-cache answer is reused; lines move fast
+        ttl: float = REUSE_SECONDS,  # seconds an odds-cache answer is reused
         use_cache: bool = True,
         delay: tuple[float, float] = (1.0, 2.0),
         fetch=scrapling_fetch,
@@ -146,7 +150,7 @@ class Http:
         self.fetch = fetch
         self._stopped = threading.Event()
         # Waits end early when the run stops, so a cancelled run never sits out a pause it no longer needs.
-        self.sleep = sleep or self._stopped.wait
+        self.sleep = sleep or self._wait
         self.progress = progress  # ppopt.progress.Progress, ticked once per request
         if progress is not None:
             progress.on_cancel.append(self.stop)
@@ -172,6 +176,26 @@ class Http:
     def stop(self):
         """End the run's fetching: every request from here on raises RunCancelled (cancelled, or one book broke)."""
         self._stopped.set()
+
+    def _wait(self, seconds: float):
+        self._stopped.wait(seconds)  # whichever run's stop is current (see stops_with)
+
+    @contextmanager
+    def stops_with(self, progress):
+        """For an Http that outlives runs (the app's, for the board): requests made inside stop when `progress`
+        (a run's, or None) is cancelled, and nothing of that run lingers once it's done. One run at a time."""
+        outer, self._stopped = self._stopped, threading.Event()
+        stop = self._stopped.set
+        if progress is not None:
+            progress.on_cancel.append(stop)
+            if progress.cancelled:
+                stop()
+        try:
+            yield self
+        finally:
+            if progress is not None:
+                progress.on_cancel.remove(stop)
+            self._stopped = outer
 
     def _check(self):
         if self._stopped.is_set():
@@ -216,23 +240,47 @@ class Http:
     def _cache_path(self, url: str) -> Path:
         return self.cache_dir / (hashlib.sha256(url.encode()).hexdigest()[:32] + ".json")
 
-    def get_json(self, url: str, cache: bool = True):
-        """The JSON at `url`. With cache=False it is always fetched live and never written to the odds cache
-        (for responses that aren't odds, such as the board)."""
-        return self._get_json(url, cache=cache)[0]
+    def get_json(self, url: str):
+        """The JSON at `url`, from the odds cache while it's fresh, else fetched live and cached."""
+        return self._get_json(url)[0]
 
-    def _get_json(self, url: str, book: str = "", cache: bool = True) -> tuple[object, bool]:
+    def get_bytes(self, url: str) -> bytes:
+        """The body at `url` as served, always fetched live and never from or into the odds cache (for responses
+        that aren't odds, such as the board)."""
+        self._check()
+        body = self._fetch_live(url)
+        self._tick("")
+        return body
+
+    def _get_json(self, url: str, book: str = "") -> tuple[object, bool]:
         """The response, and whether it was fetched live."""
-        if self._stopped.is_set():
-            raise RunCancelled()
+        self._check()
         path = self._cache_path(url)
-        if cache and self.use_cache and path.exists() and time.time() - path.stat().st_mtime < self.ttl:
+        if self.use_cache and path.exists() and time.time() - path.stat().st_mtime < self.ttl:
             data = json.loads(path.read_text())
             with self._lock:
                 self._by_book.setdefault(book, Counter())["cached"] += 1
             self._tick(book)
             return data, False
 
+        body = self._fetch_live(url, book)
+        try:
+            data = json.loads(body)
+        except ValueError as e:
+            raise FetchError(f"non-JSON response from {url}") from e
+        self.cache_dir.mkdir(parents=True, exist_ok=True)
+        # Write aside, then rename: another run reading this response never sees half of it.
+        tmp = path.with_name(f"{path.stem}.{os.getpid()}.{threading.get_ident()}.tmp")  # unique across runs
+        try:
+            tmp.write_bytes(body)
+            tmp.replace(path)
+        finally:
+            tmp.unlink(missing_ok=True)
+        self._tick(book)
+        return data, True
+
+    def _fetch_live(self, url: str, book: str = "") -> bytes:
+        """The body of a 200 answer at `url`, fetched live: counted, paced, and backed off once if pushed back."""
         with self._lock:
             self._live_requests += 1
             self._by_book.setdefault(book, Counter())["live"] += 1
@@ -240,32 +288,16 @@ class Http:
         pacer = self._pacer(book or urlsplit(url).netloc)
         with pacer:
             status, body, *rest = self.fetch(url)
-        if status in PUSHED_BACK and book:
+        if status in PUSHED_BACK:
             status, body = self._back_off(url, book, pacer, status, rest[0] if rest else {})
         if status != 200:
             raise FetchError(f"HTTP {status} from {url}")
-        try:
-            data = json.loads(body)
-        except ValueError as e:
-            raise FetchError(f"non-JSON response from {url}") from e
-        if not cache:
-            self._tick(book)
-            return data, True
-
-        self.cache_dir.mkdir(parents=True, exist_ok=True)
-        # Write aside, then rename: another run reading this response never sees half of it.
-        tmp = path.with_name(f"{path.stem}.{os.getpid()}.{threading.get_ident()}.tmp")  # unique across runs
-        try:
-            tmp.write_bytes(body if isinstance(body, bytes) else body.encode())
-            tmp.replace(path)
-        finally:
-            tmp.unlink(missing_ok=True)
-        self._tick(book)
-        return data, True
+        return body if isinstance(body, bytes) else body.encode()
 
     def _back_off(self, url, book, pacer, status, headers) -> tuple[int, bytes]:
-        """The book pushed back: hold all its requests for the wait it asked for (or one pause), slow it to one
-        request at a time, then retry this request once, in turn like any other. Only a 429 is a rate limit."""
+        """The book (for a request made by no book, the host) pushed back: hold all its requests for the wait it
+        asked for (or one pause), slow it to one request at a time, then retry this request once, in turn like any
+        other. Only a 429 is a rate limit."""
         if status == RATE_LIMITED:
             with self._lock:
                 self._rate_limited.add(book)

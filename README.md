@@ -32,7 +32,7 @@ connection, so it can't be hosted for you.
 ## Using the app
 
 1. **The board fetches itself.** Opening the page fetches the PrizePicks board if there's none yet or
-   it's over 30 minutes old, and every run fetches a fresh one first. The page shows where the board
+   it's over 30 minutes old, and every run fetches a fresh one first (or reuses one fetched in the last minute). The page shows where the board
    came from and when. If the fetch fails, the run uses the last saved board and says so, and
    *Board fetch failing? Upload one instead* lets you drop in one saved from your browser (below).
 2. **Pick your settings.** Leagues and stake are on the page. *Advanced* has hours ahead, the devig

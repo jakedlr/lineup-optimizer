@@ -8,7 +8,7 @@ best slips by EV with at most one leg per game.
 
 | Source | How | Fallback |
 |---|---|---|
-| PrizePicks | The partner feed, `partner-api.prizepicks.com/projections`, over plain HTTP: the same JSON:API board as the website's `api.prizepicks.com` feed, which DataDome protects, without that protection ([ADR 0002](docs/adr/0002-board-from-partner-feed.md)). Fetched fresh for every run, never from the odds cache. | `--pp-file samples/projections.json` saved from a logged-in browser (warns if > 30 min old); the app falls back to its saved board |
+| PrizePicks | The partner feed, `partner-api.prizepicks.com/projections`, over plain HTTP: the same JSON:API board as the website's `api.prizepicks.com` feed, which DataDome protects, without that protection ([ADR 0002](docs/adr/0002-board-from-partner-feed.md)). Fetched for every run, or reused within a minute of the last fetch (Fresh odds forces a fetch); paced one at a time and retried once after a 429; never from the odds cache. | `--pp-file samples/projections.json` saved from a logged-in browser (warns if > 30 min old); the app falls back to its saved board |
 | FanDuel, DraftKings | Internal JSON feeds via Scrapling's impersonating `Fetcher` (no browser needed), one adapter per book. DK: one request per stat subcategory per league. FD: one request per event per props tab, only for games on the PrizePicks board. | A failing book is a warning; the other still prices |
 
 - Responses cached in `.cache/` for 1 minute; `--no-cache` forces fresh fetches.

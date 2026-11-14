@@ -198,19 +198,24 @@ def test_parse_time_formats():
 
 # --- prizepicks -------------------------------------------------------------
 
-def test_http_without_the_cache_always_fetches_live_and_leaves_the_cache_alone(tmp_path):
-    fetch = FakeFetch({"u": (200, b'{"a": 1}')})
+def test_http_gets_a_body_live_as_served_and_leaves_the_cache_alone(tmp_path):
+    fetch = FakeFetch({"u": (200, b'{"a":  1}')})
     http = Http(tmp_path, fetch=fetch, sleep=lambda s: None)
-    assert http.get_json("u", cache=False) == {"a": 1}
-    assert http.get_json("u", cache=False) == {"a": 1}
-    assert fetch.calls == ["u", "u"]
+    assert http.get_bytes("u") == b'{"a":  1}'  # not parsed, so not re-encoded either
+    assert http.get_bytes("u") == b'{"a":  1}'
+    assert fetch.calls == ["u", "u"] and http.live_requests == 2
     assert list(tmp_path.iterdir()) == []
 
 
-def test_http_without_the_cache_ignores_a_fresh_cached_answer(tmp_path):
+def test_http_get_bytes_ignores_a_fresh_cached_answer(tmp_path):
     Http(tmp_path, fetch=FakeFetch({"u": (200, b'{"a": 1}')}), sleep=lambda s: None).get_json("u")
     fetch = FakeFetch({"u": (200, b'{"a": 2}')})
-    assert Http(tmp_path, fetch=fetch, sleep=lambda s: None).get_json("u", cache=False) == {"a": 2}
+    assert Http(tmp_path, fetch=fetch, sleep=lambda s: None).get_bytes("u") == b'{"a": 2}'
+
+
+def test_http_get_bytes_fails_on_anything_but_200(tmp_path):
+    with pytest.raises(FetchError, match="^HTTP 500 from u$"):
+        Http(tmp_path, fetch=FakeFetch({"u": (500, b"{}")}), sleep=lambda s: None).get_bytes("u")
 
 
 def _board(body, status=200):
@@ -223,6 +228,28 @@ def test_prizepicks_fetches_the_partner_feed():
     fetch, http = _board(json.dumps(load("pp_projections.json")).encode())
     assert prizepicks.fetch(http) == load("pp_projections.json")
     assert fetch.calls == [prizepicks.URL]
+
+
+def test_prizepicks_fetches_the_board_raw_as_the_feed_serves_it():
+    raw = b'{"data": [],   "included": []}'
+    fetch, http = _board(raw)
+    assert prizepicks.fetch_raw(http) == raw
+    assert fetch.calls == [prizepicks.URL]
+
+
+@pytest.mark.parametrize("payload, ok", [
+    ({"data": [], "included": []}, True), ({"data": []}, True), ([], False), ({"data": {}}, False), (None, False),
+])
+def test_a_projections_feed_is_an_object_with_a_data_list(payload, ok):
+    assert prizepicks.is_feed(payload) is ok
+
+
+def test_reading_a_feed_parses_and_checks_it():
+    assert prizepicks.read_feed(b'{"data": []}') == {"data": []}
+    with pytest.raises(FetchError, match="^not a PrizePicks projections feed$"):
+        prizepicks.read_feed(b'{"hello": 1}')
+    with pytest.raises(FetchError, match=r"^not a PrizePicks projections feed \(not JSON\)$"):
+        prizepicks.read_feed(b"<html>blocked</html>")
 
 
 def test_prizepicks_fetch_bypasses_the_odds_cache():
@@ -243,7 +270,7 @@ def test_prizepicks_fetch_rejects_anything_but_a_projections_feed(body):
 
 
 @pytest.mark.parametrize("status, body, reason", [
-    (200, b"<html>blocked</html>", "non-JSON"),
+    (200, b"<html>blocked</html>", "not JSON"),
     (403, b"{}", "HTTP 403"),
     (500, b"{}", "HTTP 500"),
 ])
@@ -514,11 +541,45 @@ def test_a_book_asking_for_a_long_wait_fails_at_once(tmp_path):
     assert len(net.starts) == 1 and 60 not in slept
 
 
-def test_a_request_made_by_no_book_is_not_retried(tmp_path):
-    net = Network(seconds=0, status=limits_first("https://pp.example/board", status=403))
-    with pytest.raises(FetchError, match="^HTTP 403"):
-        Http(tmp_path, fetch=net, sleep=lambda t: None).get_json("https://pp.example/board")
-    assert len(net.starts) == 1
+BOARD_URL = "https://pp.example/board"
+
+
+@pytest.mark.parametrize("status", [429, 403])
+def test_a_request_made_by_no_book_that_is_pushed_back_is_retried_once_like_a_books(tmp_path, status):
+    net = Network(seconds=0, status=limits_first(BOARD_URL, status=status))
+    http = Http(tmp_path, fetch=net, sleep=lambda t: None)
+    assert json.loads(http.get_bytes(BOARD_URL)) == {"url": BOARD_URL}
+    assert len(net.starts) == 2 and http.live_requests == 2
+    assert http.timing == {}, "a request made by no book is not a book in the run's timing"
+
+
+def test_a_request_made_by_no_book_waits_out_the_retry_after_it_is_asked_for(tmp_path):
+    clock, slept = FakeClock(), []
+    net = Network(seconds=0, status=limits_first(BOARD_URL, retry_after="5"))
+    http = Http(tmp_path, fetch=net, sleep=lambda t: (slept.append(t), clock.sleep(t)), clock=clock, delay=(1, 2))
+    http.get_bytes(BOARD_URL)
+    assert slept == [5]
+
+
+def test_a_request_made_by_no_book_that_is_pushed_back_twice_fails(tmp_path):
+    net = Network(seconds=0, status=limits_first(BOARD_URL, times=2))
+    with pytest.raises(FetchError, match="^rate-limited: HTTP 429 .* again after backing off"):
+        Http(tmp_path, fetch=net, sleep=lambda t: None).get_bytes(BOARD_URL)
+
+
+def test_an_http_that_outlives_a_push_back_is_not_slowed_for_good(tmp_path):
+    """The app keeps one Http for board requests across runs: a 429 holds the next request for the wait asked
+    for, and after that requests go at the usual pace, one at a time with a 1-2 s pause after each."""
+    clock, slept = FakeClock(), []
+    net = Network(seconds=0, status=limits_first(BOARD_URL, retry_after="5"))
+    http = Http(tmp_path, fetch=net, sleep=lambda t: (slept.append(t), clock.sleep(t)), clock=clock, delay=(1, 2))
+    http.get_bytes(BOARD_URL)
+    clock.sleep(60)  # the next run, a minute later
+    slept.clear()
+    http.get_bytes(BOARD_URL)
+    assert slept == [], "a minute after the push-back, a board request goes at once"
+    http.get_bytes(BOARD_URL)
+    assert len(slept) == 1 and 1 <= slept[0] <= 2
 
 
 def test_a_slowed_book_stays_slowed_when_handed_a_view_again(tmp_path):
@@ -546,3 +607,48 @@ def test_a_cancelled_run_is_not_a_board_fetch_failure(tmp_path):
     http.stop()
     with pytest.raises(RunCancelled):
         prizepicks.fetch(http)
+
+
+# --- an Http that outlives runs (the app's, for the board) -----------------------
+
+def test_a_cancelled_run_stops_waiting_out_a_retry_after_on_a_shared_http(tmp_path):
+    from ppopt.progress import Progress
+
+    net = Network(seconds=0, status=limits_first(BOARD_URL, retry_after="5"))
+    http = Http(tmp_path, fetch=net)
+    progress = Progress(lambda e: None)
+    threading.Timer(0.1, progress.cancel).start()  # the browser went away during the wait
+    began = time.monotonic()
+    with pytest.raises(RunCancelled):
+        with http.stops_with(progress):
+            http.get_bytes(BOARD_URL)
+    assert time.monotonic() - began < 1 and len(net.starts) == 1
+    assert progress.on_cancel == [], "the shared Http lets go of the run when it's done with it"
+
+
+def test_a_run_already_cancelled_sends_nothing(tmp_path):
+    from ppopt.progress import Progress
+
+    net = Network(seconds=0)
+    http = Http(tmp_path, fetch=net, sleep=lambda t: None)
+    progress = Progress(lambda e: None)
+    progress.cancel()
+    with pytest.raises(RunCancelled):
+        with http.stops_with(progress):
+            http.get_bytes(BOARD_URL)
+    assert net.starts == []
+
+
+def test_a_cancelled_run_does_not_stop_the_next_run_on_a_shared_http(tmp_path):
+    from ppopt.progress import Progress
+
+    http = Http(tmp_path, fetch=Network(seconds=0), sleep=lambda t: None)
+    first = Progress(lambda e: None)
+    with http.stops_with(first):
+        http.get_bytes(BOARD_URL)
+    first.cancel()  # cancelled after its board request was done: nothing of it may linger
+    with http.stops_with(Progress(lambda e: None)):
+        assert http.get_bytes(BOARD_URL)
+    with http.stops_with(None):  # outside any run (the page fetching a board)
+        assert http.get_bytes(BOARD_URL)
+    assert http.get_bytes(BOARD_URL)

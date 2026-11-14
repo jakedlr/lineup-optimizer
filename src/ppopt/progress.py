@@ -74,10 +74,14 @@ class Progress:
         for stop in self.on_cancel:
             stop()
 
-    def tick(self, book: str = ""):
-        """One request made (live or from the odds cache), by `book`."""
+    def check(self):
+        """Raise RunCancelled if the run has been cancelled."""
         if self.cancelled:
             raise RunCancelled()
+
+    def tick(self, book: str = ""):
+        """One request made (live or from the odds cache), by `book`."""
+        self.check()
         with self.lock:
             self.done_by[book] += 1
             self._emit()

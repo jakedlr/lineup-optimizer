@@ -1,5 +1,6 @@
 """PrizePicks projections feed (JSON:API format)."""
 
+import json
 from datetime import datetime
 
 from ..matching import Config
@@ -12,18 +13,37 @@ URL = f"https://partner-api.prizepicks.com/{_QUERY}"  # the partner feed: the wh
 APP_URL = f"https://api.prizepicks.com/{_QUERY}"  # the app's feed, behind DataDome: only a logged-in browser gets it
 
 
-def fetch(http: Http) -> dict:
-    """The board, fresh from the partner feed (never from the odds cache).
-    Raises FetchError if the request fails (network errors included) or the answer isn't a projections feed."""
+def is_feed(payload) -> bool:
+    """Whether this parsed JSON looks like a PrizePicks projections feed."""
+    return isinstance(payload, dict) and isinstance(payload.get("data"), list)
+
+
+def read_feed(raw: bytes) -> dict:
+    """The projections feed in `raw` (a board as fetched or uploaded). Raises FetchError if it isn't one."""
     try:
-        payload = http.get_json(URL, cache=False)
+        payload = json.loads(raw)
+    except ValueError:
+        raise FetchError("not a PrizePicks projections feed (not JSON)") from None
+    if not is_feed(payload):
+        raise FetchError("not a PrizePicks projections feed")
+    return payload
+
+
+def fetch_raw(http: Http) -> bytes:
+    """The board as the partner feed serves it, fresh (never from the odds cache) and unread: check it with
+    read_feed. Raises FetchError if the request fails (network errors included); a cancelled run is not one."""
+    try:
+        return http.get_bytes(URL)
     except (FetchError, RunCancelled):
         raise
     except Exception as e:  # noqa: BLE001 - a dropped connection or timeout is just a failed fetch
         raise FetchError(f"{e} ({URL})") from e
-    if not isinstance(payload, dict) or not isinstance(payload.get("data"), list):
-        raise FetchError(f"not a PrizePicks projections feed: {URL}")
-    return payload
+
+
+def fetch(http: Http) -> dict:
+    """The board, fresh from the partner feed. Raises FetchError if the request fails or the answer isn't a
+    projections feed."""
+    return read_feed(fetch_raw(http))
 
 
 def _teams(projection: dict, included: dict, cfg: Config, sport: str) -> frozenset[str] | None:

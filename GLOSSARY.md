@@ -10,7 +10,7 @@
 
 **Slip**: A PrizePicks entry of 2–6 legs, played as either Power (all legs must hit) or Flex (partial payouts), valued by its expected value at the chosen stake.
 
-**Board**: A snapshot of the lines PrizePicks is offering at a moment in time. Each run fetches a fresh one from the *partner feed*; when that fetch fails, the last saved board (an earlier fetch, or one uploaded from the user's browser) is the fallback. Lines move, so a board goes stale; legs are only ever drawn from the current board.
+**Board**: A snapshot of the lines PrizePicks is offering at a moment in time. Each run fetches a fresh one from the *partner feed*, or reuses one fetched under a minute ago unless it asks for fresh odds; when that fetch fails, the last saved board (an earlier fetch, or one uploaded from the user's browser) is the fallback. Lines move, so a board goes stale; legs are only ever drawn from the current board.
 _Avoid_: projections, slate
 
 **Partner feed**: PrizePicks' partner projections endpoint, the board's usual source. It carries the same lines as the board in the PrizePicks app without its bot protection.
@@ -23,7 +23,7 @@ _Avoid_: projections, slate
 
 **Odds cache**: Sportsbook responses kept for one minute and reused by later runs. A run whose every sportsbook request is answered from it is a *cached run*; a run that fetched anything live is a *fresh run*. Only a finished fresh run (or any failed run) raises a run notification.
 
-**Pacing**: How fast a run may send requests to one sportsbook: how many at once and how far apart. Each sportsbook is paced on its own. A sportsbook that pushes back is *rate-limited* and falls back to one request at a time, slowly, for the rest of the run.
+**Pacing**: How fast a run may send requests to one sportsbook: how many at once and how far apart. Each sportsbook is paced on its own. A sportsbook that pushes back is *rate-limited* and falls back to one request at a time, slowly, for the rest of the run. Board requests to the partner feed are paced too: one at a time, across runs, backing off like a sportsbook's.
 
 **Auto run**: A run the app starts by itself on the quarter hour (:00, :15, :30, :45) while *auto runs* are switched on, whether or not the page is open. A failed board fetch switches auto runs off.
 

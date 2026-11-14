@@ -1,3 +1,4 @@
+import { StrictMode } from 'react'
 import { cleanup, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -593,19 +594,20 @@ describe('Run progress', () => {
 
   it('shows the fetched board as soon as the run has it, before the report', async () => {
     const run = controlledRun()
+    const saved_at = minutesAgo(20) // fixed before mount, so it can't read 19 or 20 depending on timing
     stub({
-      'GET /api/board': () => Response.json({ saved_at: minutesAgo(20), projections: 11, source: 'uploaded' }),
+      'GET /api/board': () => Response.json({ saved_at, projections: 11, source: 'uploaded' }),
       'POST /api/run': run.response,
     })
     render(<App />)
     await userEvent.click(await screen.findByRole('button', { name: /^run$/i }))
-    expect(await screen.findByText(/uploaded 1\d min ago/i)).toBeInTheDocument()
+    expect(await screen.findByText(/uploaded 20 min ago/i)).toBeInTheDocument()
 
     run.event({ type: 'progress', done: 0, total: 0, step: 'Fetching the PrizePicks board' })
     run.event({ type: 'board', board: { saved_at: minutesAgo(0), projections: 30253, source: 'fetched' } })
     expect(await screen.findByText(/30,253 lines/)).toBeInTheDocument()
     expect(screen.getByText(/^fetched/i)).toBeInTheDocument()
-    expect(screen.queryByText(/uploaded 1\d min ago/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/uploaded 20 min ago/i)).not.toBeInTheDocument()
     expect(screen.getByRole('progressbar', { name: /run progress/i })).toBeInTheDocument() // still running
     run.close()
   })
@@ -728,5 +730,39 @@ describe('Review fixes', () => {
       await userEvent.type(top, bad)
       expect(within(screen.getByRole('region', { name: /top legs/i })).getAllByRole('row')).toHaveLength(3)
     }
+  })
+})
+
+describe('Opening board fetch (Sprint 8 review)', () => {
+  const fetchCalls = (fetchMock: ReturnType<typeof stub>) => fetchMock.mock.calls.filter(([url]) => url === '/api/board/fetch')
+  const runButton = () => screen.getByRole('button', { name: /^run$/i })
+
+  it('holds Run while the opening fetch is going, says why, so a run cannot hit the feed right behind it', async () => {
+    let answer!: (r: Response) => void
+    stub({ 'GET /api/board': noBoard, 'POST /api/board/fetch': () => new Promise<Response>((r) => (answer = r)) })
+    render(<App />)
+    await screen.findByRole('button', { name: 'NBA', pressed: true })
+    await screen.findByText(/fetching board/i)
+    expect(runButton()).toBeDisabled()
+    expect(screen.getByText('Fetching the board…')).toBeInTheDocument()
+    answer(Response.json({ saved_at: minutesAgo(0), projections: 12, source: 'fetched' }))
+    await screen.findByText(/fetched just now/i)
+    expect(runButton()).toBeEnabled()
+    expect(screen.queryByText('Fetching the board…')).not.toBeInTheDocument()
+  })
+
+  it('sends one fetch per page open, even when StrictMode mounts twice', async () => {
+    const fetchMock = stub({
+      'GET /api/board': noBoard,
+      'POST /api/board/fetch': () => Response.json({ saved_at: minutesAgo(0), projections: 12, source: 'fetched' }),
+    })
+    render(
+      <StrictMode>
+        <App />
+      </StrictMode>,
+    )
+    await screen.findByText(/fetched just now/i)
+    expect(screen.queryByText(/fetching board/i)).not.toBeInTheDocument()
+    expect(fetchCalls(fetchMock)).toHaveLength(1)
   })
 })

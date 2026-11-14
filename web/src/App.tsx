@@ -76,29 +76,38 @@ function App() {
   useEffect(() => applyTheme(theme), [theme])
 
   useEffect(() => {
+    // StrictMode mounts twice in dev: results from the discarded mount are dropped, so only the kept one fetches the
+    // board (back-to-back fetches get rate-limited by the partner feed).
+    let live = true
     // Every run fetches its own board; this one fills the promo-leg picker when there's no usable board yet.
     const fetchNow = async () => {
       setFetching(true)
       try {
-        setBoard(await fetchBoard())
+        const fresh = await fetchBoard()
+        if (live) setBoard(fresh)
       } catch (e) {
-        setFetchError(message(e))
+        if (live) setFetchError(message(e))
       } finally {
-        setFetching(false)
+        if (live) setFetching(false)
       }
     }
     getBoard()
       .catch(() => null)
       .then((saved) => {
+        if (!live) return
         setBoard(saved)
         if (!saved || minutesSince(saved.saved_at) > STALE_MINUTES) void fetchNow()
       })
     getOptions()
       .then((o) => {
+        if (!live) return
         setOptions(o)
         setSettings(load(o))
       })
-      .catch((e) => setError(`Couldn't load run settings: ${message(e)}`))
+      .catch((e) => live && setError(`Couldn't load run settings: ${message(e)}`))
+    return () => {
+      live = false
+    }
   }, [])
 
   const change = (next: Settings) => {
@@ -108,6 +117,8 @@ function App() {
 
   const request = settings ? toRun(settings, noCache, promotion) : null
   const problem = typeof request === 'string' ? request : null
+  // A run fetches the board too; starting one mid-fetch would hit the partner feed right behind this one (HTTP 429).
+  const blocked = problem ?? (fetching ? 'Fetching the board…' : null)
 
   const upload = async (file: File) => {
     setUploading(true)
@@ -125,7 +136,7 @@ function App() {
   }
 
   const run = async () => {
-    if (!request || typeof request === 'string') return
+    if (!request || typeof request === 'string' || fetching) return
     setRunning(true)
     setError(null)
     setFetchError(null) // the run fetches again, and its report says if it had to fall back
@@ -197,12 +208,12 @@ function App() {
         <button
           type="button"
           className="primary"
-          disabled={!request || !!problem || running || uploading}
+          disabled={!request || !!blocked || running || uploading}
           onClick={run}
         >
           {running ? 'Running…' : 'Run'}
         </button>
-        {!running && problem && <span className="warn">{problem}</span>}
+        {!running && blocked && <span className="warn">{blocked}</span>}
       </div>
 
       {running && <RunProgressBar progress={progress} />}
