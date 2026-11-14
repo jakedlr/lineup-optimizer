@@ -1,4 +1,4 @@
-import type { Leg, Options, Report } from '../api'
+import type { AlertOutcome, AlertsPatch, AlertsView, Leg, Options, Report } from '../api'
 
 export function leg(over: Partial<Leg> = {}): Leg {
   return {
@@ -98,7 +98,20 @@ export interface LatestEntry extends RunInfo {
   finished_at: string
   report?: Report
   error?: string
+  alert?: AlertOutcome | null
 }
+
+/** The alert settings the server starts with, in this browser's time zone so opening the page changes nothing. */
+export const alertDefaults = (): AlertsView => ({
+  server: 'https://ntfy.sh',
+  topic: '',
+  token_set: false,
+  timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+  medium: { enabled: true, edge: 0.5, legs: 3 },
+  high: { enabled: true, edge: 1, legs: 3 },
+  saved: false,
+  updated_at: null,
+})
 
 let runs = 0
 /** A run going on the server, with an id of its own. */
@@ -144,13 +157,37 @@ export function fakeServer() {
     /** Answers GET /api/run/live while `running` is set; 204 otherwise. */
     live: null as (() => Response) | null,
     nextRunAt: localTime(14, 30),
+    alerts: alertDefaults(),
+    /** Answers POST /api/alerts/test and /api/alerts/check. */
+    test: (): Response => Response.json({ sent: true }),
+    check: (_topic?: string): Response => Response.json({ state: 'unused', detail: 'no recent messages on this topic' }),
   }
   /** Change some run settings, as PATCH /api/settings does (another tab, say). */
   const patchSettings = (changes: Record<string, unknown>) => {
     state.settings = { ...state.settings, ...changes, saved: true, updated_at: stamp() }
     return state.settings
   }
+  /** Change some alert settings, as PATCH /api/alerts does (another tab, say). */
+  const patchAlerts = (changes: AlertsPatch) => {
+    const { token, medium, high, ...rest } = changes
+    const a = state.alerts
+    state.alerts = {
+      ...a,
+      ...rest,
+      medium: { ...a.medium, ...medium },
+      high: { ...a.high, ...high },
+      token_set: token === undefined ? a.token_set : token !== '',
+      saved: true,
+      updated_at: stamp(),
+    }
+    return state.alerts
+  }
   const table: Record<string, Route> = {
+    'GET /api/alerts': () => Response.json(state.alerts),
+    'PATCH /api/alerts': (init) => Response.json(patchAlerts(JSON.parse(String(init!.body)))),
+    'POST /api/alerts/test': () =>
+      state.alerts.topic ? state.test() : Response.json({ detail: 'no ntfy topic set: choose one first' }, { status: 409 }),
+    'POST /api/alerts/check': (init) => state.check(JSON.parse(String(init?.body ?? '{}')).topic),
     'GET /api/settings': () => Response.json(state.settings),
     'PUT /api/settings': (init) => {
       state.settings = { ...JSON.parse(String(init!.body)), saved: true, updated_at: stamp() }
@@ -162,8 +199,17 @@ export function fakeServer() {
       return Response.json({
         auto: state.auto,
         running: state.running,
-        latest: l && { id: l.id, started_by: l.started_by, started_at: l.started_at, finished_at: l.finished_at, ok: !!l.report, error: l.error ?? null },
+        latest: l && {
+          id: l.id,
+          started_by: l.started_by,
+          started_at: l.started_at,
+          finished_at: l.finished_at,
+          ok: !!l.report,
+          error: l.error ?? null,
+          alert: l.alert ?? null,
+        },
         settings_updated_at: state.settings.updated_at,
+        alerts_updated_at: state.alerts.updated_at,
       })
     },
     'GET /api/report/latest': () =>
@@ -175,5 +221,5 @@ export function fakeServer() {
     },
     'GET /api/run/live': () => (state.running && state.live ? state.live() : new Response(null, { status: 204 })),
   }
-  return { state, routes: table, patchSettings }
+  return { state, routes: table, patchSettings, patchAlerts }
 }

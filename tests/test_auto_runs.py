@@ -80,7 +80,7 @@ def test_unreadable_saved_settings_read_as_never_saved(tmp_path):
 def test_auto_runs_start_off_with_nothing_run_yet(tmp_path):
     assert make(tmp_path).get("/api/status").json() == {
         "auto": {"enabled": False, "next_run_at": None, "off_reason": None}, "running": None, "latest": None,
-        "settings_updated_at": None}
+        "settings_updated_at": None, "alerts_updated_at": None}
 
 
 def test_switching_auto_runs_on_names_the_next_quarter_mark(tmp_path):
@@ -199,7 +199,8 @@ def test_status_says_which_run_is_going_and_then_how_it_ended(tmp_path):
     status = client.get("/api/status").json()
     assert status["running"] is None
     assert status["latest"] == {"id": running["id"], "started_by": "manual", "started_at": NOW.isoformat(),
-                                "finished_at": NOW.isoformat(), "ok": True, "error": None}
+                                "finished_at": NOW.isoformat(), "ok": True, "error": None,
+                                "alert": None}
 
 
 # --- the latest run --------------------------------------------------------------------------------
@@ -214,7 +215,7 @@ def test_a_manual_run_is_kept_as_the_latest_and_survives_a_restart(tmp_path):
     assert "id" not in report and "started_by" not in report, "a plain run's response is just the report"
     run_id = client.get("/api/status").json()["latest"]["id"]
     latest = {"id": run_id, "started_by": "manual", "started_at": NOW.isoformat(), "finished_at": NOW.isoformat(),
-              "report": report}
+              "report": report, "alert": None}
     assert client.get("/api/report/latest").json() == latest
     assert make(tmp_path).get("/api/report/latest").json() == latest
     assert make(tmp_path).get("/api/status").json()["latest"]["ok"] is True
@@ -234,7 +235,7 @@ def test_a_failed_run_is_kept_as_the_latest_with_its_error(tmp_path):
     assert latest["error"] == detail and "report" not in latest and latest["started_by"] == "manual"
     assert client.get("/api/status").json()["latest"] == {
         "id": latest["id"], "started_by": "manual", "started_at": NOW.isoformat(), "finished_at": NOW.isoformat(),
-        "ok": False, "error": detail}
+        "ok": False, "error": detail, "alert": None}
 
 
 def test_a_cancelled_run_is_not_kept(tmp_path, monkeypatch):
@@ -737,7 +738,7 @@ def test_unreadable_auto_and_latest_files_read_as_nothing_saved(tmp_path, junk):
     client = make(tmp_path)
     assert client.get("/api/status").json() == {
         "auto": {"enabled": False, "next_run_at": None, "off_reason": None}, "running": None, "latest": None,
-        "settings_updated_at": None}
+        "settings_updated_at": None, "alerts_updated_at": None}
     assert client.get("/api/report/latest").status_code == 404
 
 
@@ -779,10 +780,10 @@ def test_a_latest_run_saved_before_runs_had_ids_still_loads_with_no_id(tmp_path)
     old = {"started_by": "auto", "started_at": NOW.isoformat(), "finished_at": NOW.isoformat(), "report": {"x": 1}}
     (tmp_path / "data" / "latest.json").write_text(json.dumps(old))
     client = make(tmp_path)
-    assert client.get("/api/report/latest").json() == {"id": None, **old}
+    assert client.get("/api/report/latest").json() == {"id": None, **old, "alert": None}
     assert client.get("/api/status").json()["latest"] == {
         "id": None, "started_by": "auto", "started_at": NOW.isoformat(), "finished_at": NOW.isoformat(),
-        "ok": True, "error": None}
+        "ok": True, "error": None, "alert": None}
 
 
 def test_the_latest_run_is_still_shown_when_saving_it_fails(tmp_path, monkeypatch, caplog):

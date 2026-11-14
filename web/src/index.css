@@ -129,7 +129,7 @@ h1, h2, h3, p { margin: 0; }
 .engine[data-state='offline']::before { background: var(--negative); }
 
 /* Cards: white on the ground, a 1px edge, no shadow. */
-.board, .settings, .promo, .run-progress, .slip, .table-wrap, .empty-report {
+.board, .settings, .alerts, .promo, .run-progress, .slip, .table-wrap, .empty-report {
   background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-card);
 }
 
@@ -230,6 +230,44 @@ kbd, code {
 .advanced .check { min-height: var(--control-height); }
 .check:has(input:disabled) { color: var(--muted); cursor: not-allowed; }
 .check-field p { margin: 0; }
+
+/* --- phone alerts ------------------------------------------------------------------------ */
+/* Folded to one line once a topic is set: the title and where alerts go. Open, the topic and its actions lead, then
+   the two tiers as rows split by a rule, then the server and token, tucked away. Changes save themselves. */
+.alerts { padding: 16px var(--pad); }
+.alerts > details > summary { width: 100%; flex-wrap: wrap; align-items: baseline; gap: 2px 12px; }
+.alerts-summary { font-weight: 400; overflow-wrap: anywhere; min-width: 0; }
+.alerts-body { display: grid; gap: var(--gap); margin-top: 12px; }
+.alerts-body > .warn { overflow-wrap: anywhere; }
+.topic { display: flex; flex-wrap: wrap; align-items: end; gap: 8px 12px; }
+.topic-field { flex: 1 1 16rem; }
+.topic-field input { width: 100%; }
+.topic-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.topic-notes { display: grid; gap: 4px; overflow-wrap: anywhere; }
+.topic-notes a { color: var(--text); text-underline-offset: 2px; }
+.tiers { display: grid; gap: 8px; }
+.tier {
+  display: grid; grid-template-columns: minmax(12rem, 1fr) auto auto; align-items: end; gap: 8px 24px;
+  padding: 12px 0; border-top: 1px solid var(--rule);
+}
+.tier:last-of-type { border-bottom: 1px solid var(--rule); }
+.tier .switch { min-height: var(--control-height); justify-self: start; padding-left: 0; }
+.tier-name { font-weight: 500; }
+.tier .field input { width: 88px; }
+.tier-says { grid-column: 1 / -1; }
+.joined { display: flex; }
+.joined input { flex: 1; min-width: 0; border-top-right-radius: 0; border-bottom-right-radius: 0; }
+.joined button { border-top-left-radius: 0; border-bottom-left-radius: 0; margin-left: -1px; }
+.token-set { display: flex; align-items: center; gap: 12px; min-height: var(--control-height); color: var(--text); font-size: var(--fs-body); }
+@media (max-width: 40rem) {
+  .tier { grid-template-columns: auto auto 1fr; }
+  .tier .switch { grid-column: 1 / -1; }
+}
+
+/* How the latest run's alert went, beside its mark. */
+.alert-sent { color: var(--text); }
+.alert-line { padding: 0 16px; overflow-wrap: anywhere; }
+.report-head .warn { overflow-wrap: anywhere; }
 
 /* --- promotion --------------------------------------------------------------------------- */
 .promo { display: grid; gap: var(--gap); padding: 16px var(--pad); }

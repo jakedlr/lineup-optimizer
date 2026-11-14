@@ -449,3 +449,46 @@ warnings, next run 09:45.
 - e2e: Playwright defaults to :8001 and `e2e/test.ts` refuses :8000 (its reset would switch the real app's auto
   runs off); `holdFeed` releases a board of any size (`e2e/hold-feed.spec.ts`, ~400 KB through a slow reader).
 
+
+## Sprint 10: ntfy alerts
+
+**Goal:** every auto run ends in a push to the user's phone through [ntfy](https://ntfy.sh), loud only when it
+matters. Terms in `GLOSSARY.md` (*Alert*, *Alert tier*, *Qualifying leg*).
+
+**Done criteria**
+- [x] Alert settings on the server: ntfy server (default `https://ntfy.sh`), topic, optional access token (never
+      sent back to the page), and the two tiers: medium (on, edge ≥ +0.5 pts, 3+ qualifying legs, priority 3) and
+      high (on, edge ≥ +1.0 pts, 3+ qualifying legs, priority 4); each tier switchable, edge 0.1–20 step 0.1, legs 1–6
+- [x] Every auto run sends one alert: the high tier if met, else medium if met, else priority 1. A tier sends at its
+      priority only when its qualifying legs changed since its last alert; a repeat goes at priority 1
+- [x] The alert's title names the tier, how many legs qualify and the bar, and the time (`HIGH · 4 legs ≥ +1.0% ·
+      14:15`, or `14:15 · best +0.3%`); its body lists the six best legs by edge, one per game, best first, feed
+      promo legs marked
+- [x] A failed board fetch alerts at priority 4 (and auto runs switch off, as in Sprint 9); any other failure
+      alerts at priority 1 with the reason
+- [x] An alert that ntfy refuses or can't be reached is shown on the page ("alert not delivered: …"); auto runs go on
+- [x] Page: topic set by hand or *Random*; *Check* reports whether the topic looks unused, has recent messages, or is
+      reserved (advice only); *Send test*; *Advanced* holds the server and token; a note that anyone who knows a
+      public topic's name can read and post to it
+- [x] Page: both tiers' switches, edge and leg count; a warning when medium's bar is above high's
+- [x] e2e: a stand-in ntfy server records alerts; an auto run's alert carries the right priority, title and legs
+
+**Notes**
+- `ppopt.alerts` composes an alert from an auto run's outcome as pure functions; `/api/alerts` (GET/PATCH, token
+  write-only), `/api/alerts/test`, `/api/alerts/check`. Settings in `alerts.json`, tier memory in
+  `alerts_state.json`. `/api/status` carries `alerts_updated_at` and `latest.alert` (`{sent, priority, title,
+  error}`, null for manual runs, no topic, or while sending: it's attached after the run is recorded, so the run's
+  end never waits on ntfy).
+- Tier memory is saved only when an alert is delivered (an undelivered high alert goes again at 4), and a failed run
+  leaves it alone. Titles use the saved time zone (the page saves the browser's; `tzdata` is a dependency) and are
+  sent as RFC 2047 encoded words where not ASCII, which ntfy decodes (`server/util.go`). A reserved topic answers 403
+  (`server/server_middleware.go`), so *Check* reads 403 as reserved.
+- Seam: `create_app(ntfy_http=...)` at the HTTP level. e2e: `web/e2e/fake-ntfy.py` runs as the `ntfy` service
+  (:8002 from the host, `http://ntfy` from the app), records publishes, answers polls, and 403s `reserved-topic`;
+  `POST /api/alerts/forget` (e2e only) clears tier memory, and the per-test reset restores alert settings too.
+- Page: *Phone alerts* card after Run settings, open while there's no topic; *Random* (`pp-` + 12 crypto-random
+  characters), *Check*, *Send test* (saves a pending change first); *Server and token* (named so it doesn't clash
+  with *Advanced*), the token saved by a button and never shown. One hook, `useServerSaved`, now backs both
+  settings forms (debounced PATCH of changed fields, other-tab sync, pagehide keepalive).
+- Live, 2026-11-14: `/api/alerts/check` on a fresh random topic against ntfy.sh answered "unused".
+

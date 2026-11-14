@@ -10,12 +10,15 @@ import {
   runReport,
   RunFailed,
   watchRun,
+  type AlertOutcome,
   type AutoState,
   type BoardInfo,
   type Report,
   type RunHead,
   type StartedBy,
 } from './api'
+import { AlertNote } from './AlertNote'
+import { AlertsPanel } from './AlertsPanel'
 import { AutoRunsSwitch } from './AutoRunsSwitch'
 import { BoardPanel } from './BoardPanel'
 import { clock, minutesSince, runLabel, STALE_MINUTES } from './format'
@@ -30,6 +33,7 @@ import { SettingsPanel } from './SettingsPanel'
 import { sendSystemNotice } from './systemNotify'
 import { applyTheme, loadTheme, type Theme } from './theme'
 import { useRunNotifier } from './useRunNotifier'
+import { useAlertSettings } from './useAlertSettings'
 import { useRunSettings } from './useRunSettings'
 import { useServerStatus, type StatusHandler } from './useServerStatus'
 
@@ -111,11 +115,14 @@ function App() {
   const [fetching, setFetching] = useState(false)
   const [fetchError, setFetchError] = useState<string | null>(null)
   const [going, setGoing] = useState<Going | null>(null)
-  const [report, setReport] = useState<{ report: Report; label: string } | null>(null)
-  const [failure, setFailure] = useState<{ error: string; label: string } | null>(null)
+  const [report, setReport] = useState<{ report: Report; label: string; id: string | null } | null>(null)
+  const [failure, setFailure] = useState<{ error: string; label: string; id: string | null } | null>(null)
+  // How the latest recorded run's alert went, as the server last said (null while none, or still sending).
+  const [latestAlert, setLatestAlert] = useState<{ id: string; alert: AlertOutcome } | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [refused, setRefused] = useState<string | null>(null)
   const { options, settings, change, sync: syncSettings, loadError, saveError } = useRunSettings()
+  const alerts = useAlertSettings()
   const [noCache, setNoCache] = useState(false)
   const [promotion, setPromotion] = useState<Promotion>(NO_PROMOTION)
   const [progress, setProgress] = useState<Shown | null>(null)
@@ -139,13 +146,14 @@ function App() {
   }
 
   /** Show how a run ended, marked with how and when it started. */
-  const show = useCallback((run: Omit<RunRef, 'id'>, outcome: Outcome) => {
+  const show = useCallback((run: Omit<RunRef, 'id'> & { id?: string | null }, outcome: Outcome) => {
     const label = runLabel(run.started_by, run.started_at)
+    const id = run.id ?? null
     if ('report' in outcome) {
-      setReport({ report: outcome.report, label })
+      setReport({ report: outcome.report, label, id })
       setFailure(null)
     } else {
-      setFailure({ error: outcome.error, label })
+      setFailure({ error: outcome.error, label, id })
     }
   }, [])
 
@@ -218,7 +226,10 @@ function App() {
   const handleStatus: StatusHandler = (answer, seq) => {
     if (!autoBusy.current && seq > autoQuietThrough.current) setAuto(answer.auto)
     syncSettings(answer.settings_updated_at)
+    alerts.sync(answer.alerts_updated_at)
     const { running, latest } = answer
+    const told = latest?.id && latest.alert ? { id: latest.id, alert: latest.alert } : null
+    setLatestAlert((was) => (JSON.stringify(was) === JSON.stringify(told) ? was : told))
     const g = goingRef.current
     if (g && !(g.lost && seq > g.lost.since)) return
     setRefused(null) // whatever refused this page's Run has gone, or is about to be watched
@@ -357,6 +368,9 @@ function App() {
   }
 
   const autoNote = autoError ?? (auto && !auto.enabled ? auto.off_reason : null)
+  /** How the alert of the run shown went, when that run is the latest and the server has said. */
+  const alertOf = (id: string | null) => (id !== null && latestAlert?.id === id ? latestAlert.alert : null)
+  const failureAlert = failure && alertOf(failure.id)
 
   return (
     <main className="shell">
@@ -402,6 +416,7 @@ function App() {
             onNoCache={setNoCache}
             saveError={saveError}
           />
+          <AlertsPanel alerts={alerts} />
           <PromoPanel
             promotion={promotion}
             onChange={setPromotion}
@@ -439,6 +454,11 @@ function App() {
           <span className="run-mark">{failure.label}</span> {failure.error}
         </p>
       )}
+      {failureAlert && (
+        <p className="small alert-line">
+          <AlertNote alert={failureAlert} />
+        </p>
+      )}
 
       {!report && !going && (
         <section className="empty-report" aria-labelledby="empty-h">
@@ -454,6 +474,7 @@ function App() {
         <ReportView
           report={report.report}
           label={report.label}
+          alert={alertOf(report.id)}
           top={count(settings.top) ?? DEFAULT_TOP}
           slipType={settings.slipType}
           slipSize={settings.slipSize}

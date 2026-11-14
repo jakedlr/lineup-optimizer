@@ -1,4 +1,5 @@
-import type { Leg, Report } from './api'
+import { AlertNote } from './AlertNote'
+import type { AlertOutcome, Leg, Report } from './api'
 import { bookAbbr, pct, pick, signedDollars, signedPct, slipName } from './format'
 import { Segmented } from './Segmented'
 import type { Settings } from './settings'
@@ -9,6 +10,8 @@ interface Props extends SlipFilter {
   report: Report
   /** Which run it came from: "Auto run · 14:15", "Run · 14:08". */
   label?: string
+  /** How this run's alert went, when it sent one and the server has said. */
+  alert?: AlertOutcome | null
   top: number
   onFilter: (f: Partial<SlipFilter>) => void
 }
@@ -200,13 +203,19 @@ function Unpriced({ report }: { report: Report }) {
   )
 }
 
-export function ReportView({ report, label, top, slipType, slipSize, onFilter }: Props) {
+export function ReportView({ report, label, alert, top, slipType, slipSize, onFilter }: Props) {
   const s = report.settings
   return (
     <div className="report">
       <div className="report-head">
         <p className="muted small">
           {label && <span className="run-mark">{label}</span>}
+          {label && alert && (
+            <>
+              {' · '}
+              <AlertNote alert={alert} />
+            </>
+          )}
           {label && ' · '}${s.stake} stake · {s.mode} · devig {s.devig} · {s.sports.join(', ')} · next {s.hours} h
         </p>
         <button type="button" className="secondary small" onClick={() => download(report)}>

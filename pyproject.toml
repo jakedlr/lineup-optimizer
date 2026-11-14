@@ -8,6 +8,7 @@ dependencies = [
     "fastapi>=0.115",
     "uvicorn[standard]>=0.32",
     "python-multipart>=0.0.9",
+    "tzdata>=2024.1",  # IANA zones for alert times: the slim image has no /usr/share/zoneinfo
 ]
 
 [project.optional-dependencies]

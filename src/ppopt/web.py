@@ -3,13 +3,14 @@
 Paths come from the environment so the same code runs from a checkout and from the Docker image:
   PPOPT_ROOT      folder holding the engine's config JSON (payouts.json, books.json, ...)
   PPOPT_DATA      writable folder for the saved board, the odds cache, the run settings, whether auto runs are on,
-                  and the latest run
+                  the latest run, the alert settings and what the last alert's tiers were met with
   PPOPT_WEB_DIST  built SPA
   PPOPT_ODDS_FILE optional JSON list of book markets used instead of live FanDuel/DraftKings
                   (offline runs and the e2e suite)
   PPOPT_BOARD_FILE optional projections JSON read instead of PrizePicks' partner feed, at each fetch
                   (the e2e suite: a missing or broken file is a failed fetch)
-  PPOPT_E2E       "1" enables POST /api/auto/run-now, which starts an auto run without waiting for a quarter mark
+  PPOPT_E2E       "1" enables POST /api/auto/run-now, which starts an auto run without waiting for a quarter mark,
+                  and POST /api/alerts/forget, which forgets what the last alert was sent for
                   (the e2e suite)
 """
 
@@ -21,6 +22,7 @@ import time
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 from typing import Annotated, Literal
 
@@ -28,7 +30,8 @@ from fastapi import Body, FastAPI, HTTPException, Query, Request, UploadFile
 from fastapi.responses import FileResponse, Response, StreamingResponse
 from pydantic import BaseModel, ConfigDict, Field, StrictBool, ValidationError, model_validator
 
-from . import cli
+from . import alerts, cli
+from .alerts import AlertSettings, AlertsPatch, TopicCheck
 from .matching import Config, config_file, game_id, matchup_label
 from .models import BookMarket
 from .pricing import PRICING_METHODS
@@ -46,6 +49,8 @@ BOARD_META = "board.meta.json"
 SETTINGS = "settings.json"
 AUTO = "auto.json"
 LATEST = "latest.json"
+ALERTS = "alerts.json"
+ALERTS_STATE = "alerts_state.json"  # each alert tier's qualifying legs at its last delivered alert
 
 
 def ndjson(events):
@@ -202,7 +207,7 @@ class RunSettings(BaseModel):
 
 
 def create_app(static_dir=None, data_dir=None, root=None, collect=None, now=None, fetch_board=None,
-               clock=time.time, schedule=True, on_auto_run_end=None, e2e=None) -> FastAPI:
+               clock=time.time, schedule=True, on_auto_run_end=None, e2e=None, ntfy_http=None) -> FastAPI:
     """`collect` stands in for the sportsbooks and `fetch_board(progress)` for PrizePicks' partner feed: it returns
     the board's raw bytes, unchecked, or raises FetchError. `progress` is the run's (None outside a run), there only
     so a run whose client has gone stops waiting; it is never ticked.
@@ -210,8 +215,11 @@ def create_app(static_dir=None, data_dir=None, root=None, collect=None, now=None
     Auto runs: `clock` is the schedule's wall clock (epoch seconds), whose thread runs while the app is up (its
     lifespan) unless `schedule` is False; tests drive `app.state.scheduler.tick(epoch)` instead.
     `on_auto_run_end(outcome)` hears how each auto run ended: the latest run as recorded ("report" or "error") and
-    "switched_off", whether it switched auto runs off. `e2e` (default: PPOPT_E2E=1) enables
-    `POST /api/auto/run-now`."""
+    "switched_off", whether it switched auto runs off; it is heard after the run's alert has gone (or failed to).
+    `e2e` (default: PPOPT_E2E=1) enables `POST /api/auto/run-now` and `POST /api/alerts/forget`.
+
+    Alerts: `ntfy_http(method, url, headers, body, timeout) -> (status, body)` stands in for HTTP to ntfy
+    (`alerts.Transport`; default urllib)."""
     static_dir = Path(static_dir or os.environ.get("PPOPT_WEB_DIST") or DEFAULT_STATIC)
     data_dir = Path(data_dir or os.environ.get("PPOPT_DATA") or REPO / "data")
     root = Path(root or os.environ.get("PPOPT_ROOT") or cli.ROOT)
@@ -229,6 +237,7 @@ def create_app(static_dir=None, data_dir=None, root=None, collect=None, now=None
             with board_http.stops_with(progress):
                 return prizepicks.fetch_raw(board_http)
     now = now or cli.utcnow
+    ntfy_http = ntfy_http or alerts.urllib_transport
     e2e = os.environ.get("PPOPT_E2E") == "1" if e2e is None else e2e
 
     @asynccontextmanager
@@ -400,6 +409,103 @@ def create_app(static_dir=None, data_dir=None, root=None, collect=None, now=None
             # Each field was checked as it arrived, and the base is valid, so the merge is too.
             return save_settings(SavedSettings(**{**base, **patch.changes()}))
 
+    alerts_path, alerts_state_path = data_dir / ALERTS, data_dir / ALERTS_STATE
+    alerts_lock = threading.Lock()  # held from reading the saved alert settings to saving them, so changes merge
+
+    def stored_alerts() -> tuple[AlertSettings | None, str | None]:
+        """The saved alert settings and when they were saved, or (None, None) when never saved (or unreadable)."""
+        stored = read_json(alerts_path)
+        if not isinstance(stored, dict):
+            return None, None
+        updated_at = stored.pop("updated_at", None)
+        try:
+            return AlertSettings.model_validate(stored), updated_at if isinstance(updated_at, str) else None
+        except ValidationError:
+            return None, None
+
+    def alert_settings() -> AlertSettings:
+        return stored_alerts()[0] or AlertSettings()
+
+    def alerts_view(saved: AlertSettings | None, updated_at: str | None) -> dict:
+        return {**(saved or AlertSettings()).view(), "saved": saved is not None,
+                "updated_at": updated_at if saved else None}
+
+    @app.get("/api/alerts")
+    def get_alerts() -> dict:
+        return alerts_view(*stored_alerts())
+
+    @app.patch("/api/alerts")
+    def patch_alerts(patch: AlertsPatch) -> dict:
+        """Change some of the alert settings, keeping the rest as saved (or the defaults)."""
+        with alerts_lock:
+            changed = patch.onto(alert_settings())
+            updated_at = now().isoformat()
+            write_json(alerts_path, {**changed.model_dump(), "updated_at": updated_at})
+        return alerts_view(changed, updated_at)
+
+    def topic_needed(settings: AlertSettings) -> None:
+        if not settings.topic:
+            raise HTTPException(409, "no ntfy topic set: choose one first")
+
+    @app.post("/api/alerts/test")
+    def test_alert() -> dict:
+        settings = alert_settings()
+        topic_needed(settings)
+        test = alerts.Alert(3, alerts.TEST_ALERT_TITLE, alerts.TEST_ALERT_BODY)
+        try:
+            alerts.publish(test, settings.server, settings.topic, settings.token, ntfy_http)
+        except alerts.SendFailed as e:
+            raise HTTPException(502, str(e)) from e
+        return {"sent": True}
+
+    @app.post("/api/alerts/check")
+    def check_topic(check: Annotated[TopicCheck | None, Body()] = None) -> dict:
+        """Advice on whether a topic (by default the saved one) looks free to use, read with the saved server and
+        token."""
+        settings = alert_settings()
+        topic = check.topic if check is not None and check.topic is not None else settings.topic
+        if not topic:
+            raise HTTPException(409, "no ntfy topic set: name one to check")
+        return alerts.check(settings.server, topic, settings.token, ntfy_http)
+
+    alert_lock = threading.Lock()  # one alert at a time: its tiers' last legs are read, it's sent, then they're saved
+
+    def send_alert(outcome: dict) -> None:
+        """Send an auto run's alert, when a topic is set, and keep how that went with the latest run. A tier's legs
+        are remembered only once its alert is delivered: an alert the phone never got isn't a repeat."""
+        settings = alert_settings()
+        if not settings.topic:
+            return
+        at = datetime.fromisoformat(outcome["started_at"]).astimezone(ZoneInfo(settings.timezone))
+        with alert_lock:
+            stored = read_json(alerts_state_path)
+            stored = stored if isinstance(stored, dict) else {}
+            previous = {name: v if isinstance(v := stored.get(name), list) else None for name, _ in alerts.TIERS}
+            alert, sets = alerts.compose(outcome, settings.model_dump(), previous, at)
+            try:
+                alerts.publish(alert, settings.server, settings.topic, settings.token, ntfy_http)
+                error = None
+            except alerts.SendFailed as e:
+                error = str(e)
+                log.warning("alert not delivered: %s", error)
+            if error is None:
+                try:
+                    write_json(alerts_state_path, sets)
+                except Exception:  # noqa: BLE001 - the next alert may go at a tier again; nothing worse
+                    log.exception("couldn't save what the alert's tiers were met with")
+        attach_alert(outcome["id"], {"sent": error is None, "priority": alert.priority, "title": alert.title,
+                                     "error": error})
+
+    @app.post("/api/alerts/forget")
+    def forget_alerted() -> dict:
+        """Forget each tier's last qualifying legs, so the next alert isn't taken for a repeat (the e2e suite's
+        specs each start from none)."""
+        if not e2e:
+            raise HTTPException(404, "not found")
+        with alert_lock:
+            alerts_state_path.unlink(missing_ok=True)
+        return {"forgotten": True}
+
     # Auto runs on or off, and why they were switched off when a run did it. Saved on every change.
     stored = read_json(data_dir / AUTO)
     stored = stored if isinstance(stored, dict) else {}
@@ -431,15 +537,27 @@ def create_app(static_dir=None, data_dir=None, root=None, collect=None, now=None
     stored = read_json(data_dir / LATEST)
     latest = {"entry": {"id": None, **stored}
               if isinstance(stored, dict) and {"started_by", "started_at", "finished_at"} <= set(stored) else None}
+    latest_lock = threading.Lock()  # held from keeping a latest run to saving it, so saves land in the same order
 
-    def record(entry: dict) -> None:
-        """Keep this run as the latest, then save it. A failed save is logged: the page still sees the run until the
-        app restarts."""
+    def keep(entry: dict) -> None:
+        """Keep this run as the latest, then save it. Call under latest_lock. A failed save is logged: the page still
+        sees the run until the app restarts."""
         latest["entry"] = entry
         try:
             write_json(data_dir / LATEST, entry)
         except Exception:  # noqa: BLE001 - the run already ended; only its keeping across a restart is lost
             log.exception("couldn't save the latest run")
+
+    def record(entry: dict) -> None:
+        with latest_lock:
+            keep(entry)
+
+    def attach_alert(run_id: str, alert: dict) -> None:
+        """Add how its alert went to the latest run, unless a later run has taken its place since."""
+        with latest_lock:
+            entry = latest["entry"]
+            if entry is not None and entry["id"] == run_id:
+                keep({**entry, "alert": alert})
 
     runner = app.state.runner = Runner(now, record)
 
@@ -452,8 +570,9 @@ def create_app(static_dir=None, data_dir=None, root=None, collect=None, now=None
                                   "started_at": going.started_at.isoformat()},
             "latest": entry and {"id": entry["id"], "started_by": entry["started_by"],
                                  "started_at": entry["started_at"], "finished_at": entry["finished_at"],
-                                 "ok": "report" in entry, "error": entry.get("error")},
+                                 "ok": "report" in entry, "error": entry.get("error"), "alert": entry.get("alert")},
             "settings_updated_at": stored_settings()[1],
+            "alerts_updated_at": stored_alerts()[1],
         }
 
     @app.get("/api/board")
@@ -567,8 +686,13 @@ def create_app(static_dir=None, data_dir=None, root=None, collect=None, now=None
                 raise cli.UserError(reason) from e
 
         def ended(entry: dict) -> None:
+            outcome = {**entry, "switched_off": switched_off}
+            try:
+                send_alert(outcome)
+            except Exception:  # noqa: BLE001 - alerts never get in the way of auto runs
+                log.exception("the auto run's alert failed")
             if on_auto_run_end is not None:
-                on_auto_run_end({**entry, "switched_off": switched_off})
+                on_auto_run_end(outcome)
 
         try:
             runner.start(work, "auto", on_end=ended)
@@ -599,7 +723,8 @@ def create_app(static_dir=None, data_dir=None, root=None, collect=None, now=None
         entry = latest.get("entry")
         if entry is None:
             raise HTTPException(404, "no run has finished yet")
-        return entry
+        # The alert is null for a manual run, an auto run with no topic set, and an auto run whose alert is going.
+        return {**entry, "alert": entry.get("alert")}
 
     @app.get("/api/{rest:path}", include_in_schema=False)
     def api_not_found(rest: str):

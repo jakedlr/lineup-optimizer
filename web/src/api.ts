@@ -295,12 +295,24 @@ export interface RecordedRun {
   finished_at: string
 }
 
+/** How an auto run's alert went (GLOSSARY: Alert). */
+export interface AlertOutcome {
+  sent: boolean
+  priority: number
+  title: string
+  /** Why ntfy refused it or couldn't be reached; null when sent. */
+  error: string | null
+}
+
 export interface Status {
   auto: AutoState
   running: RunHead | null
-  latest: (RecordedRun & { ok: boolean; error: string | null }) | null
+  /** `alert` is null for a manual run, an auto run with no topic set, and an auto run whose alert is still going. */
+  latest: (RecordedRun & { ok: boolean; error: string | null; alert?: AlertOutcome | null }) | null
   /** When the run settings were last saved (null: never). */
   settings_updated_at: string | null
+  /** When the alert settings were last saved (null: never). */
+  alerts_updated_at?: string | null
 }
 
 export async function getStatus(): Promise<Status> {
@@ -327,4 +339,70 @@ export async function getLatest(): Promise<LatestRun | null> {
   const res = await fetch('/api/report/latest')
   if (res.status === 404) return null
   return json(res)
+}
+
+/** An alert tier (GLOSSARY: Alert tier): met when `legs` games' best legs reach `edge` percentage points. */
+export interface AlertTier {
+  enabled: boolean
+  edge: number
+  legs: number
+}
+
+export type TierName = 'high' | 'medium'
+
+/** The alert settings as the server shows them: never the access token, only whether there is one. */
+export interface AlertsView {
+  server: string
+  /** "" is no topic: auto runs send no alerts. */
+  topic: string
+  token_set: boolean
+  /** The time zone alert titles' clock is in. */
+  timezone: string
+  medium: AlertTier
+  high: AlertTier
+  saved: boolean
+  updated_at: string | null
+}
+
+/** Some alert settings to change; a tier may be changed in part, and a token of "" clears it. */
+export interface AlertsPatch {
+  server?: string
+  topic?: string
+  token?: string
+  timezone?: string
+  medium?: Partial<AlertTier>
+  high?: Partial<AlertTier>
+}
+
+export async function getAlerts(): Promise<AlertsView> {
+  return json(await fetch('/api/alerts'))
+}
+
+export async function patchAlerts(changes: AlertsPatch, keepalive = false): Promise<AlertsView> {
+  return json(
+    await fetch('/api/alerts', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(changes),
+      keepalive,
+    }),
+  )
+}
+
+/** Send a test alert to the saved topic. Fails with the reason: no topic (409), or ntfy refused it or is down (502). */
+export async function sendTestAlert(): Promise<void> {
+  await json(await fetch('/api/alerts/test', { method: 'POST' }))
+}
+
+export type TopicState = 'unused' | 'recent' | 'reserved' | 'unknown'
+
+/** Advice on whether a topic (by default the saved one) looks free to use. */
+export async function checkTopic(topic?: string): Promise<{ state: TopicState; detail: string }> {
+  return json(
+    await fetch('/api/alerts/check', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(topic ? { topic } : {}),
+    }),
+  )
 }

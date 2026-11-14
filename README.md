@@ -58,6 +58,16 @@ already going is skipped. If the board can't be fetched, auto runs switch themse
 says why. The page always opens on the latest run's report, labelled *Auto run · 14:15* or
 *Run · 14:08*, and an open page follows an auto run as it happens.
 
+**Phone alerts.** Install the [ntfy](https://ntfy.sh) app, open **Phone alerts**, press *Random* for a
+hard-to-guess topic (anyone who knows a public topic's name can read and post to it), and subscribe to
+it in the app (*Send test* checks it arrives). Every auto run then pushes its six best legs (one per
+game) to your phone. It's loud only when it matters: **High** (priority 4, default 3+ games with a leg at
++1.0 pts edge or better) or **Medium** (priority 3, +0.5 pts), each adjustable and switchable; otherwise,
+or when a tier's legs haven't changed since its last alert, it arrives silently at priority 1. A board
+fetch that fails, switching auto runs off, alerts at priority 4. *Check* says whether a topic looks
+unused, has recent messages, or is reserved; *Server and token* points at a self-hosted or protected
+topic.
+
 ## How it works
 
 PrizePicks doesn't show odds. It just offers lines, like *Caleb Williams over/under 246.5 pass
@@ -300,7 +310,7 @@ Agent skills from these repos were used to plan, design and build this project w
 
 ```bash
 make test     # Python (pytest) and web (Vitest) unit tests
-make e2e      # Playwright against a separate container on port 8001 with canned odds and a canned board
+make e2e      # Playwright against a separate container on port 8001 with canned odds, a canned board and a stand-in ntfy (:8002)
 make up       # rebuild and restart the app on port 8000
 ```
 

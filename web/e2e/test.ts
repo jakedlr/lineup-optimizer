@@ -9,10 +9,20 @@ export function refuseLiveApp(baseURL: string | undefined) {
     throw new Error(`refusing to run e2e against ${baseURL}: port ${LIVE_APP_PORT} is the real app; use \`make e2e\` (:8001)`)
 }
 
-// Run settings, auto runs and the latest run live on the server (docs/adr/0003-server-side-auto-runs.md), shared by
-// every spec. Each test leaves auto runs off (so a real quarter mark can't start a run mid-suite) and the run
-// settings at the engine's defaults, so the suite refuses to run against the real app. Only one run goes at a time,
-// so the specs that start runs run one at a time (playwright.config.ts).
+/** The alert settings the server starts with (src/ppopt/alerts.py), bar the time zone: no topic, so no alerts. */
+export const ALERT_DEFAULTS = {
+  server: 'https://ntfy.sh',
+  topic: '',
+  token: '',
+  medium: { enabled: true, edge: 0.5, legs: 3 },
+  high: { enabled: true, edge: 1.0, legs: 3 },
+}
+
+// Run settings, alert settings, auto runs and the latest run live on the server (docs/adr/0003-server-side-auto-runs.md),
+// shared by every spec. Each test leaves auto runs off (so a real quarter mark can't start a run mid-suite), the run
+// settings at the engine's defaults, the alert settings at theirs (no topic) with what was last alerted forgotten, so
+// the suite refuses to run against the real app. Only one run goes at a time, so the specs that start runs run one at
+// a time (playwright.config.ts).
 export const test = base.extend<{ serverState: void }>({
   serverState: [
     async ({ request, baseURL }, use) => {
@@ -21,6 +31,8 @@ export const test = base.extend<{ serverState: void }>({
       expect((await request.put('/api/auto', { data: { enabled: false } })).ok()).toBe(true)
       const { defaults } = await (await request.get('/api/options')).json()
       expect((await request.put('/api/settings', { data: defaults })).ok()).toBe(true)
+      expect((await request.patch('/api/alerts', { data: ALERT_DEFAULTS })).ok()).toBe(true)
+      expect((await request.post('/api/alerts/forget')).ok()).toBe(true)
     },
     { auto: true },
   ],

@@ -2,7 +2,10 @@
 # partner feed, so runs are deterministic and work from anywhere. Used by `make e2e` as a separate project on port 8001.
 # The feed is whatever web/e2e/.feed/projections.json holds when the app fetches: specs write or remove it from the
 # host (no file is a failed fetch). The folder is mounted, not the file, so a spec replacing the file is seen.
-# PPOPT_E2E enables POST /api/auto/run-now, so a spec can start an auto run without waiting for a quarter mark.
+# PPOPT_E2E enables POST /api/auto/run-now, so a spec can start an auto run without waiting for a quarter mark, and
+# POST /api/alerts/forget, so each spec's first alert isn't taken for a repeat of the last spec's.
+# `ntfy` stands in for an ntfy server (web/e2e/fake-ntfy.py): the app reaches it as http://ntfy, specs on the host
+# as http://localhost:8002, where GET /_published lists what it was sent.
 services:
   app:
     environment:
@@ -12,3 +15,15 @@ services:
     volumes:
       - ./tests/fixtures:/fixtures:ro
       - ./web/e2e/.feed:/feed:ro
+  ntfy:
+    image: python:3.13-slim
+    command: ["python", "-u", "/fake-ntfy.py", "80"]
+    volumes:
+      - ./web/e2e/fake-ntfy.py:/fake-ntfy.py:ro
+    ports:
+      - "${PPOPT_NTFY_PORT:-8002}:80"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost/_health')"]
+      interval: 2s
+      timeout: 2s
+      retries: 15

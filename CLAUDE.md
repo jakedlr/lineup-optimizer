@@ -26,9 +26,10 @@ These come from external repos (install steps: README → References). Reach for
 - Test-first: a failing test, then the change. UI behaviour gets a Vitest test; layout and anything CSS decides gets
   a Playwright spec in `web/e2e/`.
 - `make e2e` runs a separate compose project on port 8001 with canned odds (`tests/fixtures/markets.json`) and a
-  canned partner feed (`web/e2e/.feed/`), so it needs neither live books nor a US connection. Specs shift the
+  canned partner feed (`web/e2e/.feed/`), so it needs neither live books nor a US connection; alerts go to a stand-in
+  ntfy (`web/e2e/fake-ntfy.py`, :8002) that records them. Specs shift the
   fixture board's start times to two hours from now. Only one run goes at a time, so specs run serially: import
-  `test` from `e2e/test.ts` (it switches auto runs off and restores run settings after each test), and use
+  `test` from `e2e/test.ts` (after each test it switches auto runs off and restores run and alert settings), and use
   `holdFeed()` from `e2e/board.ts` to hold a run mid-fetch.
 - Done means `make test` and `make e2e` green, `make up` rebuilt, `docs/sprints.md` updated, then commit and push to
   `main` (no branches in this project).

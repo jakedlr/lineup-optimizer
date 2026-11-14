@@ -29,6 +29,11 @@ _Avoid_: projections, slate
 
 **Auto run**: A run the app starts by itself on the quarter hour (:00, :15, :30, :45) while *auto runs* are switched on, whether or not the page is open. A failed board fetch switches auto runs off.
 
+**Alert**: The push an auto run sends to the user's phone through ntfy when it ends, carrying a priority, a title and the six best legs. Only auto runs send alerts; manual runs raise only a run notification.
+_Avoid_: push, ping
+
+**Alert tier**: A level an alert can be sent at, met when enough legs reach its edge threshold: *medium* (ntfy priority 3) or *high* (priority 4). Each can be switched off. An auto run meeting neither, or meeting a tier with the same qualifying legs as its last delivered alert, alerts at priority 1.
+
 **Qualifying leg**: A leg whose edge meets an alert tier's threshold. At most one per game counts, so a count of qualifying legs is a slip that could be played.
 
 **Run notification**: The alert that a run has ended: a pop-up in the page, and while the tab is in the background, a mark on the tab and (when allowed) a system notification.
