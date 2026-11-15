@@ -43,7 +43,7 @@ afterEach(() => {
 })
 
 const settingsCard = () => screen.getByRole('region', { name: 'Run settings' })
-const promoCard = () => screen.getByRole('region', { name: 'Promotion' })
+const promoCard = () => screen.getByRole('region', { name: 'Promos' })
 const runButton = () => screen.getByRole('button', { name: /^run/i })
 const ready = async () => {
   await screen.findByRole('button', { name: 'NBA', pressed: true })
@@ -221,13 +221,13 @@ describe('Why Run is held, said where the cause is', () => {
     expect(hours).toHaveAccessibleDescription('Hours ahead must be more than 0.')
   })
 
-  it('with a promotion that cannot run, in the Promotion card', async () => {
+  it('with a promotion that cannot run, in the Promos card', async () => {
     stub()
     render(<App />)
     await ready()
     await userEvent.click(within(promoCard()).getByRole('button', { name: 'Promo legs' }))
-    expect(within(promoCard()).getByText('Add a promo leg, or set Promotion to None.')).toBeInTheDocument()
-    expect(screen.getAllByText('Add a promo leg, or set Promotion to None.')).toHaveLength(2)
+    expect(within(promoCard()).getByText('Add a promo leg, or set Promos to None.')).toBeInTheDocument()
+    expect(screen.getAllByText('Add a promo leg, or set Promos to None.')).toHaveLength(2)
   })
 })
 

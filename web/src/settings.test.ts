@@ -14,7 +14,7 @@ describe('toRun', () => {
     expect(toRun(base, false, { ...NO_PROMOTION, kind: 'boost', boost: '1' })).toMatchObject({ field: 'promotion' })
     expect(toRun(base, false, { ...NO_PROMOTION, kind: 'legs' })).toEqual({
       field: 'promotion',
-      text: 'Add a promo leg, or set Promotion to None.',
+      text: 'Add a promo leg, or set Promos to None.',
     })
     const nba = { ...leg({ sport: 'NBA', player: 'Joel Embiid' }), side: 'over' as const }
     expect(toRun({ ...base, sports: ['NFL'] }, false, { ...NO_PROMOTION, kind: 'legs', legs: [nba] })).toMatchObject({ field: 'promotion' })

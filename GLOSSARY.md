@@ -6,6 +6,9 @@
 
 **Leg**: A single PrizePicks pick (player, stat, line, over/under) together with its true win probability derived from sportsbook odds.
 
+**Promo**: A bonus entry, a payout boost, or promo legs. One kind per run, chosen for that run and never saved.
+_Avoid_: promotion
+
 **Promo leg**: A leg on a discounted PrizePicks line, either found in the feed or entered manually. A slip holds at most one.
 
 **Slip**: A PrizePicks entry of 2–6 legs, played as either Power (all legs must hit) or Flex (partial payouts), valued by its expected value at the chosen stake.
@@ -25,7 +28,7 @@ _Avoid_: projections, slate
 
 **Pacing**: How fast a run may send requests to one sportsbook: how many at once and how far apart. Each sportsbook is paced on its own. A sportsbook that pushes back is *rate-limited* and falls back to one request at a time, slowly, for the rest of the run. Board requests to the partner feed are paced too: one at a time, across runs, backing off like a sportsbook's.
 
-**Run settings**: The saved choices every run starts from: leagues, stake, hours ahead, devig method and reference slip. Shared by manual and auto runs. Promotions and fresh odds are per run and never part of them.
+**Run settings**: The saved choices every run starts from: leagues, stake, hours ahead, devig method and reference slip. Shared by manual and auto runs. Promos and fresh odds are per run and never part of them.
 
 **Auto run**: A run the app starts by itself on the quarter hour (:00, :15, :30, :45) while *auto runs* are switched on, whether or not the page is open. A failed board fetch switches auto runs off.
 

@@ -2,8 +2,8 @@ import type { Locator, Page } from '@playwright/test'
 import { holdFeed } from './board.ts'
 import { expect, run, test } from './test.ts'
 
-// Sprint 11, M1–M3 and MO-6: Run and the report come first, the setup after; on a phone Run is held in a bar at the
-// foot of the screen wherever the page is scrolled; the theme is chosen at the foot of the page; control edges read.
+// Sprint 11, M2–M3 and MO-6, and Sprint 12: the setup cards come first, then Run, then the report; on a phone Run is
+// held in a bar at the foot of the screen wherever the page is scrolled; the theme is chosen at the foot of the page.
 
 const runButton = (page: Page) => page.getByRole('button', { name: /^Run/ })
 const slipsHeading = (page: Page) => page.getByRole('heading', { name: 'Best Slips' })
@@ -31,22 +31,27 @@ async function onScreen(page: Page, el: Locator) {
 test.describe('on a desktop', () => {
   test.use({ viewport: { width: 1440, height: 900 } })
 
-  test('Run and the top of Best Slips are on the first screen, the setup cards after the report', async ({ page }) => {
+  test('the setup cards, then Run, then the report, with Run and the top of Best Slips on the first screen', async ({ page }) => {
     await withReport(page)
     expect(await page.evaluate(() => scrollY)).toBe(0)
     const run = (await runButton(page).boundingBox())!
     expect(run.y + run.height).toBeLessThan(900)
-    expect((await slipsHeading(page).boundingBox())!.y).toBeLessThan(900)
+    const slips = (await slipsHeading(page).boundingBox())!
+    expect(slips.y + slips.height).toBeLessThan(900)
     const top = async (name: string) => (await page.getByRole('region', { name, exact: true }).boundingBox())!.y
-    const legs = await top('Top Legs')
-    expect(await top('Run settings')).toBeGreaterThan(legs)
-    expect(await top('Promotion')).toBeGreaterThan(await top('Run settings'))
-    expect(await top('Phone alerts')).toBeGreaterThan(await top('Promotion'))
-    // Fresh odds sits in the Run row; the theme at the foot of the page, after the last card.
+    const settings = await top('Run settings')
+    const promos = await top('Promos')
+    const alerts = await top('Phone alerts')
+    expect(promos).toBeGreaterThan(settings)
+    expect(alerts).toBeGreaterThan(promos)
+    expect(run.y).toBeGreaterThan(alerts)
+    expect(slips.y).toBeGreaterThan(run.y)
+    expect(await top('Top Legs')).toBeGreaterThan(slips.y)
+    // Fresh odds sits in the Run row; the theme at the foot of the page, after the report.
     const fresh = (await page.getByLabel(/Fresh odds/).boundingBox())!
     expect(Math.abs(fresh.y + fresh.height / 2 - (run.y + run.height / 2))).toBeLessThan(6)
     const theme = (await page.getByRole('group', { name: 'Theme' }).boundingBox())!
-    expect(theme.y).toBeGreaterThan(await top('Phone alerts'))
+    expect(theme.y).toBeGreaterThan(await top('Top Legs'))
   })
 })
 

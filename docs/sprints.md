@@ -563,3 +563,38 @@ unit comments, and BoardPanel's copy of `useNow`, now the shared hook):
 - The page's two grounds live in index.css and index.html's `theme-color` metas only: the inline theme script and
   `theme.ts` read them from the metas (kept in `data-ground` once painted over); an e2e spec holds the metas to the
   computed `--ground`.
+
+## Sprint 12: setup above the report
+
+**Goal:** the page reads in the order it's used: set up, then Run, then the report. Sprint 11's M1 put the setup
+cards below the report, which the user didn't intend; this sprint moves them back above Run and renames the
+*Promotion* card and picker to **Promos** (GLOSSARY.md). Layout and naming only: no other visual change, nothing
+folded or compacted.
+
+**Done criteria**
+- [x] One column, the same on desktop and phone: header, board strip, Run settings, Promos, Phone alerts, the Run row
+      (Run, Auto runs, Fresh odds, why Run is held, Next run) and its auto note, progress or errors, then "No report
+      yet" or the report, then the theme at the foot
+- [x] At 1440x900 with a report and scrollY 0, Run and the Best Slips heading are on the first screen (Run at y≈574,
+      Best Slips at y≈704 with the fixture board); Fresh odds stays level with Run
+- [x] Below 40rem Run and the Auto runs switch keep their sticky bar at the foot of the screen, and pressing Run still
+      scrolls the page's own progress card into view
+- [x] The user-facing word is "Promos": the card title and its placeholder, the picker's group name, and the held-Run
+      text "Add a promo leg, or set Promos to None."; code identifiers (`Promotion`, `NO_PROMOTION`) and the CLI keep
+      "promotion"
+- [x] `make test` (648 pytest, 283 Vitest) and `make e2e` (61) green; `lint.mjs --app web/src` 0 FAIL, 0 WARN;
+      `inspect.mjs --app` on the e2e stack 0 FAIL, 1 WARN (see Notes)
+- [x] Before/after screenshots at 1440x900 and 390x844 (first screen and full page) for the user's review
+
+**Notes**
+- Only App.tsx's order changed. No CSS rule depended on the old order: the phone Run bar is placed last in the column
+  by `order: 1` on a sticky grid item, not by where the Run row sits, so it still rests under the theme at the very
+  end. Two CSS comments that said the Run row sits "under the board" now say "above the report".
+- On a phone the Run row's notes (Fresh odds, Next run) now sit just under Phone alerts, and the progress card starts
+  below the first screen, so pressing Run scrolls to it, as Sprint 11 already did from deep in the report.
+- `controls.spec.ts`'s "nothing below the settings moves when they land" now guards Run itself, which sits under the
+  setup cards and their placeholders.
+- `inspect.mjs` on the e2e stack warns `tiny-text` (50% of the text under 13px). It counts characters over the whole
+  page, so order doesn't move it: HEAD before this sprint, built the same way with the same report, warns the same
+  50%. The fixture report has five Top Legs rows, so the 11–12px labels outweigh the 14px data; Sprint 11's 0 WARN
+  was on a full live board.

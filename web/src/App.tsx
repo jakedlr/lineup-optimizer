@@ -399,8 +399,35 @@ function App() {
         onFile={upload}
       />
 
-      {/* The Run row. On a phone its bar (Run and the auto runs switch) holds to the foot of the screen; the rest of
-          the row stays here in the page. */}
+      {/* The setup, read before Run: what it runs, the promo for this entry, and where its alerts go. */}
+      {options && settings ? (
+        <SettingsPanel
+          options={options}
+          settings={settings}
+          onChange={change}
+          saveError={saveError}
+          savedAt={savedAt}
+          problem={problem}
+        />
+      ) : (
+        !loadError && <SettingsPlaceholder />
+      )}
+      {options && settings ? (
+        <PromoPanel
+          promotion={promotion}
+          onChange={setPromotion}
+          sports={settings.sports}
+          hours={positive(settings.hours)}
+          boardKey={board?.saved_at ?? null}
+          problem={problem}
+        />
+      ) : (
+        !loadError && <PromoPlaceholder />
+      )}
+      <AlertsPanel alerts={alerts} />
+
+      {/* The Run row, after the setup and above the report. On a phone its bar (Run and the auto runs switch) holds to
+          the foot of the screen; the rest of the row stays here in the page. */}
       <div className="run-row">
         <div className="run-bar">
           <button
@@ -486,32 +513,6 @@ function App() {
           onFilter={(f) => change({ ...settings, ...f })}
         />
       )}
-
-      {options && settings ? (
-        <SettingsPanel
-          options={options}
-          settings={settings}
-          onChange={change}
-          saveError={saveError}
-          savedAt={savedAt}
-          problem={problem}
-        />
-      ) : (
-        !loadError && <SettingsPlaceholder />
-      )}
-      {options && settings ? (
-        <PromoPanel
-          promotion={promotion}
-          onChange={setPromotion}
-          sports={settings.sports}
-          hours={positive(settings.hours)}
-          boardKey={board?.saved_at ?? null}
-          problem={problem}
-        />
-      ) : (
-        !loadError && <PromoPlaceholder />
-      )}
-      <AlertsPanel alerts={alerts} />
 
       <footer className="foot">
         <span className="muted small" aria-hidden="true">

@@ -56,7 +56,7 @@ const ready = async () => {
 const before = (a: Element, b: Element) => !!(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING)
 
 describe('One column', () => {
-  it('reads board, Run, the report, then the setup cards: run settings, promotion, phone alerts', async () => {
+  it('reads board, the setup cards (run settings, promos, phone alerts), Run, then the report', async () => {
     stub()
     render(<App />)
     await ready()
@@ -64,11 +64,11 @@ describe('One column', () => {
     const slips = await screen.findByRole('region', { name: /best slips/i })
     const order = [
       screen.getByRole('region', { name: 'Board' }),
+      screen.getByRole('region', { name: 'Run settings' }),
+      screen.getByRole('region', { name: 'Promos' }),
+      screen.getByRole('region', { name: 'Phone alerts' }),
       runButton(),
       slips,
-      screen.getByRole('region', { name: 'Run settings' }),
-      screen.getByRole('region', { name: 'Promotion' }),
-      screen.getByRole('region', { name: 'Phone alerts' }),
     ]
     for (let i = 1; i < order.length; i++) expect(before(order[i - 1], order[i])).toBe(true)
   })
@@ -90,6 +90,7 @@ describe('One column', () => {
     expect(theme.closest('header')).toBeNull()
     expect(theme.closest('footer')).not.toBeNull()
     expect(before(screen.getByRole('region', { name: 'Phone alerts' }), theme)).toBe(true)
+    expect(before(runButton(), theme)).toBe(true)
   })
 })
 

@@ -206,7 +206,7 @@ export function toRun(s: Settings, noCache: boolean, promo: Promotion = NO_PROMO
     boost = positive(promo.boost)
     if (boost === null || boost <= 1) return held('Boost must be more than 1 (e.g. 1.4).')
   }
-  if (promo.kind === 'legs' && promo.legs.length === 0) return held('Add a promo leg, or set Promotion to None.')
+  if (promo.kind === 'legs' && promo.legs.length === 0) return held('Add a promo leg, or set Promos to None.')
   if (promo.kind === 'legs') {
     const off = promo.legs.find((l) => !s.sports.includes(l.sport))
     if (off) return held(`${off.player} is an ${off.sport} promo leg, but ${off.sport} isn't selected.`)

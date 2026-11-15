@@ -127,7 +127,7 @@ test("nothing below the settings moves when they land: the cards hold their plac
   await page.goto('/')
   const settings = page.getByRole('region', { name: 'Run settings' })
   await expect(settings).toHaveAttribute('aria-busy', 'true')
-  await expect(page.getByRole('region', { name: 'Promotion' })).toBeVisible()
+  await expect(page.getByRole('region', { name: 'Promos' })).toBeVisible()
   const before = (await runButton(page).boundingBox())!
   answer()
   await expect(settings).not.toHaveAttribute('aria-busy')

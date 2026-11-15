@@ -170,10 +170,10 @@ export function PromoPanel({ promotion, onChange, sports, hours, boardKey, probl
     <section className="promo" aria-labelledby="promo-h">
       <div className="promo-head">
         <h2 id="promo-h" className="label">
-          Promotion
+          Promos
         </h2>
         <Segmented<Promotion['kind']>
-          label="Promotion"
+          label="Promos"
           value={promotion.kind}
           options={[
             { value: 'none', label: 'None' },
@@ -254,13 +254,13 @@ export function PromoPanel({ promotion, onChange, sports, hours, boardKey, probl
   )
 }
 
-/** The Promotion card while the settings load: the title at once, and a flat bar where its picker will be. */
+/** The Promos card while the settings load: the title at once, and a flat bar where its picker will be. */
 export function PromoPlaceholder() {
   return (
     <section className="promo" aria-labelledby="promo-ph-h" aria-busy="true">
       <div className="promo-head">
         <h2 id="promo-ph-h" className="label">
-          Promotion
+          Promos
         </h2>
         <span className="ph ph-segmented" aria-hidden="true" />
       </div>

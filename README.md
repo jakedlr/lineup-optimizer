@@ -31,29 +31,32 @@ connection, so it can't be hosted for you.
 
 ## Using the app
 
+The page reads top to bottom: the board, the setup (**Run settings**, **Promos**, **Phone alerts**), then Run, then
+the report. On a phone, Run and the *Auto runs* switch also stay in a bar at the foot of the screen.
+
 1. **The board fetches itself.** Opening the page fetches the PrizePicks board if there's none yet or
    it's over 30 minutes old, and every run fetches a fresh one first (or reuses one fetched in the last minute). The page shows where the board
    came from and when. If the fetch fails, the run uses the last saved board and says so, and
    *Board fetch failing? Upload one instead* lets you drop in one saved from your browser (below).
-2. **Pick your settings.** Leagues and stake are on the page. *Advanced* has hours ahead, the devig
+2. **Pick your settings** in **Run settings**: leagues and stake, and under *Advanced* hours ahead, the devig
    method (worst case of the four by default), which slip the edge is measured against, and how many legs to
    list. *Fresh odds*, beside Run, skips the 1-minute odds cache for one run.
-3. **Choose a promotion,** if you have one: a bonus (free) entry, a payout boost, or promo legs picked
+3. **Choose a promo** in **Promos**, if you have one: a bonus (free) entry, a payout boost, or promo legs picked
    from the board (search a player, choose the stat, set Over/Under and the discounted line). Promo
    lines already in the feed, such as tacos, are included unless you untick them.
-4. **Run.** A progress bar shows the board fetch and the requests to the sportsbooks as they go (usually under a minute,
+4. **Run.** A progress bar under Run shows the board fetch and the requests to the sportsbooks as they go (usually under a minute,
    instant when the odds are cached). Then the report: **Best Slips**, **Top Legs** and anything
    **Unpriced**, with any warnings above them.
 
 The slip type and size filters and the number of legs change the view without running again.
 *Download JSON* saves the whole report. Run settings (leagues, stake, hours, devig, reference slip) are
 saved in the app, so every browser and every auto run uses the same ones; the number of legs, the slip
-filters, notifications and the theme are remembered per browser. Promotions and *Fresh odds* are never
+filters, notifications and the theme are remembered per browser. Promos and *Fresh odds* are never
 saved, since they apply to one entry. The theme follows your system, or pick Light or Dark at the foot of the page.
 
 **Auto runs.** Switch on *Auto runs* next to Run and the app runs by itself at :00, :15, :30 and :45,
 with or without the page open, using the saved run settings (feed promos included, no other
-promotions). It stays on across restarts while the container is up. A quarter hour that finds a run
+promos). It stays on across restarts while the container is up. A quarter hour that finds a run
 already going is skipped. If the board can't be fetched, auto runs switch themselves off and the page
 says why. The page always opens on the latest run's report, labelled *Auto run · 14:15* or
 *Run · 14:08*, and an open page follows an auto run as it happens.
