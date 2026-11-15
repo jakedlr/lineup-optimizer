@@ -121,6 +121,45 @@ function saveOpen(open: boolean) {
 /** This browser's time zone, listed first. */
 const here = () => Intl.DateTimeFormat().resolvedOptions().timeZone
 
+/** The zone alert titles' clock is in: chosen from the zones this browser lists, or typed where it lists none. */
+function ZoneField({ id, value, onChange }: { id: string; value: string; onChange: (zone: string) => void }) {
+  const zones = useMemo(() => zoneChoices(value, here()), [value])
+  const bad = value && !zoneValue(value) ? 'Not a time zone this browser knows, e.g. America/New_York.' : null
+  return (
+    <div className="field zone-field">
+      <label htmlFor={id}>Alert times in</label>
+      {zones.length ? (
+        <select id={id} value={value} onChange={(e) => onChange(e.target.value)}>
+          {!value && <option value="">UTC (none chosen)</option>}
+          {zones.map((z) => (
+            <option key={z.value} value={z.value}>
+              {z.label}
+            </option>
+          ))}
+        </select>
+      ) : (
+        <input
+          id={id}
+          type="text"
+          autoComplete="off"
+          autoCapitalize="off"
+          spellCheck={false}
+          placeholder="UTC"
+          value={value}
+          aria-invalid={!!bad}
+          aria-describedby={bad ? `${id}-note` : undefined}
+          onChange={(e) => onChange(e.target.value)}
+        />
+      )}
+      {bad && (
+        <p id={`${id}-note`} className="warn small">
+          {bad}
+        </p>
+      )}
+    </div>
+  )
+}
+
 /**
  * Where auto runs' alerts go and when they're loud (GLOSSARY: Alert, Alert tier, Qualifying leg). Folded to one line
  * naming where alerts go (with a Set up button while there's no topic), open or folded as this browser last left it.
@@ -206,9 +245,6 @@ export function AlertsPanel({ alerts }: { alerts: AlertSettings }) {
     : saved.topic
       ? `${saved.topic} on ${host(saved.server)}`
       : 'No topic: auto runs send no alerts'
-  const zone = form?.timezone ?? ''
-  const zones = useMemo(() => zoneChoices(zone, here()), [zone])
-  const zoneBad = form && form.timezone && !zoneValue(form.timezone) ? 'Not a time zone this browser knows, e.g. America/New_York.' : null
   const setUp = !open && !!saved && !saved.topic
 
   return (
@@ -311,37 +347,8 @@ export function AlertsPanel({ alerts }: { alerts: AlertSettings }) {
               </details>
             </div>
 
-            <div className="field zone-field">
-              <label htmlFor={`${id}-zone`}>Alert times in</label>
-              {zones.length ? (
-                <select id={`${id}-zone`} value={form.timezone} onChange={(e) => set('timezone', e.target.value)}>
-                  {!form.timezone && <option value="">UTC (none chosen)</option>}
-                  {zones.map((z) => (
-                    <option key={z.value} value={z.value}>
-                      {z.label}
-                    </option>
-                  ))}
-                </select>
-              ) : (
-                <input
-                  id={`${id}-zone`}
-                  type="text"
-                  autoComplete="off"
-                  autoCapitalize="off"
-                  spellCheck={false}
-                  placeholder="UTC"
-                  value={form.timezone}
-                  aria-invalid={!!zoneBad}
-                  aria-describedby={zoneBad ? `${id}-zone-note` : undefined}
-                  onChange={(e) => set('timezone', e.target.value)}
-                />
-              )}
-              {zoneBad && (
-                <p id={`${id}-zone-note`} className="warn small">
-                  {zoneBad}
-                </p>
-              )}
-            </div>
+            {/* Only while open: listing some 400 zones by name and offset is work a folded panel needn't do. */}
+            {open && <ZoneField id={`${id}-zone`} value={form.timezone} onChange={(v) => set('timezone', v)} />}
 
             <details className="advanced">
               <summary>Server and token</summary>

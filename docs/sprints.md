@@ -548,3 +548,18 @@ before/after mock-ups.
   order still reads sensibly, so it was left.
 - Not run on a real phone: tap flash, iOS zoom and the status-bar colour were checked in Chromium's emulation.
 
+**Review:** `/code-review` found nine issues, all fixed test-first except the two that change no behaviour (the edge
+unit comments, and BoardPanel's copy of `useNow`, now the shared hook):
+- "No report yet" also shows once a status look goes unanswered or a run followed here ends: it was blank when the
+  engine was down at opening, or when Run was pressed before the first status answer and that run failed.
+- Top Legs counts and divides by the edge as printed: a "0.0%" is break-even and clears; a leg with no edge reads
+  "—", sits below the divider and isn't counted.
+- Run settings' "Saved" names the day when it isn't today ("Saved Wed 09:12", "Saved 3 Nov 09:12" after a week).
+- An error thrown while handling a status answer reaches the console, and isn't taken for the engine going away.
+- The progress card's waiting clock counts from the server's start for the page's own run too, but never from later
+  than the card appeared, so a server clock ahead of the page's can't hold it at 0:00.
+- The time-zone list (some 400 labels) is built only while Phone alerts is open, with one formatter per zone and one
+  cached label per zone.
+- The page's two grounds live in index.css and index.html's `theme-color` metas only: the inline theme script and
+  `theme.ts` read them from the metas (kept in `data-ground` once painted over); an e2e spec holds the metas to the
+  computed `--ground`.

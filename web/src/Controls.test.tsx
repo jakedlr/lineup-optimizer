@@ -2,7 +2,7 @@ import { act, fireEvent, render, screen, waitFor, within } from '@testing-librar
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import App from './App'
-import { clock } from './format'
+import { dayClock } from './format'
 import { controlledRun, fakeServer, head, localTime, options, report, routes, runInfo } from './test/fixtures'
 import { POLL_MS } from './useServerStatus'
 
@@ -148,13 +148,24 @@ describe('Run settings card', () => {
     server.state.settings = { ...options.defaults, saved: true, updated_at: at }
     stub()
     render(<App />)
-    const stamp = await screen.findByText(`Saved ${clock(at)} · auto runs use these too`)
+    const stamp = await screen.findByText(`Saved ${dayClock(at)} · auto runs use these too`)
     expect(settingsCard()).toContainElement(stamp)
     await userEvent.click(screen.getByRole('button', { name: 'MLB' }))
     await waitFor(() => expect(server.state.settings.updated_at).not.toBe(at))
     expect(
-      await within(settingsCard()).findByText(`Saved ${clock(server.state.settings.updated_at as string)} · auto runs use these too`),
+      await within(settingsCard()).findByText(`Saved ${dayClock(server.state.settings.updated_at as string)} · auto runs use these too`),
     ).toBeInTheDocument()
+  })
+
+  it('names the day of a save that was not today', async () => {
+    const twoDaysAgo = new Date()
+    twoDaysAgo.setDate(twoDaysAgo.getDate() - 2)
+    twoDaysAgo.setHours(9, 12, 0, 0)
+    const day = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][twoDaysAgo.getDay()]
+    server.state.settings = { ...options.defaults, saved: true, updated_at: twoDaysAgo.toISOString() }
+    stub()
+    render(<App />)
+    expect(await screen.findByText(`Saved ${day} 09:12 · auto runs use these too`)).toBeInTheDocument()
   })
 
   it('says only that auto runs use them while they have never been saved', async () => {

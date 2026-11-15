@@ -66,6 +66,37 @@ describe('Empty report', () => {
     expect(screen.queryByRole('region', { name: /no report yet/i })).not.toBeInTheDocument()
   })
 
+  // Sprint 11 review: "No report yet" waited on the first status answer only, so these left the report area blank.
+  it('shows when the engine is down at opening, so its status never answers', async () => {
+    stub({ 'GET /api/status': () => Promise.reject(new TypeError('network down')) })
+    render(<App />)
+    expect(await screen.findByRole('region', { name: /no report yet/i })).toBeInTheDocument()
+  })
+
+  const failedRun = () =>
+    new Response(
+      [head(runInfo('manual', localTime(9, 55))), { type: 'error', detail: 'books down' }].map((e) => JSON.stringify(e) + '\n').join(''),
+      { headers: { 'Content-Type': 'application/x-ndjson' } },
+    )
+
+  it('shows under a run that failed after Run was pressed before the server first answered', async () => {
+    const status = gated(() => server.routes['GET /api/status']()) // never opened: the first look is still out
+    stub({ 'GET /api/status': status.route, 'POST /api/run': failedRun })
+    render(<App />)
+    await userEvent.click(await screen.findByRole('button', { name: /^run$/i }))
+    await screen.findByText('Run · 09:55 failed')
+    expect(await screen.findByRole('region', { name: /no report yet/i })).toBeInTheDocument()
+  })
+
+  it('shows under a run the server refused to start before it first answered', async () => {
+    const status = gated(() => server.routes['GET /api/status']())
+    stub({ 'GET /api/status': status.route, 'POST /api/run': () => Response.json({ detail: 'stake must be positive' }, { status: 422 }) })
+    render(<App />)
+    await userEvent.click(await screen.findByRole('button', { name: /^run$/i }))
+    await screen.findByText(/^Stake must be positive/)
+    expect(await screen.findByRole('region', { name: /no report yet/i })).toBeInTheDocument()
+  })
+
   it('keeps the Best Slips and Top Legs headings, each over one sentence', async () => {
     stub()
     render(<App />)

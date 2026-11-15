@@ -101,7 +101,9 @@ function App() {
   // The report shown, with the run it came from; `opened` when it is the one the page opened on (it arrives unfaded).
   const [report, setReport] = useState<{ report: Report; by: StartedBy; at: string; id: string | null; opened: boolean } | null>(null)
   const [failure, setFailure] = useState<{ error: string; label: string; id: string | null } | null>(null)
-  // Whether the server has said what the page opens on: "No report yet" waits for that, so it never flashes.
+  // Whether the page knows what it opens on: the server has said (and sent the latest report it names), or a run
+  // followed here has ended. "No report yet" waits for that, or for a look the server leaves unanswered, so it never
+  // flashes on a normal load and never leaves the report area blank.
   const [opened, setOpened] = useState(false)
   // How the latest recorded run's alert went, as the server last said (null while none, or still sending).
   const [latestAlert, setLatestAlert] = useState<{ id: string; alert: AlertOutcome } | null>(null)
@@ -156,6 +158,7 @@ function App() {
   const end = (run: RunRef | null, outcome: Outcome) => {
     watching.current = null
     if (run) shown.current = run
+    setOpened(true)
     show(run ?? { started_by: 'manual', started_at: new Date().toISOString() }, outcome)
     if ('report' in outcome) notifier.notify({ ok: true, report: outcome.report })
     else if (!outcome.stopped) notifier.notify({ ok: false, error: outcome.error })
@@ -235,6 +238,7 @@ function App() {
       begin(null)
       if (g.own && !(latest && same(latest, g.run))) {
         shown.current = g.run
+        setOpened(true)
         show(g.run, { error: STOPPED })
       }
     }
@@ -334,6 +338,7 @@ function App() {
         // The server never started a run: refused (another got there first: the next look watches it), or the request
         // failed before it could.
         begin(null)
+        setOpened(true)
         if (e instanceof ApiError && e.status === 409) setRefused(message(e))
         else {
           setError(message(e))
@@ -428,7 +433,7 @@ function App() {
       {autoNote && <p className="warn small auto-note">{autoNote}</p>}
 
       {going && (
-        <RunProgressBar progress={progress} startedAt={going.own ? undefined : going.run?.started_at} reveal={going.own} />
+        <RunProgressBar progress={progress} startedAt={going.run?.started_at} reveal={going.own} />
       )}
 
       {(error ?? loadError) && (
@@ -452,7 +457,7 @@ function App() {
         </p>
       )}
 
-      {!report && !going && opened && (
+      {!report && !going && (opened || status.missed) && (
         <section className="report-empty" aria-label="No report yet">
           <div className="block">
             <h2>Best Slips</h2>

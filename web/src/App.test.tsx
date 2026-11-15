@@ -748,6 +748,15 @@ describe('Run progress', () => {
     run.close()
   })
 
+  // Sprint 11 review: this page's own run counted from when Run was pressed, even once the server named it.
+  it("counts the wait from the server's start time once the server names this page's run", async () => {
+    const { run } = await start()
+    await screen.findByText(/waiting for prizepicks · 0:0\d/i)
+    run.event({ type: 'run', id: 'own1', started_by: 'manual', started_at: new Date(Date.now() - 40_000).toISOString() })
+    expect(await screen.findByText(/waiting for prizepicks · 0:4\d/i, {}, { timeout: 2500 })).toBeInTheDocument()
+    run.close()
+  })
+
   it('shows a progress bar with a percentage and the current step', async () => {
     const { run } = await start()
     const bar = await screen.findByRole('progressbar', { name: /run progress/i })

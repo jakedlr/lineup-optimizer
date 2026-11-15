@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { elapsed, money, sentence, signOf, signedMoney, signedPct } from './format'
+import { dayClock, elapsed, money, sentence, signOf, signedMoney, signedPct } from './format'
 
 describe('money', () => {
   it('signs an EV with thousands separators and a true minus', () => {
@@ -45,5 +45,32 @@ describe('elapsed', () => {
     expect(elapsed(7_000)).toBe('0:07')
     expect(elapsed(125_400)).toBe('2:05')
     expect(elapsed(-50)).toBe('0:00')
+  })
+})
+
+// Sprint 11 review: "Saved 09:12" gave no day, so last week's save read like this morning's.
+describe('dayClock', () => {
+  const now = new Date(2026, 10, 14, 15, 30) // Saturday 14 Nov 2026, local time
+  const at = (d: number, h: number, m: number, month = 10, y = 2026) => new Date(y, month, d, h, m).toISOString()
+
+  it('is the clock time alone today', () => {
+    expect(dayClock(at(14, 9, 12), now)).toBe('09:12')
+    expect(dayClock(at(14, 0, 1), now)).toBe('00:01')
+  })
+
+  it('names the weekday within the last week', () => {
+    expect(dayClock(at(13, 23, 59), now)).toBe('Fri 23:59')
+    expect(dayClock(at(11, 9, 12), now)).toBe('Wed 09:12')
+    expect(dayClock(at(8, 9, 12), now)).toBe('Sun 09:12')
+  })
+
+  it('gives the date once older than a week, and the year when not this one', () => {
+    expect(dayClock(at(7, 9, 12), now)).toBe('7 Nov 09:12')
+    expect(dayClock(at(3, 9, 12), now)).toBe('3 Nov 09:12')
+    expect(dayClock(at(30, 18, 5, 11, 2025), now)).toBe('30 Dec 2025 18:05')
+  })
+
+  it('gives the date for a time ahead of this clock on another day', () => {
+    expect(dayClock(at(15, 9, 12), now)).toBe('15 Nov 09:12')
   })
 })

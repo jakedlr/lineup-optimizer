@@ -144,7 +144,8 @@ function TopLegs({ report, top }: { report: Report; top: number }) {
   const legs = report.legs.slice(0, top)
   const ref = report.ref_slip
   const refName = slipName({ type: ref.type === 'flex' ? 'flex' : 'power', size: ref.size })
-  const clears = (l: Leg) => (l.edge ?? 0) >= 0
+  // Clears as its edge figure reads: a "0.0%" is break-even, which clears; a leg with no edge doesn't.
+  const clears = (l: Leg) => l.edge !== undefined && signOf(l.edge, 1, 100) >= 0
   const firstBelow = legs.findIndex((l) => !clears(l))
   // Every book that priced a leg, in one order, so each keeps its own column of figures.
   const books = [...new Set(report.legs.flatMap((l) => Object.keys(l.books)))].sort()
@@ -187,7 +188,6 @@ function TopLegs({ report, top }: { report: Report; top: number }) {
                     l.disagreement >= 0.03 && `books differ ${(l.disagreement * 100).toFixed(1)}%`,
                   ].filter((n): n is string => !!n)
                   const priced = books.filter((b) => b in l.books).map((b) => `${bookAbbr(b)} ${bookPrice(l.books[b])}`)
-                  const edge = l.edge ?? 0
                   return (
                     <Fragment key={`${l.game}|${l.player}|${l.stat}|${l.side}|${l.line}`}>
                       {i === firstBelow && (
@@ -198,7 +198,11 @@ function TopLegs({ report, top }: { report: Report; top: number }) {
                         </tr>
                       )}
                       <tr>
-                        <td className={`num c-edge ${signClass(signOf(edge, 1, 100), 'muted')}`}>{signedPct(edge)}</td>
+                        {l.edge === undefined ? (
+                          <td className="num c-edge muted">—</td>
+                        ) : (
+                          <td className={`num c-edge ${signClass(signOf(l.edge, 1, 100), 'muted')}`}>{signedPct(l.edge)}</td>
+                        )}
                         <td className="num c-prob">{pct(l.prob)}</td>
                         <td className="c-sport">{l.sport}</td>
                         <td className="nowrap c-matchup">{l.matchup}</td>

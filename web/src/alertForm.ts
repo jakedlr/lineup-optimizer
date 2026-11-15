@@ -57,23 +57,31 @@ export function zoneValue(s: string): string | null {
   }
 }
 
-const labels = new Map<string, string>()
+const formatters = new Map<string, Intl.DateTimeFormat | null>() // one per zone; null: this browser can't format it
+const labels = new Map<string, { hour: number; label: string }>() // one per zone, as of the hour it was worked out
+
+function offsetFormat(zone: string): Intl.DateTimeFormat | null {
+  if (!formatters.has(zone)) {
+    try {
+      formatters.set(zone, new Intl.DateTimeFormat('en-US', { timeZone: zone, timeZoneName: 'shortOffset' }))
+    } catch {
+      formatters.set(zone, null)
+    }
+  }
+  return formatters.get(zone)!
+}
 
 /** A zone as a person names it: its city and its offset from GMT at `at`, "Los Angeles (GMT-8)". */
 export function zoneLabel(zone: string, at = new Date()): string {
-  const key = `${zone}|${Math.floor(at.getTime() / 3_600_000)}` // offsets change on the hour at most
-  const known = labels.get(key)
-  if (known) return known
+  const hour = Math.floor(at.getTime() / 3_600_000) // offsets change on the hour at most
+  const known = labels.get(zone)
+  if (known?.hour === hour) return known.label
   const city = zone.split('/').pop()!.replace(/_/g, ' ')
-  let label = city
-  try {
-    const parts = new Intl.DateTimeFormat('en-US', { timeZone: zone, timeZoneName: 'shortOffset' }).formatToParts(at)
-    const offset = parts.find((p) => p.type === 'timeZoneName')?.value
-    if (offset) label = `${city} (${offset})`
-  } catch {
-    // a zone this browser can't format: its city alone
-  }
-  labels.set(key, label)
+  const offset = offsetFormat(zone)
+    ?.formatToParts(at)
+    .find((p) => p.type === 'timeZoneName')?.value
+  const label = offset ? `${city} (${offset})` : city // a zone this browser can't format: its city alone
+  labels.set(zone, { hour, label })
   return label
 }
 

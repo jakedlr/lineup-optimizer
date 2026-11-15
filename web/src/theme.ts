@@ -2,9 +2,6 @@ export type Theme = 'system' | 'light' | 'dark'
 
 const KEY = 'ppopt.theme'
 
-/** The page's ground in each scheme (index.css `--ground`): what the phone's status bar is painted. */
-export const GROUND = { light: '#f2f4f7', dark: '#0b0c0e' } as const
-
 export function loadTheme(): Theme {
   try {
     const t = localStorage.getItem(KEY)
@@ -34,12 +31,16 @@ export function quietly(change: () => void) {
   )
 }
 
-/** The status bar: the forced theme's ground in both schemes, or each scheme's own under System. */
+/**
+ * The status bar: the forced theme's ground in both schemes, or each scheme's own under System. Each theme-color meta
+ * in index.html starts out as its scheme's ground (index.css `--ground`), and keeps that in `data-ground` once painted.
+ */
 function paintStatusBar(t: Theme) {
-  for (const meta of document.querySelectorAll<HTMLMetaElement>('meta[name="theme-color"]')) {
-    const scheme = t !== 'system' ? t : (meta.getAttribute('media') ?? '').includes('dark') ? 'dark' : 'light'
-    meta.content = GROUND[scheme]
-  }
+  const metas = [...document.querySelectorAll<HTMLMetaElement>('meta[name="theme-color"]')]
+  const schemeOf = (m: HTMLMetaElement) => ((m.getAttribute('media') ?? '').includes('dark') ? 'dark' : 'light')
+  const ground: Partial<Record<'light' | 'dark', string>> = {}
+  for (const m of metas) ground[schemeOf(m)] = m.dataset.ground ??= m.content
+  for (const m of metas) m.content = ground[t === 'system' ? schemeOf(m) : t] ?? m.dataset.ground!
 }
 
 /** Set on <html> (see the inline script in index.html, which does the same before first paint). */

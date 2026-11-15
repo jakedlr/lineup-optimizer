@@ -148,6 +148,26 @@ test("forcing a theme paints the status bar its ground, and swaps colours withou
   expect(await metas()).toEqual(['#f2f4f7', '#0b0c0e'])
 })
 
+// index.html's theme-color metas are the only copy of index.css's --ground: the inline script and theme.ts read them.
+test("the status bar takes index.css's ground in each scheme, a remembered theme's before the app loads", async ({ page }) => {
+  await opened(page)
+  const metas = () => page.locator('meta[name="theme-color"]').evaluateAll((ms) => ms.map((m) => (m as HTMLMetaElement).content))
+  const ground = () => page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--ground').trim())
+  await page.emulateMedia({ colorScheme: 'light' })
+  const light = await ground()
+  await page.emulateMedia({ colorScheme: 'dark' })
+  const dark = await ground()
+  expect(await metas()).toEqual([light, dark]) // as index.html gives them
+  expect(light).not.toBe(dark)
+
+  await page.getByRole('group', { name: 'Theme' }).getByRole('button', { name: 'Dark' }).click()
+  await page.reload()
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark')
+  expect(await metas()).toEqual([dark, dark])
+  await page.getByRole('group', { name: 'Theme' }).getByRole('button', { name: 'System' }).click()
+  expect(await metas()).toEqual([light, dark])
+})
+
 test("the pop-up's close mark takes a tap well outside what it draws", async ({ page }) => {
   await opened(page)
   await page.getByText('Advanced').click()

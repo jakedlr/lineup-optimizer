@@ -4,7 +4,8 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <!-- The phone's status bar takes the page's ground (index.css --ground; theme.ts GROUND keeps it in step). -->
+    <!-- The phone's status bar takes the page's ground: these two are index.css --ground (theme.test.ts holds them to
+         it), and the only copy of it the script below and theme.ts read. -->
     <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f2f4f7" />
     <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0b0c0e" />
     <title>PrizePicks EV Optimizer</title>
@@ -15,8 +16,13 @@
         const t = localStorage.getItem('ppopt.theme')
         if (t === 'light' || t === 'dark') {
           document.documentElement.dataset.theme = t
-          const ground = t === 'dark' ? '#0b0c0e' : '#f2f4f7'
-          for (const m of document.querySelectorAll('meta[name="theme-color"]')) m.content = ground
+          const metas = document.querySelectorAll('meta[name="theme-color"]')
+          let ground = ''
+          for (const m of metas) {
+            m.dataset.ground = m.content // its own scheme's, kept for theme.ts to paint back
+            if ((m.getAttribute('media') || '').includes(t)) ground = m.content
+          }
+          for (const m of metas) m.content = ground
         }
       } catch {}
     </script>

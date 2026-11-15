@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState, type DragEvent } from 'react'
+import { useRef, useState, type DragEvent } from 'react'
 import type { BoardInfo } from './api'
 import { ago, minutesSince, sentence, STALE_MINUTES } from './format'
+import { useNow } from './useNow'
 
 interface Props {
   board: BoardInfo | null | undefined // undefined while loading
@@ -10,16 +11,6 @@ interface Props {
   locked: boolean // while fetching, uploading or running: a new board mid-run would be reported on with the old one's results
   appUrl: string | null // the PrizePicks app's feed, for saving a board by hand
   onFile: (file: File) => void
-}
-
-/** Re-render periodically so "fetched N min ago" stays true. */
-function useNow(intervalMs = 30_000) {
-  const [now, setNow] = useState(() => Date.now())
-  useEffect(() => {
-    const id = setInterval(() => setNow(Date.now()), intervalMs)
-    return () => clearInterval(id)
-  }, [intervalMs])
-  return now
 }
 
 const PRIZEPICKS = 'https://app.prizepicks.com'

@@ -1,6 +1,6 @@
 import { useEffect, useId, useRef, useState } from 'react'
 import type { Options } from './api'
-import { clock } from './format'
+import { dayClock } from './format'
 import type { Problem, Settings } from './settings'
 import { BLOCKED_NOTE, requestSystemNotify, systemNotifyState, UNSUPPORTED_NOTE } from './systemNotify'
 
@@ -77,7 +77,7 @@ export function SettingsPanel({ options, settings, onChange, saveError, savedAt,
         {saveError ? (
           <p className="warn small">{saveError}</p>
         ) : (
-          <p className="muted small">{savedAt ? `Saved ${clock(savedAt)} · auto runs use these too` : 'Auto runs use these too'}</p>
+          <p className="muted small">{savedAt ? `Saved ${dayClock(savedAt)} · auto runs use these too` : 'Auto runs use these too'}</p>
         )}
       </div>
       <div className="settings-row">

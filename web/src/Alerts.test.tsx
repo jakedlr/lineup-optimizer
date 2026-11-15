@@ -314,6 +314,7 @@ describe('Phone alerts panel', () => {
       const fetchMock = stub()
       render(<App />)
       await waitFor(() => expect(alertPatches(fetchMock)).toEqual([{ timezone: here }]))
+      await userEvent.click(within(panel()).getByText('Phone alerts'))
       expect(zone()).toHaveValue(here)
     })
 
@@ -321,6 +322,8 @@ describe('Phone alerts panel', () => {
       server.state.alerts = { ...server.state.alerts, timezone: other }
       const fetchMock = stub()
       render(<App />)
+      await waitFor(() => expect(topic()).toBeInTheDocument())
+      await userEvent.click(within(panel()).getByText('Phone alerts'))
       await waitFor(() => expect(zone()).toHaveValue(other))
       await new Promise((r) => setTimeout(r, 50))
       expect(alertPatches(fetchMock)).toEqual([])
@@ -334,6 +337,20 @@ describe('Phone alerts panel', () => {
       await userEvent.selectOptions(zone(), other)
       await waitFor(() => expect(alertPatches(fetchMock)).toEqual([{ timezone: other }]))
       expect(server.state.alerts.timezone).toBe(other)
+    })
+
+    // Sprint 11 review: some 400 zone labels were built on every mount, though the panel opens folded.
+    it('builds no list of zones while the panel is folded', async () => {
+      const listed = vi.spyOn(Intl, 'supportedValuesOf')
+      server.state.alerts = { ...server.state.alerts, topic: 'pp-abc', saved: true, updated_at: '2026-11-14T11:00:00+00:00' }
+      stub()
+      render(<App />)
+      await waitFor(() => expect(topic()).toHaveValue('pp-abc'))
+      expect(details().open).toBe(false)
+      expect(listed).not.toHaveBeenCalledWith('timeZone')
+      await userEvent.click(within(panel()).getByText('Phone alerts'))
+      expect(within(zone()).getByRole('option', { name: /^Tokyo \(GMT\+9\)$/ })).toBeInTheDocument()
+      listed.mockRestore()
     })
 
     it("names each zone by its city and offset, this browser's first", async () => {

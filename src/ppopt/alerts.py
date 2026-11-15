@@ -276,12 +276,12 @@ Topic = Annotated[str, Field(strict=True, pattern=r"^[-_A-Za-z0-9]{0,64}$")]  # 
 SomeTopic = Annotated[str, Field(strict=True, pattern=r"^[-_A-Za-z0-9]{1,64}$")]
 Token = Annotated[str, Field(strict=True, max_length=256, pattern=r"^[\x21-\x7e]*$")]  # "" is none
 Zone = Annotated[str, Field(strict=True), AfterValidator(_zone)]
-Edge = Annotated[float, Field(strict=True, ge=0.1, le=20), AfterValidator(_tenths)]  # percentage points
+Edge = Annotated[float, Field(strict=True, ge=0.1, le=20), AfterValidator(_tenths)]  # percentage points, shown as %
 Legs = Annotated[int, Field(strict=True, ge=1, le=6)]
 
 
 class Tier(BaseModel):
-    """An alert tier: met when at least `legs` games' best legs reach `edge` points."""
+    """An alert tier: met when at least `legs` games' best legs reach `edge` (percentage points, shown as %)."""
 
     model_config = ConfigDict(extra="forbid")
 

@@ -343,7 +343,7 @@ export async function getLatest(): Promise<LatestRun | null> {
   return json(res)
 }
 
-/** An alert tier (GLOSSARY: Alert tier): met when `legs` games' best legs reach `edge` percentage points. */
+/** An alert tier (GLOSSARY: Alert tier): met when `legs` games' best legs reach `edge` (percentage points, shown as %). */
 export interface AlertTier {
   enabled: boolean
   edge: number

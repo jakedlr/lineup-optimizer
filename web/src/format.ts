@@ -62,6 +62,23 @@ export function clock(iso: string): string {
   return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}` // taste-skill-ignore: a clock time
 }
 
+const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+
+/**
+ * A local time with as much of its day as it needs: "09:12" today, "Wed 09:12" within the last week, "3 Nov 09:12"
+ * before that (or on a day ahead of this clock), "30 Dec 2025 18:05" in another year.
+ */
+export function dayClock(iso: string, now = new Date()): string {
+  const d = new Date(iso)
+  const midnight = (t: Date) => new Date(t.getFullYear(), t.getMonth(), t.getDate()).getTime()
+  const daysBack = Math.round((midnight(now) - midnight(d)) / 86_400_000) // rounded: a DST day is 23 or 25 h
+  if (daysBack === 0) return clock(iso)
+  if (daysBack > 0 && daysBack < 7) return `${DAYS[d.getDay()]} ${clock(iso)}`
+  const year = d.getFullYear() === now.getFullYear() ? '' : ` ${d.getFullYear()}`
+  return `${d.getDate()} ${MONTHS[d.getMonth()]}${year} ${clock(iso)}`
+}
+
 /**
  * How a report or failure is marked: "Auto run · 14:15", "Run · 14:08"; a report no longer the latest word is the
  * "Previous run · 14:08", "Previous auto run · 14:15".

@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import type { AlertsView } from './api'
 import {
   alertChanges,
@@ -163,6 +163,18 @@ describe('Alert time zones', () => {
     expect(zoneLabel('America/Los_Angeles', summer)).toBe('Los Angeles (GMT-7)')
     expect(zoneLabel('Asia/Kolkata', winter)).toBe('Kolkata (GMT+5:30)')
     expect(zoneLabel('America/Argentina/Buenos_Aires', winter)).toBe('Buenos Aires (GMT-3)')
+  })
+
+  // Sprint 11 review: a formatter was built per zone per hour, and every label kept for good.
+  it('build one formatter per zone, however many hours it is labelled at, and follow its offset as it changes', () => {
+    const made = vi.spyOn(Intl, 'DateTimeFormat')
+    const chatham = () => made.mock.calls.filter(([, o]) => o?.timeZone === 'Pacific/Chatham').length
+    expect(zoneLabel('Pacific/Chatham', winter)).toBe('Chatham (GMT+13:45)')
+    expect(zoneLabel('Pacific/Chatham', new Date('2026-01-15T13:00:00Z'))).toBe('Chatham (GMT+13:45)')
+    expect(zoneLabel('Pacific/Chatham', summer)).toBe('Chatham (GMT+12:45)')
+    expect(zoneLabel('Pacific/Chatham', winter)).toBe('Chatham (GMT+13:45)')
+    expect(chatham()).toBe(1)
+    made.mockRestore()
   })
 
   it("put this browser's first, then the rest by name, keeping the IANA id as the value", () => {

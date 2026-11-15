@@ -19,13 +19,15 @@ const hidden = () => document.visibilityState === 'hidden'
  * order they were asked, so a caller can set aside one asked before something it knows changed (`asked()` is the
  * number of the latest one asked). Looks again at once when the tab comes back into view, and on `look()`.
  * `engine` says whether the engine answers: offline after MISSES_OFFLINE looks in a row went unanswered, online again
- * at the next answer.
+ * at the next answer. `missed`: some look has gone unanswered since the page opened. An error the handler throws is
+ * logged, not taken for a missed look.
  */
 export function useServerStatus(handler: RefObject<StatusHandler>) {
   const seq = useRef(0)
   const live = useRef(true)
   const misses = useRef(0)
   const [engine, setEngine] = useState<Engine>('checking')
+  const [missed, setMissed] = useState(false)
 
   const look = useCallback(() => {
     const n = ++seq.current
@@ -39,10 +41,12 @@ export function useServerStatus(handler: RefObject<StatusHandler>) {
         },
         () => {
           // unanswered: the next look will tell
-          if (live.current && ++misses.current >= MISSES_OFFLINE) setEngine('offline')
+          if (!live.current) return
+          setMissed(true)
+          if (++misses.current >= MISSES_OFFLINE) setEngine('offline')
         },
       )
-      .catch(() => {})
+      .catch((e) => console.error(e)) // the handler threw: a bug here, not the engine gone
   }, [handler])
 
   useEffect(() => {
@@ -67,5 +71,5 @@ export function useServerStatus(handler: RefObject<StatusHandler>) {
   }, [look])
 
   const asked = useCallback(() => seq.current, [])
-  return { look, asked, engine }
+  return { look, asked, engine, missed }
 }

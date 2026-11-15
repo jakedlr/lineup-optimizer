@@ -93,6 +93,27 @@ describe('Top Legs', () => {
     expect(rows[4]).toHaveTextContent('Rome Odunze')
   })
 
+  // Sprint 11 review: the count and the divider read the raw edge, the edge cell its rounding.
+  it('counts a leg whose edge rounds to 0.0% as clearing, above the divider, as its figure says', () => {
+    const even = leg({ player: 'Even Steven', game: 'NFL:DAL-NYG', prob: 0.5735, edge: -0.0004, books: { fanduel: 0.57 } })
+    view({ ...report, legs: [...report.legs, even, below] })
+    expect(within(legsRegion()).getByText('3 of 4 legs clear the Power 2 break-even (57.4%)')).toBeInTheDocument()
+    const rows = within(legsRegion()).getAllByRole('row')
+    expect(rows[3]).toHaveTextContent('Even Steven')
+    expect(within(rows[3]).getByText('0.0%')).not.toHaveClass('muted')
+    expect(rows[4]).toHaveTextContent(/^Below the/)
+  })
+
+  it('puts a leg with no edge below the divider, uncounted, with a dash for its edge', () => {
+    const unknown = leg({ player: 'No Edge', game: 'NFL:DAL-NYG', prob: 0.6, edge: undefined, books: { fanduel: 0.6 } })
+    view({ ...report, legs: [...report.legs, unknown] })
+    expect(within(legsRegion()).getByText('2 of 3 legs clear the Power 2 break-even (57.4%)')).toBeInTheDocument()
+    const rows = within(legsRegion()).getAllByRole('row')
+    expect(rows[3]).toHaveTextContent(/^Below the/)
+    expect(rows[4]).toHaveTextContent('No Edge')
+    expect(rows[4].querySelector('.c-edge')).toHaveTextContent(/^—$/)
+  })
+
   it('has no divider when every leg clears', () => {
     view()
     expect(within(legsRegion()).queryByText(/^below the/i)).not.toBeInTheDocument()

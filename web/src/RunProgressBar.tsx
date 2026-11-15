@@ -5,7 +5,7 @@ import { useNow } from './useNow'
 
 interface Props {
   progress: Shown | null
-  /** When the run started, as the server says; this page's own clock until the server names the run. */
+  /** When the run started, as the server says; unknown until the server names the run. */
   startedAt?: string
   /** This page's own run: the card is brought into view as it starts (Run may have been pressed far down the page). */
   reveal?: boolean
@@ -26,7 +26,9 @@ export function RunProgressBar({ progress, startedAt, reveal }: Props) {
   const now = useNow(1000)
   const planned = !!progress && progress.total > 0
   const percent = Math.min(progress?.percent ?? 0, 99)
-  const since = startedAt ? Date.parse(startedAt) : mounted
+  // The server's start, but never later than this card appeared: a server clock ahead of this one can't hold it at 0:00.
+  const server = startedAt ? Date.parse(startedAt) : NaN
+  const since = Number.isFinite(server) ? Math.min(server, mounted) : mounted
   return (
     <div className="run-progress" ref={card}>
       <div className="run-progress-head">
