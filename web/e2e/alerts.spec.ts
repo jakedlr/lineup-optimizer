@@ -52,11 +52,11 @@ async function autoRunAlerted(request: APIRequestContext) {
 
 const panel = (page: Page) => page.getByRole('region', { name: 'Phone alerts' })
 
-/** Open the panel, which starts folded (unless this browser left it open). */
+/** Open the panel, which starts folded. */
 async function openPanel(page: Page) {
   const alerts = panel(page)
-  await expect(alerts.locator('.alerts-summary')).toBeVisible() // the server has said where alerts go
-  if ((await alerts.locator('details').first().getAttribute('open')) === null) await alerts.getByRole('heading', { name: 'Phone alerts' }).click()
+  await expect(alerts.locator('.alerts-summary')).toHaveText(/ on |^No topic/) // the server has said where alerts go
+  await alerts.getByRole('heading', { name: 'Phone alerts' }).click()
   await expect(alerts.locator('details').first()).toHaveAttribute('open', '')
   return alerts
 }
@@ -147,14 +147,7 @@ test('the panel picks a topic, checks it, and sends a test alert through the sta
   await alerts.getByRole('button', { name: 'Send test' }).click()
   await expect(alerts.getByText(/^Test alert not sent: ntfy refused it \(403: forbidden\)$/)).toBeVisible()
 
-  // Opened again, the panel is as this browser left it (open), naming the topic; folded, it stays folded.
-  await page.reload()
-  await expect(alerts.getByText('reserved-topic on ntfy')).toBeVisible()
-  await expect(alerts.locator('details').first()).toHaveAttribute('open', '')
-  await alerts.getByRole('heading', { name: 'Phone alerts' }).click()
-  await expect(alerts.locator('details').first()).not.toHaveAttribute('open')
-  // The browser says the panel folded (its toggle event) a moment after the click; a person can't reload faster.
-  await expect.poll(() => page.evaluate(() => localStorage.getItem('ppopt.alertsOpen'))).toBeNull()
+  // Opened again, the panel starts folded, naming the topic, though it was left open.
   await page.reload()
   await expect(alerts.getByText('reserved-topic on ntfy')).toBeVisible()
   await expect(alerts.locator('details').first()).not.toHaveAttribute('open')
@@ -175,6 +168,7 @@ test("the time zone alert titles' clock is in is chosen after the tiers, by city
   await expect.poll(held).toBe(other)
 
   await page.reload() // opening again doesn't put this browser's back
+  await openPanel(page)
   await expect(zone).toHaveValue(other)
   expect(await held()).toBe(other)
 })

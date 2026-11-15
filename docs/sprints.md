@@ -538,8 +538,8 @@ before/after mock-ups.
   checked on blur or Add; the board card offers a quiet "Upload a board instead" unless the board is missing, stale
   or failing; "Engine offline: retrying" after two unanswered status polls (the one-off `/api/health` check is
   gone).
-- Phone alerts: starts folded (open state remembered per browser) with *Set up* while there's no topic; compact tier
-  rows under one Edge / Qualifying legs header; edge in % everywhere; *Alert times in* after the tiers, listing zones
+- Phone alerts: starts folded (open state remembered per browser; folded on every load since Sprint 12's review)
+  with *Set up* while there's no topic; compact tier rows under one Edge / Qualifying legs header; edge in % everywhere; *Alert times in* after the tiers, listing zones
   as "Los Angeles (GMT-8)" with the browser's first; Save token no longer overflows at 768.
 - Motion and touch: no transitions during a theme switch; the toast pauses under the pointer or focus and fades out
   in 150 ms; reduced motion drops transforms but keeps colour and opacity; no tap flash, 16px fields on touch
@@ -598,3 +598,20 @@ folded or compacted.
   page, so order doesn't move it: HEAD before this sprint, built the same way with the same report, warns the same
   50%. The fixture report has five Top Legs rows, so the 11–12px labels outweigh the 14px data; Sprint 11's 0 WARN
   was on a full live board.
+
+**Review:** `/code-review` found five issues; four fixed test-first, one kept:
+- Phone alerts starts folded on every load: the open state is no longer remembered (`ppopt.alertsOpen` is no longer
+  read or written; a stale key is left alone, as nothing reads it). Opening and closing it, and *Set up*, work as
+  before.
+- Nothing under Phone alerts moves when the alert settings arrive late with it folded (`controls.spec.ts`, at 1440,
+  700 and 390 wide, with and without a topic). At 390 the no-topic line wrapped under the title as it landed and
+  pushed the Run row's notes down 20px. Now the folded line is held open (a blank line) until the settings arrive,
+  and below 40rem it always takes a line of its own under the title, so a phone's folded card is one line taller
+  with a topic set than before; desktop is unchanged.
+- The user-facing word is "Promos" in two more places: README's "Promos are supported too", and the API's refusal
+  of two at once, "use only one promo per run: bonus entry, boost or promo legs". The CLI keeps "promotion".
+- The Promos picker's group is named "Promo kind", so it no longer shares the name of its card.
+- Kept: the reason Run is held still shows both at its field and beside Run. On a phone the cause and Run are seldom
+  on one screen, and Run settings is two cards up from Run.
+- `make test` (649 pytest, 282 Vitest) and `make e2e` (64) green; `lint.mjs --app web/src` 0 FAIL, 0 WARN;
+  `inspect.mjs --app` on the e2e stack 0 FAIL, 1 WARN (the same `tiny-text` as above).

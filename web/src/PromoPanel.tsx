@@ -173,7 +173,7 @@ export function PromoPanel({ promotion, onChange, sports, hours, boardKey, probl
           Promos
         </h2>
         <Segmented<Promotion['kind']>
-          label="Promos"
+          label="Promo kind"
           value={promotion.kind}
           options={[
             { value: 'none', label: 'None' },

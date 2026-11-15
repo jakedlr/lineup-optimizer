@@ -8,7 +8,7 @@ test.beforeEach(async ({ page }) => {
 })
 
 test('a promo leg picked from the board is priced into the report', async ({ page }) => {
-  const promotion = page.getByRole('group', { name: 'Promos' })
+  const promotion = page.getByRole('group', { name: 'Promo kind' })
   await promotion.getByRole('button', { name: 'Promo legs' }).click()
 
   await page.getByLabel('Find a line on the board').fill('embiid')
@@ -24,7 +24,7 @@ test('a promo leg picked from the board is priced into the report', async ({ pag
 })
 
 test('bonus entry runs Power slips only', async ({ page }) => {
-  await page.getByRole('group', { name: 'Promos' }).getByRole('button', { name: 'Bonus entry' }).click()
+  await page.getByRole('group', { name: 'Promo kind' }).getByRole('button', { name: 'Bonus entry' }).click()
   await run(page)
   await expect(page.getByText(/· bonus ·/)).toBeVisible()
   const slips = page.getByRole('region', { name: 'Best Slips' })

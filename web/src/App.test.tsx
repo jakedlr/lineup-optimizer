@@ -612,7 +612,7 @@ describe('Promotions', () => {
     return fetchMock
   }
 
-  const promotion = () => screen.getByRole('group', { name: 'Promos' })
+  const promotion = () => screen.getByRole('group', { name: 'Promo kind' })
 
   async function runBody(fetchMock: ReturnType<typeof stub>) {
     await userEvent.click(screen.getByRole('button', { name: /^run$/i }))
@@ -865,7 +865,7 @@ describe('Review fixes', () => {
   const boardLines = [{ sport: 'NBA', matchup: 'CLE vs PHI', player: 'Joel Embiid', stat_label: 'Pts+Rebs+Asts', line: 35.5 }]
 
   async function addEmbiidPromo() {
-    await userEvent.click(within(screen.getByRole('group', { name: 'Promos' })).getByRole('button', { name: /promo legs/i }))
+    await userEvent.click(within(screen.getByRole('group', { name: 'Promo kind' })).getByRole('button', { name: /promo legs/i }))
     await userEvent.type(await screen.findByLabelText(/find a line/i), 'embiid')
     await userEvent.click(screen.getByRole('button', { name: /joel embiid/i }))
     await userEvent.click(screen.getByRole('button', { name: /add promo leg/i }))

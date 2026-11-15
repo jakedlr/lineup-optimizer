@@ -71,7 +71,9 @@ describe('Phone alerts panel', () => {
     expect(within(panel()).getByRole('button', { name: 'Check' })).toHaveAccessibleDescription('Set a topic to check or test it.')
   })
 
-  it('remembers in this browser whether it was left open', async () => {
+  // Sprint 12 review: it starts folded on every load, even where an older build remembered it open.
+  it('starts folded on every load, even where this browser once left it open', async () => {
+    localStorage.setItem('ppopt.alertsOpen', '1')
     server.state.alerts = { ...server.state.alerts, topic: 'pp-abc', saved: true }
     stub()
     const { unmount } = render(<App />)
@@ -82,19 +84,7 @@ describe('Phone alerts panel', () => {
     unmount()
     render(<App />)
     await waitFor(() => expect(topic()).toHaveValue('pp-abc'))
-    expect(details().open).toBe(true)
-    expect(within(panel()).queryByRole('button', { name: 'Set up' })).not.toBeInTheDocument()
-  })
-
-  it('starts folded when this browser cannot say how it was left', async () => {
-    vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
-      throw new Error('blocked')
-    })
-    stub()
-    render(<App />)
-    await waitFor(() => expect(within(panel()).getByText(/no topic/i)).toBeInTheDocument())
     expect(details().open).toBe(false)
-    vi.restoreAllMocks()
   })
 
   it('is collapsed once a topic is set, naming it', async () => {

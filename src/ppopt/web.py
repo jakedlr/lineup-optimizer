@@ -183,7 +183,7 @@ class RunSettings(BaseModel):
     @model_validator(mode="after")
     def one_promotion(self):
         if sum([self.bonus, self.boost is not None, bool(self.promo_legs)]) > 1:
-            raise ValueError("use only one promotion per run: bonus, boost or promo legs")
+            raise ValueError("use only one promo per run: bonus entry, boost or promo legs")
         return self
 
     def apply(self, args):

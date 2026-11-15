@@ -256,6 +256,12 @@ kbd, code {
 .alerts[data-set-up] > details > summary { padding-right: calc(24px + 4.5rem); }
 .set-up { position: absolute; top: 13px; right: calc(var(--pad) + 24px); }
 .alerts-summary { font-weight: 400; overflow-wrap: anywhere; min-width: 0; }
+/* On a phone, where the line naming where alerts go seldom fits beside the title, it always takes a line of its own,
+   so the card is as tall before the settings arrive as after; Set up then fits beside the title. */
+@media (max-width: 40rem) {
+  .alerts-summary { flex-basis: 100%; }
+  .alerts[data-set-up] > details > summary { padding-right: 24px; }
+}
 .alerts-body { display: grid; gap: var(--gap); margin-top: 12px; }
 .alerts-body > .warn { overflow-wrap: anywhere; }
 .topic { display: flex; flex-wrap: wrap; align-items: end; gap: 8px 12px; }

@@ -98,26 +98,6 @@ function Tier({ name, label, priority, tier, onChange }: { name: TierName; label
   )
 }
 
-const OPEN_KEY = 'ppopt.alertsOpen'
-
-/** Whether this browser left the panel open: folded unless it says so. */
-function loadOpen(): boolean {
-  try {
-    return localStorage.getItem(OPEN_KEY) === '1'
-  } catch {
-    return false
-  }
-}
-
-function saveOpen(open: boolean) {
-  try {
-    if (open) localStorage.setItem(OPEN_KEY, '1')
-    else localStorage.removeItem(OPEN_KEY)
-  } catch {
-    // not remembered; still applied
-  }
-}
-
 /** This browser's time zone, listed first. */
 const here = () => Intl.DateTimeFormat().resolvedOptions().timeZone
 
@@ -162,22 +142,17 @@ function ZoneField({ id, value, onChange }: { id: string; value: string; onChang
 
 /**
  * Where auto runs' alerts go and when they're loud (GLOSSARY: Alert, Alert tier, Qualifying leg). Folded to one line
- * naming where alerts go (with a Set up button while there's no topic), open or folded as this browser last left it.
+ * naming where alerts go (with a Set up button while there's no topic), folded on every load.
  * Changes save themselves, as the run settings do.
  */
 export function AlertsPanel({ alerts }: { alerts: AlertSettings }) {
   const { form, saved, change, flush, unsaved, setToken, clearToken, saveError, loadError } = alerts
-  const [open, setOpenState] = useState(loadOpen)
+  const [open, setOpen] = useState(false)
   const [checked, setChecked] = useState<Said | null>(null)
   const [tested, setTested] = useState<Said | null>(null)
   const [busy, setBusy] = useState<'check' | 'test' | null>(null)
   const [token, setTokenInput] = useState('')
   const id = useId()
-
-  const setOpen = (next: boolean) => {
-    setOpenState(next)
-    saveOpen(next)
-  }
 
   const set = <K extends keyof AlertForm>(key: K, value: AlertForm[K]) => form && change({ ...form, [key]: value })
 
@@ -254,7 +229,8 @@ export function AlertsPanel({ alerts }: { alerts: AlertSettings }) {
           <h2 id={`${id}-h`} className="label">
             Phone alerts
           </h2>
-          {summary && <span className="muted small alerts-summary">{summary}</span>}
+          {/* Held open (a blank line) until the settings arrive, so the card has its height before they do. */}
+          <span className="muted small alerts-summary">{summary ?? '\u00a0'}</span>
         </summary>
         {loadError && <p className="warn small">{loadError}</p>}
         {form && (

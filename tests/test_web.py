@@ -320,6 +320,12 @@ def test_bad_promotions_are_422(tmp_path, body):
     assert ran(tmp_path, body).status_code == 422, body
 
 
+def test_two_promos_at_once_are_422_naming_the_promos(tmp_path):
+    r = ran(tmp_path, {"bonus": True, "boost": 1.4})
+    assert r.status_code == 422
+    assert "use only one promo per run: bonus entry, boost or promo legs" in str(r.json()["detail"])
+
+
 def test_board_lines_list_priceable_lines_in_the_window(tmp_path):
     client = engine_app(tmp_path)
     assert client.get("/api/board/lines").status_code == 409

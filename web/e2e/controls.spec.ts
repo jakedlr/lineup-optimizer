@@ -136,6 +136,36 @@ test("nothing below the settings moves when they land: the cards hold their plac
   expect(Math.abs(after.y - before.y)).toBeLessThan(24)
 })
 
+// Sprint 12 review: Phone alerts sits above Run, folded; its one line names where alerts go only once the settings
+// arrive, so that line must already take its full height while they're on their way. On a phone Run rides in the
+// sticky bar at the foot, so Fresh odds, in the Run row's notes right under the card, is what would move.
+for (const width of [1440, 700, 390]) {
+  test(`nothing under Phone alerts moves when the alert settings land late, folded, at ${width} wide`, async ({ page, request }) => {
+    for (const topic of ['', 'pp-abcdefghijkl']) {
+      await request.patch('/api/alerts', { data: { topic } })
+      await page.setViewportSize({ width, height: 900 })
+      let answer!: () => void
+      const waiting = new Promise<void>((r) => (answer = r))
+      await page.unrouteAll()
+      await page.route('**/api/alerts', async (route) => {
+        if (route.request().method() === 'GET') await waiting
+        await route.continue()
+      })
+      await page.goto('/')
+      await expect(page.getByRole('region', { name: 'Run settings' })).not.toHaveAttribute('aria-busy')
+      const alerts = page.getByRole('region', { name: 'Phone alerts' })
+      await expect(alerts.getByText(/ on |No topic/)).toHaveCount(0) // still on their way
+      const fresh = page.locator('label.fresh')
+      const before = [(await runButton(page).boundingBox())!, (await fresh.boundingBox())!]
+      answer()
+      await expect(alerts.getByText(topic ? `${topic} on ntfy` : /^No topic/)).toBeVisible()
+      await expect(alerts.locator('details').first()).not.toHaveAttribute('open')
+      const after = [(await runButton(page).boundingBox())!, (await fresh.boundingBox())!]
+      for (const i of [0, 1]) expect(Math.abs(after[i].y - before[i].y), `${topic || 'no topic'}: ${i ? 'Fresh odds' : 'Run'}`).toBeLessThan(1)
+    }
+  })
+}
+
 test("forcing a theme paints the status bar its ground, and swaps colours without fading through the old", async ({ page }) => {
   await opened(page)
   const metas = () => page.locator('meta[name="theme-color"]').evaluateAll((ms) => ms.map((m) => (m as HTMLMetaElement).content))

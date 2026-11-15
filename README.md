@@ -89,7 +89,7 @@ Under −113), and those prices reveal how likely each outcome is. This tool use
    lineup for every size, using **at most one pick per game** so that picks don't influence
    each other.
 
-Promotions are supported too: free/bonus entries, payout boosts, and discounted "promo" lines
+Promos are supported too: free/bonus entries, payout boosts, and discounted "promo" lines
 such as tacos.
 
 ## Getting the PrizePicks board
